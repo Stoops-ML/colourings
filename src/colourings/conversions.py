@@ -1,5 +1,5 @@
 import re
-from collections.abc import Iterable
+from collections.abc import Sequence
 
 from .definitions import (
     COLOR_NAME_TO_RGB,
@@ -21,15 +21,15 @@ from .identify import (
 # add HSV, CMYK, YUV conversion
 
 
-def rgb2rgba(rgb: Iterable[int | float], alpha: int | float) -> tuple[float]:
+def rgb2rgba(rgb: Sequence[int | float], alpha: int | float) -> tuple[float]:
     return rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha
 
 
-def hsl2hsla(hsl: Iterable[int | float], alpha: int | float) -> tuple[float]:
+def hsl2hsla(hsl: Sequence[int | float], alpha: int | float) -> tuple[float]:
     return hsl[0] / 360.0, hsl[1], hsl[2], alpha
 
 
-def hsl2rgb(hsl: Iterable[int | float]) -> tuple[float]:
+def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float]:
     """Convert HSL representation towards RGB
 
     :param h: Hue, position around the chromatic circle (h=1 equiv h=0)
@@ -50,38 +50,38 @@ def hsl2rgb(hsl: Iterable[int | float]) -> tuple[float]:
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSL type.")
 
-    h, s, l = [float(v) for v in hsl]  # noqa: E741
-    h /= 360.0
+    _h, _s, _l = [float(v) for v in hsl]
+    _h /= 360.0
 
-    if s == 0:
-        return l * 255.0, l * 255.0, l * 255.0
+    if _s == 0:
+        return _l * 255.0, _l * 255.0, _l * 255.0
 
-    v2 = l * (1.0 + s) if l < 0.5 else (l + s) - (s * l)
+    v2 = _l * (1.0 + _s) if _l < 0.5 else (_l + _s) - (_s * _l)
 
-    v1 = 2.0 * l - v2
+    v1 = 2.0 * _l - v2
 
-    r = _hue2rgb(v1, v2, h + (1.0 / 3))
-    g = _hue2rgb(v1, v2, h)
-    b = _hue2rgb(v1, v2, h - (1.0 / 3))
+    r = _hue2rgb(v1, v2, _h + (1.0 / 3))
+    g = _hue2rgb(v1, v2, _h)
+    b = _hue2rgb(v1, v2, _h - (1.0 / 3))
 
     return r * 255.0, g * 255.0, b * 255.0
 
 
-def rgba2hsl(rgba: Iterable[int | float]) -> tuple[float]:
+def rgba2hsl(rgba: Sequence[int | float]) -> tuple[float]:
     if not is_rgba(rgba):
         raise ValueError("Input is not an RGBA type.")
     rgb = [v * 255.0 for v in rgba[:3]]
     return rgb2hsl(rgb)
 
 
-def hsla2hsl(hsla: Iterable[int | float]) -> tuple[float]:
+def hsla2hsl(hsla: Sequence[int | float]) -> tuple[float]:
     if not is_hsla(hsla):
         raise ValueError("Input is not an HSLA type.")
     hsl = (hsla[0] * 360, hsla[1], hsla[2])
     return hsl
 
 
-def rgb2hsl(rgb: Iterable[int | float]) -> tuple[float]:
+def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float]:
     """Convert RGB representation towards HSL
 
     :param r: Red amount (float between 0 and 255)
@@ -155,7 +155,7 @@ def _hue2rgb(v1, v2, vH):
     return v1
 
 
-def rgb2hex(rgb: Iterable[int | float], force_long: bool = False) -> str:
+def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
     """Transform RGB tuple to hex RGB representation
 
     :param rgb: RGB 3-uple of float between 0 and 1
@@ -250,7 +250,7 @@ def web2hex(web: str, force_long=False) -> str:
     )  # convert dec to hex
 
 
-def hsl2hex(hsl: Iterable[int | float]) -> str:
+def hsl2hex(hsl: Sequence[int | float]) -> str:
     if not is_hsl(hsl):
         raise ValueError("Input is not of hsl type.")
     return rgb2hex(hsl2rgb(hsl))
@@ -262,7 +262,7 @@ def hex2hsl(hex: str) -> str:
     return rgb2hsl(hex2rgb(hex))
 
 
-def rgb2web(rgb: Iterable[int | float]) -> tuple[float]:
+def rgb2web(rgb: Sequence[int | float]) -> tuple[float]:
     if not is_rgb(rgb):
         raise ValueError("Input is not an RGB type.")
     return hex2web(rgb2hex(rgb))
@@ -280,7 +280,7 @@ def web2hsl(web: str) -> tuple[float]:
     return rgb2hsl(web2rgb(web))
 
 
-def hsl2web(hsl: Iterable[int | float]) -> str:
+def hsl2web(hsl: Sequence[int | float]) -> str:
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSL type.")
     return rgb2web(hsl2rgb(hsl))

@@ -4,7 +4,7 @@ import hashlib
 import math
 import tkinter
 import warnings
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from .conversions import (
@@ -133,7 +133,7 @@ def HSL_equivalence(c1: Color, c2: Color) -> bool:
 
 
 def identify_color(
-    color: str | Iterable[int | float] | Color | Colour,
+    color: str | Sequence[int | float] | Color | Colour,
 ) -> Callable[[Any], Any]:
     if isinstance(color, Color | Colour):
         return lambda x: x.hsl
@@ -146,17 +146,17 @@ def identify_color(
         return hex2hsl
     elif isinstance(color, str) and is_web(color):
         return web2hsl
-    elif isinstance(color, Iterable) and is_rgb(color) and is_hsl(color):
+    elif isinstance(color, Sequence) and is_rgb(color) and is_hsl(color):
         raise TypeError("Cannot discern whether color is RGB or HSL")
-    elif isinstance(color, Iterable) and is_rgb(color):
+    elif isinstance(color, Sequence) and is_rgb(color):
         return rgb2hsl
-    elif isinstance(color, Iterable) and is_hsl(color):
+    elif isinstance(color, Sequence) and is_hsl(color):
         return lambda x: x
-    elif isinstance(color, Iterable) and is_rgba(color) and is_hsla(color):
+    elif isinstance(color, Sequence) and is_rgba(color) and is_hsla(color):
         raise TypeError("Cannot discern whether color is RGBA or HSLA")
-    # elif isinstance(color, Iterable) and is_rgba(color): NOTE: unreachable
+    # elif isinstance(color, Sequence) and is_rgba(color): NOTE: unreachable
     #     return rgba2hsl
-    # elif isinstance(color, Iterable) and is_hsla(color): NOTE: unreachable
+    # elif isinstance(color, Sequence) and is_hsla(color): NOTE: unreachable
     #     return hsla2hsl
     else:
         raise TypeError("Cannot identify color.")
@@ -173,15 +173,15 @@ class Color:
 
     def __init__(  # noqa: C901
         self,
-        color: str | Iterable[int | float] | None = None,
+        color: str | Sequence[int | float] | None = None,
         *,
         web: str | None = None,
-        hsl: Iterable[int | float] | None = None,
-        hsla: Iterable[int | float] | None = None,
+        hsl: Sequence[int | float] | None = None,
+        hsla: Sequence[int | float] | None = None,
         hex: str | None = None,
         hex_l: str | None = None,
-        rgb: Iterable[int | float] | None = None,
-        rgba: Iterable[int | float] | None = None,
+        rgb: Sequence[int | float] | None = None,
+        rgba: Sequence[int | float] | None = None,
         alpha: float | None = None,
         pick_for: Any = None,
         picker: Callable[[Any], Color] = RGB_color_picker,
