@@ -12,7 +12,48 @@ from colourings.colour import (
     identify_color,
     make_color_factory,
 )
-from colourings.conversions import hsl2rgb, rgb2hex
+
+
+def test_bad_color_scale():
+    with pytest.raises(ValueError):
+        color_scale((Color("white"),), 2)
+
+
+def test_color_scale_with_exact_inputs():
+    assert color_scale((Color("white"), Color("black")), 2) == [
+        Color("white"),
+        Color("black"),
+    ]
+    assert color_scale((Color("blue"), Color("black")), 2) == [
+        Color("blue"),
+        Color("black"),
+    ]
+    assert color_scale((Color("blue"), Color("black"), Color("blue")), 3) == [
+        Color("blue"),
+        Color("black"),
+        Color("blue"),
+    ]
+    assert color_scale(
+        (Color("blue"), Color("black"), Color("blue"), Color("orange")), 4
+    ) == [
+        Color("blue"),
+        Color("black"),
+        Color("blue"),
+        Color("orange"),
+    ]
+    assert color_scale(
+        (Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")),
+        5,
+    ) == [Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")]
+
+
+def test_color_scale_with_fewer_inputs():
+    assert color_scale((Color("white"), Color("black")), 1) == [Color("white")]
+    assert color_scale((Color("blue"), Color("black")), 1) == [Color("blue")]
+    assert color_scale((Color("blue"), Color("black"), Color("blue")), 2) == [
+        Color("blue"),
+        Color("black"),
+    ]
 
 
 def test_bad_alpha():
@@ -43,65 +84,63 @@ def test_HEX():
         HEX.DONOTEXISTS  # noqa: B018
 
 
-def test_color_scale():
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale((0, 1, 0.5), (360, 1, 0.5), 3, longer=True)
-    ] == ["#f00", "#0f0", "#00f", "#f00"]
+def test_color_scale_hsl():
+    assert color_scale(
+        (Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), 4, longer=True
+    ) == [Color("#f00"), Color("#0f0"), Color("#00f"), Color("#f00")]
 
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale((360, 1, 0.5), (0, 1, 0.5), 3, longer=True)
-    ] == ["#f00", "#00f", "#0f0", "#f00"]
+    assert color_scale(
+        (Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), 4, longer=True
+    ) == [Color("#f00"), Color("#00f"), Color("#0f0"), Color("#f00")]
 
-    assert [
-        rgb2hex(hsl2rgb(hsl)) for hsl in color_scale((0, 1, 0.5), (360, 1, 0.5), 3)
-    ] == ["#f00", "#f00", "#f00", "#f00"]
-
-    assert [
-        rgb2hex(hsl2rgb(hsl)) for hsl in color_scale((360, 1, 0.5), (0, 1, 0.5), 3)
-    ] == ["#f00", "#f00", "#f00", "#f00"]
-
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale((360.0 / 3, 1, 0.5), (2 * 360.0 / 3, 1, 0.5), 3)
-    ] == ["#0f0", "#0fa", "#0af", "#00f"]
-
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale(
-            (360.0 / 3, 1, 0.5), (2 * 360.0 / 3, 1, 0.5), 3, longer=True
-        )
-    ] == ["#0f0", "#fa0", "#f0a", "#00f"]
-
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale(
-            (2 * 360.0 / 3, 1, 0.5), (360.0 / 3, 1, 0.5), 3, longer=True
-        )
-    ] == ["#00f", "#f0a", "#fa0", "#0f0"]
-
-    assert [rgb2hex(hsl2rgb(hsl)) for hsl in color_scale((0, 0, 0), (0, 0, 1), 15)] == [
-        "#000",
-        "#111",
-        "#222",
-        "#333",
-        "#444",
-        "#555",
-        "#666",
-        "#777",
-        "#888",
-        "#999",
-        "#aaa",
-        "#bbb",
-        "#ccc",
-        "#ddd",
-        "#eee",
-        "#fff",
+    assert color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), 4) == [
+        Color("#f00"),
+        Color("#f00"),
+        Color("#f00"),
+        Color("#f00"),
     ]
 
-    with pytest.raises(ValueError):
-        color_scale((0, 1, 0.5), (360, 1, 0.5), -2)
+    assert color_scale((Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), 4) == [
+        Color("#f00"),
+        Color("#f00"),
+        Color("#f00"),
+        Color("#f00"),
+    ]
+
+    assert color_scale(
+        (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))), 4
+    ) == [Color("#0f0"), Color("#0fa"), Color("#0af"), Color("#00f")]
+
+    assert color_scale(
+        (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))),
+        4,
+        longer=True,
+    ) == [Color("#0f0"), Color("#fa0"), Color("#f0a"), Color("#00f")]
+
+    assert color_scale(
+        (Color(hsl=(2 * 360.0 / 3, 1, 0.5)), Color(hsl=(360.0 / 3, 1, 0.5))),
+        4,
+        longer=True,
+    ) == [Color("#00f"), Color("#f0a"), Color("#fa0"), Color("#0f0")]
+
+    assert color_scale((Color(hsl=(0, 0, 0)), Color(hsl=(0, 0, 1))), 16) == [
+        Color("#000"),
+        Color("#111"),
+        Color("#222"),
+        Color("#333"),
+        Color("#444"),
+        Color("#555"),
+        Color("#666"),
+        Color("#777"),
+        Color("#888"),
+        Color("#999"),
+        Color("#aaa"),
+        Color("#bbb"),
+        Color("#ccc"),
+        Color("#ddd"),
+        Color("#eee"),
+        Color("#fff"),
+    ]
 
 
 def test_RGB_color_picker():

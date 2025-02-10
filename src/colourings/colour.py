@@ -21,7 +21,7 @@ from .conversions import (
     web2hex,
     web2hsl,
 )
-from .definitions import COLOR_NAME_TO_RGB
+from .definitions import COLOR_NAME_TO_RGB, linspace
 from .identify import (
     is_hsl,
     is_hsla,
@@ -62,28 +62,67 @@ RGB = C_RGB()
 HEX = C_HEX()
 
 
-def color_scale(begin_hsl, end_hsl, nb, longer=False):
-    """Returns a list of nb color HSL tuples between begin_hsl and end_hsl"""
-    if nb < 0:
-        raise ValueError("Number of colours must be greater than or equal to 0")
+def color_scale(
+    colors: Sequence[Color | Colour], num_steps: int, longer: bool = False
+) -> list[Color]:
+    """Create a color scale using many colours via linear interpolation of hsl.
 
-    h1, s1, l1 = begin_hsl
-    h2, s2, l2 = end_hsl
-    h1 /= 360.0
-    h2 /= 360.0
-    if longer == (abs(h1 - h2) < 0.5):
-        if h1 < h2:
-            h1 += 1
-        else:
-            h2 += 1
-    return [
-        (
-            (h1 * 360.0 * (1 - v) + h2 * 360.0 * v) % 360.0,
-            s1 * (1 - v) + s2 * v,
-            l1 * (1 - v) + l2 * v,
+    TODO: implement better interpolation technique: https://www.alanzucconi.com/2016/01/06/colour-interpolation/
+
+    Parameters
+    ----------
+    colors : Sequence[Color  |  Colour]
+        Sequence of Color objects
+    nb : int
+        Total number of steps
+    longer : bool, optional
+        Long or short path, by default False
+
+    Yields
+    ------
+    list[Color]
+        List of Color objects
+
+    Raises
+    ------
+    ValueError
+        Number of colors specified must be at least two
+    """
+    # checks
+    if len(colors) < 2:
+        raise ValueError("At least two colours are required to make a scale.")
+
+    # linearly interpolate between colours
+    num_sections = len(colors) - 1
+    num_steps_per_colour = int(math.floor(num_steps / num_sections))
+    remainder = (num_steps / num_sections) % 1
+    out = []
+    added = 0
+    for i in range(num_sections):
+        i_start = num_steps_per_colour * i + added
+        i_end = num_steps_per_colour * (i + 1) + added
+        if round(remainder * (i + 1), 7) >= 1:
+            i_end += 1
+            added += 1
+        if i_end > num_steps:
+            i_end = num_steps
+
+        h1, s1, l1 = colors[i].hsl
+        h2, s2, l2 = colors[i + 1].hsl
+        h1 /= 360.0
+        h2 /= 360.0
+        if longer == (abs(h1 - h2) < 0.5):
+            if h1 < h2:
+                h1 += 1
+            else:
+                h2 += 1
+        hs = [(v * 360) % 360 for v in linspace(h1, h2, i_end - i_start)]
+        ss = linspace(s1, s2, i_end - i_start)
+        ls = linspace(l1, l2, i_end - i_start)
+        out.extend(
+            [Color(hsl=(_h, _s, _l)) for _h, _s, _l in zip(hs, ss, ls, strict=False)]
         )
-        for v in (float(step) / (nb) for step in range(nb + 1))
-    ]
+    return out
 
 
 def hash_or_str(obj) -> str:
@@ -354,8 +393,7 @@ class Color:
 
     def range_to(self, value, steps, longer=False):
         """range of color generation"""
-        for hsl in color_scale(self._hsl, Color(value).hsl, steps - 1, longer=longer):
-            yield Color(hsl=hsl)
+        yield from color_scale((self, Color(value)), steps, longer=longer)
 
     def preview(self, size_x=200, size_y=200):
         if not isinstance(size_x, int | float):

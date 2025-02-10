@@ -157,3 +157,33 @@ COLOR_NAME_TO_RGB = {
 
 LONG_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 SHORT_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{3}$")
+
+
+def linspace(start: int, stop: int, num: int, endpoint: bool = True) -> list[float]:
+    """Python implementation of numpy.linspace
+
+    Parameters
+    ----------
+    start : int
+        Start number
+    stop : int
+        End number
+    num : int
+        Number of steps
+    endpoint : bool, optional
+        Includes end number if true else doesn't, by default True
+
+    Returns
+    -------
+    list[int]
+        Linearly spaced numbers between start and end
+    """
+    if num <= 0:
+        return []
+    if num == 1:
+        return [start]
+
+    step = (stop - start) / (num - 1) if endpoint else (stop - start) / num
+
+    result = [float(start + step * i) for i in range(num)]
+    return result
