@@ -2,7 +2,6 @@
 [![PyPI - Version](https://img.shields.io/pypi/v/colourings)](https://pypi.org/project/colourings/)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/colourings)
 [![codecov](https://codecov.io/github/Stoops-ML/colourings/graph/badge.svg?token=NQUPC3NY6S)](https://codecov.io/github/Stoops-ML/colourings)
-![PyPI - License](https://img.shields.io/pypi/l/colourings)
 
 Converts and manipulates common color representation (RGB, HSL, web, ...)
 
