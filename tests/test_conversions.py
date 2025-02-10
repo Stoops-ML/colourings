@@ -1,15 +1,17 @@
 import pytest
 
-from colouring.conversions import (
+from colourings.conversions import (
     hex2hsl,
     hex2rgb,
     hex2web,
     hsl2hex,
     hsl2rgb,
-    hsl2web,rgba2hsl, hsla2hsl,
+    hsl2web,
+    hsla2hsl,
     rgb2hex,
     rgb2hsl,
     rgb2web,
+    rgba2hsl,
     web2hex,
     web2hsl,
     web2rgb,
@@ -63,24 +65,26 @@ def test_bad_rgba2hsl():
     with pytest.raises(ValueError):
         rgba2hsl("a")
     with pytest.raises(ValueError):
-        rgba2hsl((2,0,0,0))
+        rgba2hsl((2, 0, 0, 0))
     with pytest.raises(ValueError):
-        rgba2hsl((0,2,0,0))
+        rgba2hsl((0, 2, 0, 0))
     with pytest.raises(ValueError):
-        rgba2hsl((0,0,2,0))
+        rgba2hsl((0, 0, 2, 0))
     with pytest.raises(ValueError):
-        rgba2hsl((0,0,0,2))
+        rgba2hsl((0, 0, 0, 2))
+
+
 def test_bad_hsla2hsl():
     with pytest.raises(ValueError):
         hsla2hsl("a")
     with pytest.raises(ValueError):
-        hsla2hsl((2,0,0,0))
+        hsla2hsl((2, 0, 0, 0))
     with pytest.raises(ValueError):
-        hsla2hsl((0,2,0,0))
+        hsla2hsl((0, 2, 0, 0))
     with pytest.raises(ValueError):
-        hsla2hsl((0,0,2,0))
+        hsla2hsl((0, 0, 2, 0))
     with pytest.raises(ValueError):
-        hsla2hsl((0,0,0,2))
+        hsla2hsl((0, 0, 0, 2))
 
 
 def test_bad_hex2web():

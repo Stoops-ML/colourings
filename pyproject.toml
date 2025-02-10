@@ -21,8 +21,8 @@ legacy_tox_ini = """
     [gh-actions]
     python =
         3.10: py310
-        3.11: py311, quality, test
-        3.12: py312
+        3.11: py311
+        3.12: py312, quality, test
         3.13: py313
 
     [testenv]
@@ -42,7 +42,7 @@ legacy_tox_ini = """
     description = measures code coverage
     usedevelop = True
     commands =
-        pytest --cov colouring {posargs:--cov-report=term-missing}
+        pytest --cov colourings {posargs:--cov-report=term-missing}
 
     [testenv:quality]
     description = checks code quality
@@ -61,7 +61,7 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "colouring"
+name = "colourings"
 authors = [
     {name = "Daniel Stoops", email = "danielstoops25@gmail.com"},
 ]
@@ -86,16 +86,17 @@ dynamic = ["version"]
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
     "ruff>=0.9.4",
     "tox>=4.24.1",
 ]
 
 [project.urls]
-Repository = "https://github.com/Stoops-ML/colouring"
-# Documentation = "https://colouring.readthedocs.io/en"
+Repository = "https://github.com/Stoops-ML/colourings"
+# Documentation = "https://colourings.readthedocs.io/en"
 
 [tool.setuptools.dynamic]
-version = {attr = "colouring.__version__"}
+version = {attr = "colourings.__version__"}
 
 [tool.mypy]
 files = [
@@ -119,7 +120,7 @@ no_implicit_reexport = true
 
 # More strict checks for library code
 [[tool.mypy.overrides]]
-module = "colouring"
+module = "colourings"
 disallow_untyped_defs = true
 
 # Ignore certain missing imports

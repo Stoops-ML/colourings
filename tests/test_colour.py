@@ -1,6 +1,6 @@
 import pytest
 
-from colouring.colour import (
+from colourings.colour import (
     HEX,
     HSL,
     RGB,
@@ -12,13 +12,15 @@ from colouring.colour import (
     identify_color,
     make_color_factory,
 )
-from colouring.conversions import hsl2rgb, rgb2hex
+from colourings.conversions import hsl2rgb, rgb2hex
+
 
 def test_bad_alpha():
     with pytest.raises(ValueError):
-        Color(rgba=(1,1,1,1), alpha=0)
+        Color(rgba=(1, 1, 1, 1), alpha=0)
     with pytest.raises(ValueError):
-        Color(hsla=(1,1,1,1), alpha=0)
+        Color(hsla=(1, 1, 1, 1), alpha=0)
+
 
 def test_bad_identify_color():
     with pytest.raises(TypeError):
@@ -142,7 +144,7 @@ def test_purple_inputs():
         Color("purple")
         == Color("#800080")
         == Color(hsl=(300, 1, 0.25098039215686274))
-        == Color(hsla=(300/360, 1, 0.25098039215686274, 1.0))
+        == Color(hsla=(300 / 360, 1, 0.25098039215686274, 1.0))
         == Color((300, 1, 0.25098039215686274))
         == Color(Color("purple"))
     )
@@ -168,7 +170,7 @@ def test_blue_inputs():
         == Color("#00f")
         == Color("#0000ff")
         == Color(hsl=(240, 1, 0.5))
-        == Color(hsla=(240/360, 1, 0.5, 1.0))
+        == Color(hsla=(240 / 360, 1, 0.5, 1.0))
         == Color(rgb=(0, 0, 255))
         == Color(rgba=(0, 0, 1, 1))
         == Color((0, 0, 255))

@@ -171,7 +171,7 @@ class Color:
 
     _hsl = None  # internal representation
 
-    def __init__(
+    def __init__(  # noqa: C901
         self,
         color: str | Iterable[int | float] | None = None,
         *,
