@@ -102,17 +102,17 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float]:
 
     vsum = vmin + vmax
 
-    l = vsum / 2  # noqa: E741
+    _l = vsum / 2
 
     if diff < FLOAT_ERROR:  ## This is a gray, no chroma...
-        return (0.0, 0.0, l)
+        return (0.0, 0.0, _l)
 
     ##
     ## Chromatic data...
     ##
 
     ## Saturation
-    s = diff / vsum if l < 0.5 else diff / (2.0 - vsum)
+    s = diff / vsum if _l < 0.5 else diff / (2.0 - vsum)
 
     dr = (((vmax - r) / 6) + (diff / 2)) / diff
     dg = (((vmax - g) / 6) + (diff / 2)) / diff
@@ -130,7 +130,7 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float]:
     if h > 1:
         h -= 1
 
-    return h * 360.0, s, l
+    return h * 360.0, s, _l
 
 
 def _hue2rgb(v1, v2, vH):
