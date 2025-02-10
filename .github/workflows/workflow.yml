@@ -35,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install .[dev]
       - name: Generate coverage report
-        run: python -m pytest --cov colouring
+        run: python -m pytest --cov colourings
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@main
         with:

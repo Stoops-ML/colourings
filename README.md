@@ -1,4 +1,4 @@
-# Colouring
+# colourings
 
 Converts and manipulates common color representation (RGB, HSL, web, ...)
 
@@ -27,7 +27,7 @@ Below is a modified copy of the readme from [Colour](https://github.com/vaab/col
 ## Installation
 
 ```
-pip install colouring
+pip install colourings
 ```
 
 ## Usage
@@ -41,7 +41,7 @@ Here is a reduced sample of a common usage scenario:
 Let's create blue color:
 
 ```
->>> from colouring import Color
+>>> from colourings import Color
 >>> c = Color("blue")
 >>> c
 <Color blue>
@@ -194,7 +194,7 @@ True
 But, this is not the sole way to compare two colors. As I'm quite lazy, I'm providing you a way to customize it to your needs. Thus:
 
 ```
->>> from colouring import RGB_equivalence, HSL_equivalence
+>>> from colourings import RGB_equivalence, HSL_equivalence
 >>> black_red = Color("red", lightness=0, equality=HSL_equivalence)
 >>> black_blue = Color("blue", lightness=0, equality=HSL_equivalence)
 
@@ -357,7 +357,7 @@ As you might have noticed, there are few attributes that you might want to see a
 You can create a customized Color factory thanks to the make_color_factory:
 
 ```
->>> from colouring import make_color_factory, HSL_equivalence, RGB_color_picker
+>>> from colourings import make_color_factory, HSL_equivalence, RGB_color_picker
 
 >>> get_color = make_color_factory(
 ...    equality=HSL_equivalence,

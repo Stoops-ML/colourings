@@ -1,6 +1,6 @@
 import pytest
 
-from colouring.colour import (
+from colourings.colour import (
     HEX,
     HSL,
     RGB,
@@ -12,7 +12,7 @@ from colouring.colour import (
     identify_color,
     make_color_factory,
 )
-from colouring.conversions import hsl2rgb, rgb2hex
+from colourings.conversions import hsl2rgb, rgb2hex
 
 def test_bad_alpha():
     with pytest.raises(ValueError):

@@ -1,4 +1,4 @@
-from colouring.identify import is_hsl, is_rgb
+from colourings.identify import is_hsl, is_rgb
 
 
 def test_bad_rbg():

@@ -1,6 +1,6 @@
 import pytest
 
-from colouring.conversions import (
+from colourings.conversions import (
     hex2hsl,
     hex2rgb,
     hex2web,
