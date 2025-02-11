@@ -88,12 +88,39 @@ def test_colour_scale_with_exact_inputs():
 
 
 def test_colour_scale_with_fewer_inputs():
-    assert colour_scale((Color("white"), Color("black")), 1) == [Color("white")]
-    assert colour_scale((Color("blue"), Color("black")), 1) == [Color("blue")]
-    assert colour_scale((Color("blue"), Color("black"), Color("blue")), 2) == [
-        Color("blue"),
-        Color("black"),
-    ]
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        colour_scale((Color("white"), Color("black")), 1)
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        colour_scale((Color("blue"), Color("black")), 1)
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        colour_scale((Color("blue"), Color("black"), Color("blue")), 2)
+
+
+def test_color_scale_with_fewer_inputs():
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        color_scale((Color("white"), Color("black")), 1)
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        color_scale((Color("blue"), Color("black")), 1)
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        color_scale((Color("blue"), Color("black"), Color("blue")), 2)
 
 
 def test_bad_color_scale():
@@ -129,15 +156,6 @@ def test_color_scale_with_exact_inputs():
     ) == [Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")]
 
 
-def test_color_scale_with_fewer_inputs():
-    assert color_scale((Color("white"), Color("black")), 1) == [Color("white")]
-    assert color_scale((Color("blue"), Color("black")), 1) == [Color("blue")]
-    assert color_scale((Color("blue"), Color("black"), Color("blue")), 2) == [
-        Color("blue"),
-        Color("black"),
-    ]
-
-
 def test_bad_alpha():
     with pytest.raises(ValueError):
         Color(rgba=(1, 1, 1, 1), alpha=0)
@@ -166,46 +184,84 @@ def test_HEX():
         HEX.DONOTEXISTS  # noqa: B018
 
 
-def test_color_scale_hsl():
-    assert color_scale(
-        (Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), 4, longer=True
-    ) == [Color("#f00"), Color("#0f0"), Color("#00f"), Color("#f00")]
+def test_color_scale_num_sections():
+    n = 10
+    cs = color_scale(
+        (Color("black"), Color("orange"), Color("blue"), Color("white")), n
+    )
+    assert cs == [
+        Color("black"),
+        Color("#39221c"),
+        Color("#8e4d1c"),
+        Color("orange"),
+        Color("#ff003c"),
+        Color("#e100ff"),
+        Color("blue"),
+        Color("#bd71e3"),
+        Color("#e3c6d9"),
+        Color("white"),
+    ]
+    assert len(cs) == n
 
-    assert color_scale(
-        (Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), 4, longer=True
-    ) == [Color("#f00"), Color("#00f"), Color("#0f0"), Color("#f00")]
+    n = 4
+    cs = color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), n, longer=True)
+    assert cs == [Color("#f00"), Color("#0f0"), Color("#00f"), Color("#f00")]
+    assert len(cs) == n
 
-    assert color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), 4) == [
+    n = 4
+    cs = color_scale((Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), n, longer=True)
+    assert len(cs) == n
+    assert cs == [Color("#f00"), Color("#00f"), Color("#0f0"), Color("#f00")]
+
+    n = 4
+    cs = color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), n)
+    assert len(cs) == n
+    assert cs == [
         Color("#f00"),
         Color("#f00"),
         Color("#f00"),
         Color("#f00"),
     ]
 
-    assert color_scale((Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), 4) == [
+    n = 4
+    cs = color_scale((Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), n)
+    assert len(cs) == n
+    assert cs == [
         Color("#f00"),
         Color("#f00"),
         Color("#f00"),
         Color("#f00"),
     ]
 
-    assert color_scale(
-        (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))), 4
-    ) == [Color("#0f0"), Color("#0fa"), Color("#0af"), Color("#00f")]
+    n = 4
+    cs = color_scale(
+        (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))), n
+    )
+    assert len(cs) == n
+    assert cs == [Color("#0f0"), Color("#0fa"), Color("#0af"), Color("#00f")]
 
-    assert color_scale(
+    n = 4
+    cs = color_scale(
         (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))),
-        4,
+        n,
         longer=True,
-    ) == [Color("#0f0"), Color("#fa0"), Color("#f0a"), Color("#00f")]
+    )
+    assert len(cs) == n
+    assert cs == [Color("#0f0"), Color("#fa0"), Color("#f0a"), Color("#00f")]
 
-    assert color_scale(
+    n = 4
+    cs = color_scale(
         (Color(hsl=(2 * 360.0 / 3, 1, 0.5)), Color(hsl=(360.0 / 3, 1, 0.5))),
-        4,
+        n,
         longer=True,
-    ) == [Color("#00f"), Color("#f0a"), Color("#fa0"), Color("#0f0")]
+    )
+    assert len(cs) == n
+    assert cs == [Color("#00f"), Color("#f0a"), Color("#fa0"), Color("#0f0")]
 
-    assert color_scale((Color(hsl=(0, 0, 0)), Color(hsl=(0, 0, 1))), 16) == [
+    n = 16
+    cs = color_scale((Color(hsl=(0, 0, 0)), Color(hsl=(0, 0, 1))), n)
+    assert len(cs) == n
+    assert cs == [
         Color("#000"),
         Color("#111"),
         Color("#222"),

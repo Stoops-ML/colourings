@@ -91,22 +91,19 @@ def color_scale(
     # checks
     if len(colors) < 2:
         raise ValueError("At least two colours are required to make a scale.")
+    if len(colors) > num_steps:
+        raise ValueError(
+            "Number of steps must be greater than or equal to the number of colors."
+        )
 
     # linearly interpolate between colours
     num_sections = len(colors) - 1
-    num_steps_per_colour = int(math.floor(num_steps / num_sections))
-    remainder = (num_steps / num_sections) % 1
+    num_steps_per_iter = math.floor((num_steps - len(colors)) / num_sections)
+    remainder = ((num_steps - len(colors)) / num_sections) % 1
     out = []
     added = 0
     for i in range(num_sections):
-        i_start = num_steps_per_colour * i + added
-        i_end = num_steps_per_colour * (i + 1) + added
-        if round(remainder * (i + 1), 7) >= 1:
-            i_end += 1
-            added += 1
-        if i_end > num_steps:
-            i_end = num_steps
-
+        # colour definitions
         h1, s1, l1 = colors[i].hsl
         h2, s2, l2 = colors[i + 1].hsl
         h1 /= 360.0
@@ -116,12 +113,24 @@ def color_scale(
                 h1 += 1
             else:
                 h2 += 1
-        hs = [(v * 360) % 360 for v in linspace(h1, h2, i_end - i_start)]
-        ss = linspace(s1, s2, i_end - i_start)
-        ls = linspace(l1, l2, i_end - i_start)
-        out.extend(
-            [Color(hsl=(_h, _s, _l)) for _h, _s, _l in zip(hs, ss, ls, strict=False)]
-        )
+
+        # number of colours
+        num_colors = num_steps_per_iter + 2  # add 2 for stand and end colours
+        if round(remainder * (i + 1) - added, 7) >= 1:
+            num_colors += 1
+            added += 1
+
+        # interpolate
+        hs = [(v * 360) % 360 for v in linspace(h1, h2, num_colors)]
+        ss = linspace(s1, s2, num_colors)
+        ls = linspace(l1, l2, num_colors)
+        add = [Color(hsl=(_h, _s, _l)) for _h, _s, _l in zip(hs, ss, ls, strict=False)]
+
+        # add to output
+        if i == 0:
+            out.extend(add)
+        else:
+            out.extend(add[1:])
     return out
 
 
