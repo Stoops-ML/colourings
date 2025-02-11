@@ -363,18 +363,26 @@ class Color:
         return hex2web(self.hex)
 
     def set_hsl(self, value) -> None:
+        if not is_hsl(value):
+            raise TypeError("Value is not a valid HSL")
         self._hsl = list(value)
 
     def set_rgb(self, value) -> None:
         self.hsl = rgb2hsl(value)
 
     def set_hue(self, value) -> None:
+        if not 0 <= value <= 360:
+            raise ValueError("Hue must be between 0 and 360.")
         self._hsl[0] = value
 
     def set_saturation(self, value) -> None:
+        if not 0 <= value <= 1:
+            raise ValueError("Saturation must be between 0 and 1.")
         self._hsl[1] = value
 
     def set_lightness(self, value) -> None:
+        if not 0 <= value <= 1:
+            raise ValueError("Lightness must be between 0 and 1.")
         self._hsl[2] = value
 
     def set_red(self, value) -> None:
@@ -390,7 +398,7 @@ class Color:
         self.rgb = (r, g, value)
 
     def set_alpha(self, value) -> None:
-        if value < 0 or value > 1:
+        if not 0 <= value <= 1:
             raise ValueError("Alpha must be between 0 and 1.")
         self._alpha = value
 

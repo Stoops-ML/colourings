@@ -123,6 +123,26 @@ def test_color_scale_with_fewer_inputs():
         color_scale((Color("blue"), Color("black"), Color("blue")), 2)
 
 
+def test_bad_color_changes():
+    c = Color("red")
+    with pytest.raises(ValueError, match="Lightness must be between 0 and 1."):
+        c.lightness = 2
+    with pytest.raises(ValueError, match="Lightness must be between 0 and 1."):
+        c.lightness = -0.5
+    with pytest.raises(ValueError, match="Saturation must be between 0 and 1."):
+        c.saturation = 2
+    with pytest.raises(ValueError, match="Saturation must be between 0 and 1."):
+        c.saturation = -0.5
+    with pytest.raises(ValueError, match="Hue must be between 0 and 360."):
+        c.hue = 361
+    with pytest.raises(ValueError, match="Hue must be between 0 and 360."):
+        c.hue = -0.5
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1."):
+        c.alpha = 2
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1."):
+        c.alpha = -0.5
+
+
 def test_bad_color_scale():
     with pytest.raises(ValueError):
         color_scale((Color("white"),), 2)
