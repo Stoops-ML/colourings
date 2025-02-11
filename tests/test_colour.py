@@ -147,6 +147,22 @@ def test_bad_color_change_alpha():
         c.alpha = -0.5
 
 
+def test_bad_color_change_rgb():
+    c = Color("red")
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.red = 300
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.red = -0.5
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.green = 300
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.green = -0.5
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.blue = 300
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.blue = -0.5
+
+
 def test_bad_color_scale():
     with pytest.raises(ValueError):
         color_scale((Color("white"),), 2)
