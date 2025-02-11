@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from colourings.colour import (
@@ -9,9 +11,89 @@ from colourings.colour import (
     HSL_equivalence,
     RGB_color_picker,
     color_scale,
+    colour_scale,
     identify_color,
     make_color_factory,
 )
+
+
+@patch("tkinter.Tk")
+def test_preview(mock_tk):
+    c = Colour("red")
+    x, y = 300, 300
+    mock_root = MagicMock()
+    mock_tk.return_value = mock_root
+    c.preview(x, y)
+    mock_tk.assert_called_once()
+    mock_root.geometry.assert_called_once_with(f"{x}x{y}")
+    mock_root.config.assert_called_once_with(background=c.hex_l)
+    mock_root.title.assert_called_once_with(f"{str(c)} preview")
+    mock_root.mainloop.assert_called_once()
+
+
+def test_preview_invalid_size_x():
+    c = Colour("red")
+    with pytest.raises(TypeError, match="`size_x` must be of integer or float type"):
+        c.preview("invalid", 300)
+
+
+def test_preview_invalid_size_y():
+    c = Colour("red")
+    with pytest.raises(TypeError, match="`size_y` must be of integer or float type"):
+        c.preview(300, "invalid")
+
+
+@patch("warnings.warn")
+def test_preview_alpha_warning(mock_warn):
+    c = Colour("red", alpha=0.5)
+    with patch("tkinter.Tk"):
+        c.preview(300, 300)
+    mock_warn.assert_called_once_with(
+        f"Alpha set to {c.alpha}, but is not displayed in the window.",
+        stacklevel=2,
+    )
+
+
+def test_bad_colour_scale():
+    with pytest.raises(ValueError):
+        colour_scale((Color("white"),), 2)
+
+
+def test_colour_scale_with_exact_inputs():
+    assert colour_scale((Color("white"), Color("black")), 2) == [
+        Color("white"),
+        Color("black"),
+    ]
+    assert colour_scale((Color("blue"), Color("black")), 2) == [
+        Color("blue"),
+        Color("black"),
+    ]
+    assert colour_scale((Color("blue"), Color("black"), Color("blue")), 3) == [
+        Color("blue"),
+        Color("black"),
+        Color("blue"),
+    ]
+    assert colour_scale(
+        (Color("blue"), Color("black"), Color("blue"), Color("orange")), 4
+    ) == [
+        Color("blue"),
+        Color("black"),
+        Color("blue"),
+        Color("orange"),
+    ]
+    assert colour_scale(
+        (Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")),
+        5,
+    ) == [Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")]
+
+
+def test_colour_scale_with_fewer_inputs():
+    assert colour_scale((Color("white"), Color("black")), 1) == [Color("white")]
+    assert colour_scale((Color("blue"), Color("black")), 1) == [Color("blue")]
+    assert colour_scale((Color("blue"), Color("black"), Color("blue")), 2) == [
+        Color("blue"),
+        Color("black"),
+    ]
 
 
 def test_bad_color_scale():
