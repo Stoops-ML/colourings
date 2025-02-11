@@ -184,9 +184,11 @@ def test_bad_alpha():
 
 
 def test_bad_identify_color():
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="Cannot identify color."):
         identify_color("a")
-    with pytest.raises(TypeError):
+    with pytest.raises(
+        TypeError, match="Cannot determine whether color is RGBA or HSLA."
+    ):
         identify_color((0, 0, 0, 0))
 
 
