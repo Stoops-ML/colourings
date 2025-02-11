@@ -115,7 +115,7 @@ def color_scale(
                 h2 += 1
 
         # number of colours
-        num_colors = num_steps_per_iter + 2  # add 2 for stand and end colours
+        num_colors = num_steps_per_iter + 2  # add 2 for start and end colours
         if round(remainder * (i + 1) - added, 7) >= 1:
             num_colors += 1
             added += 1
