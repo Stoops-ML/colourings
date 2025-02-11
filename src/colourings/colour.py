@@ -186,6 +186,25 @@ def HSL_equivalence(c1: Color, c2: Color) -> bool:
 def identify_color(
     color: str | Sequence[int | float] | Color | Colour,
 ) -> Callable[[Any], Any]:
+    # checks
+    if (
+        isinstance(color, Sequence)
+        and len(color) == 3
+        and is_rgb(color)
+        and is_hsl(color)
+    ):
+        raise TypeError("Cannot determine whether color is RGB or HSL.")
+    elif (
+        isinstance(color, Sequence)
+        and len(color) == 4
+        and is_rgba(color)
+        and is_hsla(color)
+    ):
+        raise TypeError("Cannot determine whether color is RGBA or HSLA.")
+    else:
+        pass
+
+    # identify colour
     if isinstance(color, Color | Colour):
         return lambda x: x.hsl
     elif (
@@ -197,14 +216,10 @@ def identify_color(
         return hex2hsl
     elif isinstance(color, str) and is_web(color):
         return web2hsl
-    elif isinstance(color, Sequence) and is_rgb(color) and is_hsl(color):
-        raise TypeError("Cannot discern whether color is RGB or HSL")
     elif isinstance(color, Sequence) and is_rgb(color):
         return rgb2hsl
     elif isinstance(color, Sequence) and is_hsl(color):
         return lambda x: x
-    elif isinstance(color, Sequence) and is_rgba(color) and is_hsla(color):
-        raise TypeError("Cannot discern whether color is RGBA or HSLA")
     # elif isinstance(color, Sequence) and is_rgba(color): NOTE: unreachable
     #     return rgba2hsl
     # elif isinstance(color, Sequence) and is_hsla(color): NOTE: unreachable
@@ -363,34 +378,33 @@ class Color:
         return hex2web(self.hex)
 
     def set_hsl(self, value) -> None:
+        if not is_hsl(value):
+            raise TypeError("Value is not a valid HSL")
         self._hsl = list(value)
 
     def set_rgb(self, value) -> None:
         self.hsl = rgb2hsl(value)
 
     def set_hue(self, value) -> None:
-        self._hsl[0] = value
+        self.hsl = (value, self.hsl[1], self.hsl[2])
 
     def set_saturation(self, value) -> None:
-        self._hsl[1] = value
+        self.hsl = (self.hsl[0], value, self.hsl[2])
 
     def set_lightness(self, value) -> None:
-        self._hsl[2] = value
+        self.hsl = (self.hsl[0], self.hsl[1], value)
 
     def set_red(self, value) -> None:
-        _, g, b = self.rgb
-        self.rgb = (value, g, b)
+        self.rgb = (value, self.rgb[1], self.rgb[2])
 
     def set_green(self, value) -> None:
-        r, _, b = self.rgb
-        self.rgb = (r, value, b)
+        self.rgb = (self.rgb[0], value, self.rgb[2])
 
     def set_blue(self, value) -> None:
-        r, g, _ = self.rgb
-        self.rgb = (r, g, value)
+        self.rgb = (self.rgb[0], self.rgb[1], value)
 
     def set_alpha(self, value) -> None:
-        if value < 0 or value > 1:
+        if not 0 <= value <= 1:
             raise ValueError("Alpha must be between 0 and 1.")
         self._alpha = value
 

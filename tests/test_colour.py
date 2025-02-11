@@ -123,6 +123,46 @@ def test_color_scale_with_fewer_inputs():
         color_scale((Color("blue"), Color("black"), Color("blue")), 2)
 
 
+def test_bad_color_change_HSL():
+    c = Color("red")
+    with pytest.raises(TypeError, match="Value is not a valid HSL"):
+        c.lightness = 2
+    with pytest.raises(TypeError, match="Value is not a valid HSL"):
+        c.lightness = -0.5
+    with pytest.raises(TypeError, match="Value is not a valid HSL"):
+        c.saturation = 2
+    with pytest.raises(TypeError, match="Value is not a valid HSL"):
+        c.saturation = -0.5
+    with pytest.raises(TypeError, match="Value is not a valid HSL"):
+        c.hue = 361
+    with pytest.raises(TypeError, match="Value is not a valid HSL"):
+        c.hue = -0.5
+
+
+def test_bad_color_change_alpha():
+    c = Color("red")
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1."):
+        c.alpha = 2
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1."):
+        c.alpha = -0.5
+
+
+def test_bad_color_change_rgb():
+    c = Color("red")
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.red = 300
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.red = -0.5
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.green = 300
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.green = -0.5
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.blue = 300
+    with pytest.raises(ValueError, match="Input is not an RGB type."):
+        c.blue = -0.5
+
+
 def test_bad_color_scale():
     with pytest.raises(ValueError):
         color_scale((Color("white"),), 2)
@@ -164,9 +204,11 @@ def test_bad_alpha():
 
 
 def test_bad_identify_color():
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="Cannot identify color."):
         identify_color("a")
-    with pytest.raises(TypeError):
+    with pytest.raises(
+        TypeError, match="Cannot determine whether color is RGBA or HSLA."
+    ):
         identify_color((0, 0, 0, 0))
 
 
