@@ -182,8 +182,6 @@ def linspace(start: int, stop: int, num: int, endpoint: bool = True) -> list[flo
         return []
     if num == 1:
         return [start]
-
     step = (stop - start) / (num - 1) if endpoint else (stop - start) / num
-
     result = [float(start + step * i) for i in range(num)]
     return result
