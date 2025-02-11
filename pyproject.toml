@@ -89,6 +89,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "ruff>=0.9.4",
     "tox>=4.24.1",
+    "build",
 ]
 
 [project.urls]
