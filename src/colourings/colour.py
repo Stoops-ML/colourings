@@ -186,6 +186,25 @@ def HSL_equivalence(c1: Color, c2: Color) -> bool:
 def identify_color(
     color: str | Sequence[int | float] | Color | Colour,
 ) -> Callable[[Any], Any]:
+    # checks
+    if (
+        isinstance(color, Sequence)
+        and len(color) == 3
+        and is_rgb(color)
+        and is_hsl(color)
+    ):
+        raise TypeError("Cannot determine whether color is RGB or HSL.")
+    elif (
+        isinstance(color, Sequence)
+        and len(color) == 4
+        and is_rgba(color)
+        and is_hsla(color)
+    ):
+        raise TypeError("Cannot determine whether color is RGBA or HSLA.")
+    else:
+        pass
+
+    # identify colour
     if isinstance(color, Color | Colour):
         return lambda x: x.hsl
     elif (
@@ -197,14 +216,10 @@ def identify_color(
         return hex2hsl
     elif isinstance(color, str) and is_web(color):
         return web2hsl
-    elif isinstance(color, Sequence) and is_rgb(color) and is_hsl(color):
-        raise TypeError("Cannot discern whether color is RGB or HSL")
     elif isinstance(color, Sequence) and is_rgb(color):
         return rgb2hsl
     elif isinstance(color, Sequence) and is_hsl(color):
         return lambda x: x
-    elif isinstance(color, Sequence) and is_rgba(color) and is_hsla(color):
-        raise TypeError("Cannot discern whether color is RGBA or HSLA")
     # elif isinstance(color, Sequence) and is_rgba(color): NOTE: unreachable
     #     return rgba2hsl
     # elif isinstance(color, Sequence) and is_hsla(color): NOTE: unreachable
