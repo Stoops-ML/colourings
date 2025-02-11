@@ -203,6 +203,26 @@ def test_color_scale_num_sections():
     ]
     assert len(cs) == n
 
+    n = 12
+    cs = color_scale(
+        (Color("black"), Color("orange"), Color("blue"), Color("white")), n
+    )
+    assert cs == [
+        Color("black"),
+        Color("#39221c"),
+        Color("#8e4d1c"),
+        Color("orange"),
+        Color("#ff0004"),
+        Color("#ff00ac"),
+        Color("#a900ff"),
+        Color("blue"),
+        Color("#9f58e7"),
+        Color("#df9fdf"),
+        Color("#e7d7df"),
+        Color("white"),
+    ]
+    assert len(cs) == n
+
     n = 4
     cs = color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), n, longer=True)
     assert cs == [Color("#f00"), Color("#0f0"), Color("#00f"), Color("#f00")]
