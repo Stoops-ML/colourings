@@ -395,16 +395,13 @@ class Color:
         self.hsl = (self.hsl[0], self.hsl[1], value)
 
     def set_red(self, value) -> None:
-        _, g, b = self.rgb
-        self.rgb = (value, g, b)
+        self.rgb = (value, self.rgb[1], self.rgb[2])
 
     def set_green(self, value) -> None:
-        r, _, b = self.rgb
-        self.rgb = (r, value, b)
+        self.rgb = (self.rgb[0], value, self.rgb[2])
 
     def set_blue(self, value) -> None:
-        r, g, _ = self.rgb
-        self.rgb = (r, g, value)
+        self.rgb = (self.rgb[0], self.rgb[1], value)
 
     def set_alpha(self, value) -> None:
         if not 0 <= value <= 1:
