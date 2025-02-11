@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from colourings.colour import (
@@ -9,10 +11,149 @@ from colourings.colour import (
     HSL_equivalence,
     RGB_color_picker,
     color_scale,
+    colour_scale,
     identify_color,
     make_color_factory,
 )
-from colourings.conversions import hsl2rgb, rgb2hex
+
+
+@patch("tkinter.Tk")
+def test_preview(mock_tk):
+    c = Colour("red")
+    x, y = 300, 300
+    mock_root = MagicMock()
+    mock_tk.return_value = mock_root
+    c.preview(x, y)
+    mock_tk.assert_called_once()
+    mock_root.geometry.assert_called_once_with(f"{x}x{y}")
+    mock_root.config.assert_called_once_with(background=c.hex_l)
+    mock_root.title.assert_called_once_with(f"{str(c)} preview")
+    mock_root.mainloop.assert_called_once()
+
+
+def test_preview_invalid_size_x():
+    c = Colour("red")
+    with pytest.raises(TypeError, match="`size_x` must be of integer or float type"):
+        c.preview("invalid", 300)
+
+
+def test_preview_invalid_size_y():
+    c = Colour("red")
+    with pytest.raises(TypeError, match="`size_y` must be of integer or float type"):
+        c.preview(300, "invalid")
+
+
+@patch("warnings.warn")
+def test_preview_alpha_warning(mock_warn):
+    c = Colour("red", alpha=0.5)
+    with patch("tkinter.Tk"):
+        c.preview(300, 300)
+    mock_warn.assert_called_once_with(
+        f"Alpha set to {c.alpha}, but is not displayed in the window.",
+        stacklevel=2,
+    )
+
+
+def test_bad_colour_scale():
+    with pytest.raises(ValueError):
+        colour_scale((Color("white"),), 2)
+
+
+def test_colour_scale_with_exact_inputs():
+    assert colour_scale((Color("white"), Color("black")), 2) == [
+        Color("white"),
+        Color("black"),
+    ]
+    assert colour_scale((Color("blue"), Color("black")), 2) == [
+        Color("blue"),
+        Color("black"),
+    ]
+    assert colour_scale((Color("blue"), Color("black"), Color("blue")), 3) == [
+        Color("blue"),
+        Color("black"),
+        Color("blue"),
+    ]
+    assert colour_scale(
+        (Color("blue"), Color("black"), Color("blue"), Color("orange")), 4
+    ) == [
+        Color("blue"),
+        Color("black"),
+        Color("blue"),
+        Color("orange"),
+    ]
+    assert colour_scale(
+        (Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")),
+        5,
+    ) == [Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")]
+
+
+def test_colour_scale_with_fewer_inputs():
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        colour_scale((Color("white"), Color("black")), 1)
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        colour_scale((Color("blue"), Color("black")), 1)
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        colour_scale((Color("blue"), Color("black"), Color("blue")), 2)
+
+
+def test_color_scale_with_fewer_inputs():
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        color_scale((Color("white"), Color("black")), 1)
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        color_scale((Color("blue"), Color("black")), 1)
+    with pytest.raises(
+        ValueError,
+        match="Number of steps must be greater than or equal to the number of colors.",
+    ):
+        color_scale((Color("blue"), Color("black"), Color("blue")), 2)
+
+
+def test_bad_color_scale():
+    with pytest.raises(ValueError):
+        color_scale((Color("white"),), 2)
+
+
+def test_color_scale_with_exact_inputs():
+    assert color_scale((Color("white"), Color("black")), 2) == [
+        Color("white"),
+        Color("black"),
+    ]
+    assert color_scale((Color("blue"), Color("black")), 2) == [
+        Color("blue"),
+        Color("black"),
+    ]
+    assert color_scale((Color("blue"), Color("black"), Color("blue")), 3) == [
+        Color("blue"),
+        Color("black"),
+        Color("blue"),
+    ]
+    assert color_scale(
+        (Color("blue"), Color("black"), Color("blue"), Color("orange")), 4
+    ) == [
+        Color("blue"),
+        Color("black"),
+        Color("blue"),
+        Color("orange"),
+    ]
+    assert color_scale(
+        (Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")),
+        5,
+    ) == [Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")]
 
 
 def test_bad_alpha():
@@ -43,65 +184,121 @@ def test_HEX():
         HEX.DONOTEXISTS  # noqa: B018
 
 
-def test_color_scale():
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale((0, 1, 0.5), (360, 1, 0.5), 3, longer=True)
-    ] == ["#f00", "#0f0", "#00f", "#f00"]
+def test_color_scale_num_sections():
+    n = 10
+    cs = color_scale(
+        (Color("black"), Color("orange"), Color("blue"), Color("white")), n
+    )
+    assert cs == [
+        Color("black"),
+        Color("#39221c"),
+        Color("#8e4d1c"),
+        Color("orange"),
+        Color("#ff003c"),
+        Color("#e100ff"),
+        Color("blue"),
+        Color("#bd71e3"),
+        Color("#e3c6d9"),
+        Color("white"),
+    ]
+    assert len(cs) == n
 
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale((360, 1, 0.5), (0, 1, 0.5), 3, longer=True)
-    ] == ["#f00", "#00f", "#0f0", "#f00"]
+    n = 12
+    cs = color_scale(
+        (Color("black"), Color("orange"), Color("blue"), Color("white")), n
+    )
+    assert cs == [
+        Color("black"),
+        Color("#39221c"),
+        Color("#8e4d1c"),
+        Color("orange"),
+        Color("#ff0004"),
+        Color("#ff00ac"),
+        Color("#a900ff"),
+        Color("blue"),
+        Color("#9f58e7"),
+        Color("#df9fdf"),
+        Color("#e7d7df"),
+        Color("white"),
+    ]
+    assert len(cs) == n
 
-    assert [
-        rgb2hex(hsl2rgb(hsl)) for hsl in color_scale((0, 1, 0.5), (360, 1, 0.5), 3)
-    ] == ["#f00", "#f00", "#f00", "#f00"]
+    n = 4
+    cs = color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), n, longer=True)
+    assert cs == [Color("#f00"), Color("#0f0"), Color("#00f"), Color("#f00")]
+    assert len(cs) == n
 
-    assert [
-        rgb2hex(hsl2rgb(hsl)) for hsl in color_scale((360, 1, 0.5), (0, 1, 0.5), 3)
-    ] == ["#f00", "#f00", "#f00", "#f00"]
+    n = 4
+    cs = color_scale((Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), n, longer=True)
+    assert len(cs) == n
+    assert cs == [Color("#f00"), Color("#00f"), Color("#0f0"), Color("#f00")]
 
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale((360.0 / 3, 1, 0.5), (2 * 360.0 / 3, 1, 0.5), 3)
-    ] == ["#0f0", "#0fa", "#0af", "#00f"]
-
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale(
-            (360.0 / 3, 1, 0.5), (2 * 360.0 / 3, 1, 0.5), 3, longer=True
-        )
-    ] == ["#0f0", "#fa0", "#f0a", "#00f"]
-
-    assert [
-        rgb2hex(hsl2rgb(hsl))
-        for hsl in color_scale(
-            (2 * 360.0 / 3, 1, 0.5), (360.0 / 3, 1, 0.5), 3, longer=True
-        )
-    ] == ["#00f", "#f0a", "#fa0", "#0f0"]
-
-    assert [rgb2hex(hsl2rgb(hsl)) for hsl in color_scale((0, 0, 0), (0, 0, 1), 15)] == [
-        "#000",
-        "#111",
-        "#222",
-        "#333",
-        "#444",
-        "#555",
-        "#666",
-        "#777",
-        "#888",
-        "#999",
-        "#aaa",
-        "#bbb",
-        "#ccc",
-        "#ddd",
-        "#eee",
-        "#fff",
+    n = 4
+    cs = color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), n)
+    assert len(cs) == n
+    assert cs == [
+        Color("#f00"),
+        Color("#f00"),
+        Color("#f00"),
+        Color("#f00"),
     ]
 
-    with pytest.raises(ValueError):
-        color_scale((0, 1, 0.5), (360, 1, 0.5), -2)
+    n = 4
+    cs = color_scale((Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), n)
+    assert len(cs) == n
+    assert cs == [
+        Color("#f00"),
+        Color("#f00"),
+        Color("#f00"),
+        Color("#f00"),
+    ]
+
+    n = 4
+    cs = color_scale(
+        (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))), n
+    )
+    assert len(cs) == n
+    assert cs == [Color("#0f0"), Color("#0fa"), Color("#0af"), Color("#00f")]
+
+    n = 4
+    cs = color_scale(
+        (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))),
+        n,
+        longer=True,
+    )
+    assert len(cs) == n
+    assert cs == [Color("#0f0"), Color("#fa0"), Color("#f0a"), Color("#00f")]
+
+    n = 4
+    cs = color_scale(
+        (Color(hsl=(2 * 360.0 / 3, 1, 0.5)), Color(hsl=(360.0 / 3, 1, 0.5))),
+        n,
+        longer=True,
+    )
+    assert len(cs) == n
+    assert cs == [Color("#00f"), Color("#f0a"), Color("#fa0"), Color("#0f0")]
+
+    n = 16
+    cs = color_scale((Color(hsl=(0, 0, 0)), Color(hsl=(0, 0, 1))), n)
+    assert len(cs) == n
+    assert cs == [
+        Color("#000"),
+        Color("#111"),
+        Color("#222"),
+        Color("#333"),
+        Color("#444"),
+        Color("#555"),
+        Color("#666"),
+        Color("#777"),
+        Color("#888"),
+        Color("#999"),
+        Color("#aaa"),
+        Color("#bbb"),
+        Color("#ccc"),
+        Color("#ddd"),
+        Color("#eee"),
+        Color("#fff"),
+    ]
 
 
 def test_RGB_color_picker():

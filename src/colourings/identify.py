@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Sequence
 
 from .definitions import COLOR_NAME_TO_RGB, LONG_HEX_COLOR, SHORT_HEX_COLOR
 
@@ -11,7 +11,7 @@ def is_short_hex(color: str) -> bool:
     return bool(SHORT_HEX_COLOR.fullmatch(color))
 
 
-def is_rgb(color: Iterable[int | float]) -> bool:
+def is_rgb(color: Sequence[int | float]) -> bool:
     if len(color) != 3:
         return False
     for channel in color:
@@ -20,7 +20,7 @@ def is_rgb(color: Iterable[int | float]) -> bool:
     return True
 
 
-def is_rgba(color: Iterable[int | float]) -> bool:
+def is_rgba(color: Sequence[int | float]) -> bool:
     if len(color) != 4:
         return False
     for channel in color:
@@ -33,7 +33,7 @@ def is_web(color: str) -> bool:
     return color in COLOR_NAME_TO_RGB or is_long_hex(color) or is_short_hex(color)
 
 
-def is_hsl(color: Iterable[int | float]) -> bool:
+def is_hsl(color: Sequence[int | float]) -> bool:
     if len(color) != 3:
         return False
     if not 0 <= color[0] <= 360:
@@ -44,7 +44,7 @@ def is_hsl(color: Iterable[int | float]) -> bool:
     return True
 
 
-def is_hsla(color: Iterable[int | float]) -> bool:
+def is_hsla(color: Sequence[int | float]) -> bool:
     if len(color) != 4:
         return False
     for channel in color:

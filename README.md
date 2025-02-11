@@ -9,11 +9,12 @@ This is a fork of the [Colour](https://github.com/vaab/colour/) Python package. 
 - Support for RGBA and HSLA [#42](https://github.com/vaab/colour/issues/42)
 - Add Teal [#58](https://github.com/vaab/colour/issues/58) and RebeccaPurple colors [#25](https://github.com/vaab/colour/pull/25)
 - Correct luminance and lightness definitions [#64](https://github.com/vaab/colour/issues/64)
-- Add `Color` class [#46](https://github.com/vaab/colour/pull/46)
-- Add preview method [#63](https://github.com/vaab/colour/pull/63)
+- Add `Colour` class [#46](https://github.com/vaab/colour/pull/46)
+- Add `Color.preview` method [#63](https://github.com/vaab/colour/pull/63)
 - Color scale uses shortest path [#50](https://github.com/vaab/colour/pull/50)
+- `color_scale` can interpolate between more than two colors
 - Dedicated tests directory
-- Add typing (not currently passing mypy)
+- Add (limited) typing (not currently passing mypy)
 - Updated project structure
 
 Below is a modified copy of the readme from [Colour](https://github.com/vaab/colour/).
@@ -166,6 +167,13 @@ If you have to create graphical representation with color scale between red and 
 ```
 
 Notice how naturally, the yellow is displayed in human format and in the middle of the scale. And that the quite unusual (but compatible) 'chartreuse' color specification has been used in place of the hexadecimal representation.
+
+You can create your own scale with as many colors as you like:
+```
+>>> from colourings import color_scale
+>>> color_scale((Color("black"), Color("orange"), Color("blue"), Color("white")), 10)
+[Color("black"), Color("#39221c"), Color("#8e4d1c"), Color("orange"), Color("#ff003c"), Color("#e100ff"), Color("blue"), Color("#bd71e3"), Color("#e3c6d9"), Color("white")]
+```
 
 ### Color Comparison
 

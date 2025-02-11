@@ -4,7 +4,7 @@ import hashlib
 import math
 import tkinter
 import warnings
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from .conversions import (
@@ -21,7 +21,7 @@ from .conversions import (
     web2hex,
     web2hsl,
 )
-from .definitions import COLOR_NAME_TO_RGB
+from .definitions import COLOR_NAME_TO_RGB, linspace
 from .identify import (
     is_hsl,
     is_hsla,
@@ -62,28 +62,79 @@ RGB = C_RGB()
 HEX = C_HEX()
 
 
-def color_scale(begin_hsl, end_hsl, nb, longer=False):
-    """Returns a list of nb color HSL tuples between begin_hsl and end_hsl"""
-    if nb < 0:
-        raise ValueError("Number of colours must be greater than or equal to 0")
+def color_scale(
+    colors: Sequence[Color | Colour], num_steps: int, longer: bool = False
+) -> list[Color]:
+    """Create a color scale using many colours via linear interpolation of hsl.
 
-    h1, s1, l1 = begin_hsl
-    h2, s2, l2 = end_hsl
-    h1 /= 360.0
-    h2 /= 360.0
-    if longer == (abs(h1 - h2) < 0.5):
-        if h1 < h2:
-            h1 += 1
-        else:
-            h2 += 1
-    return [
-        (
-            (h1 * 360.0 * (1 - v) + h2 * 360.0 * v) % 360.0,
-            s1 * (1 - v) + s2 * v,
-            l1 * (1 - v) + l2 * v,
+    TODO: implement better interpolation technique: https://www.alanzucconi.com/2016/01/06/colour-interpolation/
+
+    Parameters
+    ----------
+    colors : Sequence[Color  |  Colour]
+        Sequence of Color objects
+    nb : int
+        Total number of steps
+    longer : bool, optional
+        Long or short path, by default False
+
+    Yields
+    ------
+    list[Color]
+        List of Color objects
+
+    Raises
+    ------
+    ValueError
+        Number of colors specified must be at least two
+    """
+    # checks
+    if len(colors) < 2:
+        raise ValueError("At least two colours are required to make a scale.")
+    if len(colors) > num_steps:
+        raise ValueError(
+            "Number of steps must be greater than or equal to the number of colors."
         )
-        for v in (float(step) / (nb) for step in range(nb + 1))
-    ]
+
+    # linearly interpolate between colours
+    num_sections = len(colors) - 1
+    num_steps_per_iter = math.floor((num_steps - len(colors)) / num_sections)
+    remainder = ((num_steps - len(colors)) / num_sections) % 1
+    out = []
+    added = 0
+    for i in range(num_sections):
+        # colour definitions
+        h1, s1, l1 = colors[i].hsl
+        h2, s2, l2 = colors[i + 1].hsl
+        h1 /= 360.0
+        h2 /= 360.0
+        if longer == (abs(h1 - h2) < 0.5):
+            if h1 < h2:
+                h1 += 1
+            else:
+                h2 += 1
+
+        # number of colours
+        num_colors = num_steps_per_iter + 2  # add 2 for start and end colours
+        if round(remainder * (i + 1) - added, 7) >= 1:
+            num_colors += 1
+            added += 1
+
+        # interpolate
+        hs = [(v * 360) % 360 for v in linspace(h1, h2, num_colors)]
+        ss = linspace(s1, s2, num_colors)
+        ls = linspace(l1, l2, num_colors)
+        add = [Color(hsl=(_h, _s, _l)) for _h, _s, _l in zip(hs, ss, ls, strict=False)]
+
+        # add to output
+        if i == 0:
+            out.extend(add)
+        else:
+            out.extend(add[1:])
+    return out
+
+
+colour_scale = color_scale
 
 
 def hash_or_str(obj) -> str:
@@ -133,7 +184,7 @@ def HSL_equivalence(c1: Color, c2: Color) -> bool:
 
 
 def identify_color(
-    color: str | Iterable[int | float] | Color | Colour,
+    color: str | Sequence[int | float] | Color | Colour,
 ) -> Callable[[Any], Any]:
     if isinstance(color, Color | Colour):
         return lambda x: x.hsl
@@ -146,17 +197,17 @@ def identify_color(
         return hex2hsl
     elif isinstance(color, str) and is_web(color):
         return web2hsl
-    elif isinstance(color, Iterable) and is_rgb(color) and is_hsl(color):
+    elif isinstance(color, Sequence) and is_rgb(color) and is_hsl(color):
         raise TypeError("Cannot discern whether color is RGB or HSL")
-    elif isinstance(color, Iterable) and is_rgb(color):
+    elif isinstance(color, Sequence) and is_rgb(color):
         return rgb2hsl
-    elif isinstance(color, Iterable) and is_hsl(color):
+    elif isinstance(color, Sequence) and is_hsl(color):
         return lambda x: x
-    elif isinstance(color, Iterable) and is_rgba(color) and is_hsla(color):
+    elif isinstance(color, Sequence) and is_rgba(color) and is_hsla(color):
         raise TypeError("Cannot discern whether color is RGBA or HSLA")
-    # elif isinstance(color, Iterable) and is_rgba(color): NOTE: unreachable
+    # elif isinstance(color, Sequence) and is_rgba(color): NOTE: unreachable
     #     return rgba2hsl
-    # elif isinstance(color, Iterable) and is_hsla(color): NOTE: unreachable
+    # elif isinstance(color, Sequence) and is_hsla(color): NOTE: unreachable
     #     return hsla2hsl
     else:
         raise TypeError("Cannot identify color.")
@@ -173,15 +224,15 @@ class Color:
 
     def __init__(  # noqa: C901
         self,
-        color: str | Iterable[int | float] | None = None,
+        color: str | Sequence[int | float] | None = None,
         *,
         web: str | None = None,
-        hsl: Iterable[int | float] | None = None,
-        hsla: Iterable[int | float] | None = None,
+        hsl: Sequence[int | float] | None = None,
+        hsla: Sequence[int | float] | None = None,
         hex: str | None = None,
         hex_l: str | None = None,
-        rgb: Iterable[int | float] | None = None,
-        rgba: Iterable[int | float] | None = None,
+        rgb: Sequence[int | float] | None = None,
+        rgba: Sequence[int | float] | None = None,
         alpha: float | None = None,
         pick_for: Any = None,
         picker: Callable[[Any], Color] = RGB_color_picker,
@@ -354,8 +405,7 @@ class Color:
 
     def range_to(self, value, steps, longer=False):
         """range of color generation"""
-        for hsl in color_scale(self._hsl, Color(value).hsl, steps - 1, longer=longer):
-            yield Color(hsl=hsl)
+        yield from color_scale((self, Color(value)), steps, longer=longer)
 
     def preview(self, size_x=200, size_y=200):
         if not isinstance(size_x, int | float):
