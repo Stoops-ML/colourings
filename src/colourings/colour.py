@@ -125,6 +125,9 @@ def color_scale(
     return out
 
 
+colour_scale = color_scale
+
+
 def hash_or_str(obj) -> str:
     try:
         return hash((type(obj).__name__, obj))
