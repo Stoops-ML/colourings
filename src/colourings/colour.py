@@ -386,19 +386,13 @@ class Color:
         self.hsl = rgb2hsl(value)
 
     def set_hue(self, value) -> None:
-        if not 0 <= value <= 360:
-            raise ValueError("Hue must be between 0 and 360.")
-        self._hsl[0] = value
+        self.hsl = (value, self.hsl[1], self.hsl[2])
 
     def set_saturation(self, value) -> None:
-        if not 0 <= value <= 1:
-            raise ValueError("Saturation must be between 0 and 1.")
-        self._hsl[1] = value
+        self.hsl = (self.hsl[0], value, self.hsl[2])
 
     def set_lightness(self, value) -> None:
-        if not 0 <= value <= 1:
-            raise ValueError("Lightness must be between 0 and 1.")
-        self._hsl[2] = value
+        self.hsl = (self.hsl[0], self.hsl[1], value)
 
     def set_red(self, value) -> None:
         _, g, b = self.rgb
