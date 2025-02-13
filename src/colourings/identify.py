@@ -36,7 +36,7 @@ def is_web(color: str) -> bool:
 def is_hsl(color: Sequence[int | float]) -> bool:
     if len(color) != 3:
         return False
-    if not 0 <= color[0] <= 360:
+    if isinstance(color[0], int | float) and not 0 <= color[0] <= 360:
         return False
     for channel in color[1:]:
         if not isinstance(channel, int | float) or not (0 <= channel <= 1):
