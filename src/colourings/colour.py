@@ -137,7 +137,7 @@ def color_scale(
 colour_scale = color_scale
 
 
-def hash_or_str(obj) -> str:
+def hash_or_str(obj) -> str | int:
     try:
         return hash((type(obj).__name__, obj))
     except TypeError:
@@ -266,7 +266,7 @@ class Color:
         alpha: float | None = None,
         pick_for: Any = None,
         picker: Callable[[Any], Color] = RGB_color_picker,
-        pick_key: Callable[[Any], str] = hash_or_str,
+        pick_key: Callable[[Any], str | int] = hash_or_str,
         equality: Callable[[Color, Color], bool] = RGB_equivalence,
         **kwargs,
     ):
@@ -299,7 +299,7 @@ class Color:
         elif web is not None:
             self.hsl = web2hsl(web)
         elif hsl is not None:
-            self.hsl = hsl
+            self.hsl = hsl  # type: ignore
         elif hsla is not None:
             if alpha is not None and alpha != hsla[3]:
                 raise ValueError(
@@ -347,7 +347,7 @@ class Color:
             self.__dict__[label] = value
 
     def get_hsl(self) -> tuple[float, float, float]:
-        return self._hsl  # type: ignore
+        return self._hsl
 
     def get_hex(self) -> str:
         return rgb2hex(self.rgb)

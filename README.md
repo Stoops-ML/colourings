@@ -14,8 +14,7 @@ This is a fork of the [Colour](https://github.com/vaab/colour/) Python package. 
 - Color scale uses shortest path [#50](https://github.com/vaab/colour/pull/50)
 - `color_scale` can interpolate between more than two colors
 - RGB values are between 0 and 255 and hue is between 0 and 360. This is in contrast to RGBA and HSLA values that are between 0 and 1
-- Dedicated tests directory
-- Add (limited) typing (not currently passing mypy)
+- Add typing
 - Updated project structure
 
 Below is a modified copy of the readme from [Colour](https://github.com/vaab/colour/).

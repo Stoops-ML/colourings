@@ -43,6 +43,7 @@ legacy_tox_ini = """
     usedevelop = True
     commands =
         pytest --cov colourings {posargs:--cov-report=term-missing}
+        python -m mypy
 
     [testenv:quality]
     description = checks code quality
