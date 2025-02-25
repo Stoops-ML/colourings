@@ -121,9 +121,9 @@ def color_scale(
             added += 1
 
         # interpolate
-        hs = [(v * 360) % 360 for v in linspace(int(h1), int(h2), num_colors)]
-        ss = linspace(int(s1), int(s2), num_colors)
-        ls = linspace(int(l1), int(l2), num_colors)
+        hs = [(v * 360) % 360 for v in linspace(h1, h2, num_colors)]
+        ss = linspace(s1, s2, num_colors)
+        ls = linspace(l1, l2, num_colors)
         add = [Color(hsl=(_h, _s, _l)) for _h, _s, _l in zip(hs, ss, ls, strict=False)]
 
         # add to output

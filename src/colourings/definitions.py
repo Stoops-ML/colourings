@@ -159,7 +159,9 @@ LONG_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 SHORT_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{3}$")
 
 
-def linspace(start: int, stop: int, num: int, endpoint: bool = True) -> list[float]:
+def linspace(
+    start: int | float, stop: int | float, num: int, endpoint: bool = True
+) -> list[float]:
     """Python implementation of numpy.linspace
 
     Parameters
