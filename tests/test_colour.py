@@ -34,13 +34,13 @@ def test_preview(mock_tk):
 def test_preview_invalid_size_x():
     c = Colour("red")
     with pytest.raises(TypeError, match="`size_x` must be of integer or float type"):
-        c.preview("invalid", 300)
+        c.preview("invalid", 300)  # type: ignore
 
 
 def test_preview_invalid_size_y():
     c = Colour("red")
     with pytest.raises(TypeError, match="`size_y` must be of integer or float type"):
-        c.preview(300, "invalid")
+        c.preview(300, "invalid")  # type: ignore
 
 
 @patch("warnings.warn")

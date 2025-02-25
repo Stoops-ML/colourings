@@ -21,15 +21,19 @@ from .identify import (
 # add HSV, CMYK, YUV conversion
 
 
-def rgb2rgba(rgb: Sequence[int | float], alpha: int | float) -> tuple[float]:
+def rgb2rgba(
+    rgb: Sequence[int | float], alpha: int | float
+) -> tuple[float, float, float, float]:
     return rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha
 
 
-def hsl2hsla(hsl: Sequence[int | float], alpha: int | float) -> tuple[float]:
+def hsl2hsla(
+    hsl: Sequence[int | float], alpha: int | float
+) -> tuple[float, float, float, float]:
     return hsl[0] / 360.0, hsl[1], hsl[2], alpha
 
 
-def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float]:
+def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float, float, float]:
     """Convert HSL representation towards RGB
 
     :param h: Hue, position around the chromatic circle (h=1 equiv h=0)
@@ -67,21 +71,21 @@ def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float]:
     return r * 255.0, g * 255.0, b * 255.0
 
 
-def rgba2hsl(rgba: Sequence[int | float]) -> tuple[float]:
+def rgba2hsl(rgba: Sequence[int | float]) -> tuple[float, float, float]:
     if not is_rgba(rgba):
         raise ValueError("Input is not an RGBA type.")
     rgb = [v * 255.0 for v in rgba[:3]]
     return rgb2hsl(rgb)
 
 
-def hsla2hsl(hsla: Sequence[int | float]) -> tuple[float]:
+def hsla2hsl(hsla: Sequence[int | float]) -> tuple[float, float, float]:
     if not is_hsla(hsla):
         raise ValueError("Input is not an HSLA type.")
     hsl = (hsla[0] * 360, hsla[1], hsla[2])
     return hsl
 
 
-def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float]:
+def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
     """Convert RGB representation towards HSL
 
     :param r: Red amount (float between 0 and 255)
@@ -172,7 +176,7 @@ def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
     return f"#{hx}"
 
 
-def hex2rgb(hex: str) -> tuple[float]:
+def hex2rgb(hex: str) -> tuple[float, float, float]:
     """Transform hex RGB representation to RGB tuple
 
     :param str_rgb: 3 hex char or 6 hex char string representation
@@ -194,7 +198,7 @@ def hex2rgb(hex: str) -> tuple[float]:
     except Exception as e:
         raise ValueError(f"Invalid value {hex} provided for rgb color.") from e
 
-    return tuple([float(int(v, 16)) for v in (r, g, b)])
+    return (float(int(r, 16)), float(int(g, 16)), float(int(b, 16)))
 
 
 def hex2web(hex: str) -> str:
@@ -256,25 +260,25 @@ def hsl2hex(hsl: Sequence[int | float]) -> str:
     return rgb2hex(hsl2rgb(hsl))
 
 
-def hex2hsl(hex: str) -> str:
+def hex2hsl(hex: str) -> tuple[float, float, float]:
     if not (is_long_hex(hex) or is_short_hex(hex)):
         raise ValueError("Input is not of hex type.")
     return rgb2hsl(hex2rgb(hex))
 
 
-def rgb2web(rgb: Sequence[int | float]) -> tuple[float]:
+def rgb2web(rgb: Sequence[int | float]) -> str:
     if not is_rgb(rgb):
         raise ValueError("Input is not an RGB type.")
     return hex2web(rgb2hex(rgb))
 
 
-def web2rgb(web: str) -> tuple[float]:
+def web2rgb(web: str) -> tuple[float, float, float]:
     if not is_web(web):
         raise ValueError("Input is not of web type.")
     return hex2rgb(web2hex(web))
 
 
-def web2hsl(web: str) -> tuple[float]:
+def web2hsl(web: str) -> tuple[float, float, float]:
     if not is_web(web):
         raise ValueError("Input is not an web type.")
     return rgb2hsl(web2rgb(web))
