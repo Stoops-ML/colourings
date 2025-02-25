@@ -213,7 +213,8 @@ def hex2web(hex: str) -> str:
     if not (is_long_hex(hex) or is_short_hex(hex)):
         raise ValueError("Input is not of hex type.")
 
-    dec_rgb = tuple(int(v) for v in hex2rgb(hex))
+    rgb = hex2rgb(hex)
+    dec_rgb = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
     if dec_rgb in RGB_TO_COLOR_NAMES:
         ## take the first one
         color_name = RGB_TO_COLOR_NAMES[dec_rgb][0]
