@@ -459,7 +459,7 @@ class Color:
         return f"<Color {self.web}>"
 
     def __eq__(self, other) -> bool:
-        if isinstance(other, Color | Colour):
+        if isinstance(other, Color):
             return self.equality(self, other)
         raise NotImplementedError("Other object must be of type `Color` or `Colour`")
 
