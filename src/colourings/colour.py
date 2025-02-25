@@ -4,7 +4,7 @@ import hashlib
 import math
 import tkinter
 import warnings
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Generator, Sequence
 from typing import Any
 
 from .conversions import (
@@ -235,7 +235,22 @@ class Color:
     format (HSL, RGB, HEX, WEB) and their partial representation.
     """
 
-    _hsl = None  # internal representation
+    _hsl: tuple[float] = None  # internal representation
+    hsl: tuple[float]
+    hex: str
+    hex_l: str
+    rgb: tuple[float]
+    rgba: tuple[float]
+    hsla: tuple[float]
+    hue: float
+    saturation: float
+    lightness: float
+    luminance: float
+    red: float
+    green: float
+    blue: float
+    alpha: float
+    web: str
 
     def __init__(  # noqa: C901
         self,
@@ -331,50 +346,50 @@ class Color:
         else:
             self.__dict__[label] = value
 
-    def get_hsl(self):
+    def get_hsl(self) -> tuple[float]:
         return tuple(self._hsl)
 
-    def get_hex(self):
+    def get_hex(self) -> str:
         return rgb2hex(self.rgb)
 
-    def get_hex_l(self):
+    def get_hex_l(self) -> str:
         return rgb2hex(self.rgb, force_long=True)
 
-    def get_rgb(self):
+    def get_rgb(self) -> tuple[float]:
         return hsl2rgb(self.hsl)
 
-    def get_rgba(self):
+    def get_rgba(self) -> tuple[float]:
         return rgb2rgba(hsl2rgb(self.hsl), self._alpha)
 
-    def get_hsla(self):
+    def get_hsla(self) -> tuple[float]:
         return hsl2hsla(self.hsl, self._alpha)
 
-    def get_hue(self):
+    def get_hue(self) -> float:
         return self.hsl[0]
 
-    def get_saturation(self):
+    def get_saturation(self) -> float:
         return self.hsl[1]
 
-    def get_lightness(self):
+    def get_lightness(self) -> float:
         return self.hsl[2]
 
-    def get_luminance(self):
+    def get_luminance(self) -> float:
         r, g, b, _ = self.get_rgba()
         return math.sqrt(0.299 * r**2 + 0.587 * g**2 + 0.114 * b**2)
 
-    def get_red(self):
+    def get_red(self) -> float:
         return self.rgb[0]
 
-    def get_green(self):
+    def get_green(self) -> float:
         return self.rgb[1]
 
-    def get_blue(self):
+    def get_blue(self) -> float:
         return self.rgb[2]
 
-    def get_alpha(self):
+    def get_alpha(self) -> float:
         return self._alpha
 
-    def get_web(self):
+    def get_web(self) -> str:
         return hex2web(self.hex)
 
     def set_hsl(self, value) -> None:
@@ -417,11 +432,11 @@ class Color:
     def set_web(self, value) -> None:
         self.hex = web2hex(value)
 
-    def range_to(self, value, steps, longer=False):
+    def range_to(self, value, steps, longer=False) -> Generator[Color, None, None]:
         """range of color generation"""
         yield from color_scale((self, Color(value)), steps, longer=longer)
 
-    def preview(self, size_x=200, size_y=200):
+    def preview(self, size_x=200, size_y=200) -> None:
         if not isinstance(size_x, int | float):
             raise TypeError("`size_x` must be of integer or float type")
         if not isinstance(size_y, int | float):
@@ -437,13 +452,13 @@ class Color:
         root.title(f"{str(self)} preview")
         root.mainloop()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.web}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Color {self.web}>"
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         if isinstance(other, Color | Colour):
             return self.equality(self, other)
         raise NotImplementedError("Other object must be of type `Color` or `Colour`")
