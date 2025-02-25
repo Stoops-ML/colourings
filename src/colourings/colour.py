@@ -121,9 +121,9 @@ def color_scale(
             added += 1
 
         # interpolate
-        hs = [(v * 360) % 360 for v in linspace(h1, h2, num_colors)]
-        ss = linspace(s1, s2, num_colors)
-        ls = linspace(l1, l2, num_colors)
+        hs = [(v * 360) % 360 for v in linspace(int(h1), int(h2), num_colors)]
+        ss = linspace(int(s1), int(s2), num_colors)
+        ls = linspace(int(l1), int(l2), num_colors)
         add = [Color(hsl=(_h, _s, _l)) for _h, _s, _l in zip(hs, ss, ls, strict=False)]
 
         # add to output
@@ -235,13 +235,13 @@ class Color:
     format (HSL, RGB, HEX, WEB) and their partial representation.
     """
 
-    _hsl: tuple[float] = None  # internal representation
-    hsl: tuple[float]
+    _hsl: tuple[float, float, float]  # internal representation
+    hsl: tuple[float, float, float]
     hex: str
     hex_l: str
-    rgb: tuple[float]
-    rgba: tuple[float]
-    hsla: tuple[float]
+    rgb: tuple[float, float, float]
+    rgba: tuple[float, float, float, float]
+    hsla: tuple[float, float, float, float]
     hue: float
     saturation: float
     lightness: float
@@ -254,7 +254,7 @@ class Color:
 
     def __init__(  # noqa: C901
         self,
-        color: str | Sequence[int | float] | None = None,
+        color: str | Sequence[int | float] | Color | None = None,
         *,
         web: str | None = None,
         hsl: Sequence[int | float] | None = None,
@@ -346,8 +346,8 @@ class Color:
         else:
             self.__dict__[label] = value
 
-    def get_hsl(self) -> tuple[float]:
-        return tuple(self._hsl)
+    def get_hsl(self) -> tuple[float, float, float]:
+        return self._hsl  # type: ignore
 
     def get_hex(self) -> str:
         return rgb2hex(self.rgb)
@@ -355,13 +355,13 @@ class Color:
     def get_hex_l(self) -> str:
         return rgb2hex(self.rgb, force_long=True)
 
-    def get_rgb(self) -> tuple[float]:
+    def get_rgb(self) -> tuple[float, float, float]:
         return hsl2rgb(self.hsl)
 
-    def get_rgba(self) -> tuple[float]:
+    def get_rgba(self) -> tuple[float, float, float, float]:
         return rgb2rgba(hsl2rgb(self.hsl), self._alpha)
 
-    def get_hsla(self) -> tuple[float]:
+    def get_hsla(self) -> tuple[float, float, float, float]:
         return hsl2hsla(self.hsl, self._alpha)
 
     def get_hue(self) -> float:
@@ -392,51 +392,53 @@ class Color:
     def get_web(self) -> str:
         return hex2web(self.hex)
 
-    def set_hsl(self, value) -> None:
+    def set_hsl(self, value: Sequence[float]) -> None:
         if not is_hsl(value):
             raise TypeError("Value is not a valid HSL")
-        self._hsl = list(value)
+        self._hsl = tuple(value)  # type: ignore
 
-    def set_rgb(self, value) -> None:
+    def set_rgb(self, value: Sequence[float]) -> None:
         self.hsl = rgb2hsl(value)
 
-    def set_hue(self, value) -> None:
+    def set_hue(self, value: float) -> None:
         self.hsl = (value, self.hsl[1], self.hsl[2])
 
-    def set_saturation(self, value) -> None:
+    def set_saturation(self, value: float) -> None:
         self.hsl = (self.hsl[0], value, self.hsl[2])
 
-    def set_lightness(self, value) -> None:
+    def set_lightness(self, value: float) -> None:
         self.hsl = (self.hsl[0], self.hsl[1], value)
 
-    def set_red(self, value) -> None:
+    def set_red(self, value: float) -> None:
         self.rgb = (value, self.rgb[1], self.rgb[2])
 
-    def set_green(self, value) -> None:
+    def set_green(self, value: float) -> None:
         self.rgb = (self.rgb[0], value, self.rgb[2])
 
-    def set_blue(self, value) -> None:
+    def set_blue(self, value: float) -> None:
         self.rgb = (self.rgb[0], self.rgb[1], value)
 
-    def set_alpha(self, value) -> None:
+    def set_alpha(self, value: float) -> None:
         if not 0 <= value <= 1:
             raise ValueError("Alpha must be between 0 and 1.")
         self._alpha = value
 
-    def set_hex(self, value) -> None:
+    def set_hex(self, value: str) -> None:
         self.rgb = hex2rgb(value)
 
-    def set_hex_l(self, value) -> None:
+    def set_hex_l(self, value: str) -> None:
         self.set_hex(value)
 
-    def set_web(self, value) -> None:
+    def set_web(self, value: str) -> None:
         self.hex = web2hex(value)
 
-    def range_to(self, value, steps, longer=False) -> Generator[Color, None, None]:
+    def range_to(
+        self, value: str | Sequence[int | float] | Color, steps, longer=False
+    ) -> Generator[Color, None, None]:
         """range of color generation"""
         yield from color_scale((self, Color(value)), steps, longer=longer)
 
-    def preview(self, size_x=200, size_y=200) -> None:
+    def preview(self, size_x: int | float = 200, size_y: int | float = 200) -> None:
         if not isinstance(size_x, int | float):
             raise TypeError("`size_x` must be of integer or float type")
         if not isinstance(size_y, int | float):

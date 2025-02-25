@@ -63,7 +63,7 @@ def test_web2hex():
 
 def test_bad_rgba2hsl():
     with pytest.raises(ValueError):
-        rgba2hsl("a")
+        rgba2hsl("a")  # type: ignore
     with pytest.raises(ValueError):
         rgba2hsl((2, 0, 0, 0))
     with pytest.raises(ValueError):
@@ -76,7 +76,7 @@ def test_bad_rgba2hsl():
 
 def test_bad_hsla2hsl():
     with pytest.raises(ValueError):
-        hsla2hsl("a")
+        hsla2hsl("a")  # type: ignore
     with pytest.raises(ValueError):
         hsla2hsl((2, 0, 0, 0))
     with pytest.raises(ValueError):
@@ -115,7 +115,7 @@ def test_bad_web2hsl():
 
 def test_bad_hsl2web():
     with pytest.raises(ValueError):
-        hsl2web("a")
+        hsl2web("a")  # type: ignore
     with pytest.raises(ValueError):
         hsl2web((0, 0, 0, 0))
     with pytest.raises(ValueError):
@@ -128,7 +128,7 @@ def test_bad_hsl2web():
 
 def test_bad_hsl2hex():
     with pytest.raises(ValueError):
-        hsl2hex("a")
+        hsl2hex("a")  # type: ignore
     with pytest.raises(ValueError):
         hsl2hex((0, 0, 0, 0))
     with pytest.raises(ValueError):
@@ -148,7 +148,7 @@ def test_bad_hex2hsl():
 
 def test_bad_rgb2web():
     with pytest.raises(ValueError):
-        rgb2web("a")
+        rgb2web("a")  # type: ignore
     with pytest.raises(ValueError):
         rgb2web((1, 0, 0, 0))
     with pytest.raises(ValueError):
