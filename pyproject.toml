@@ -100,6 +100,9 @@ Repository = "https://github.com/Stoops-ML/colourings"
 [tool.setuptools.dynamic]
 version = {attr = "colourings.__version__"}
 
+[tool.setuptools.package-data]
+"colourings" = ["py.typed"]
+
 [tool.mypy]
 files = [
     "src/**/*.py",
