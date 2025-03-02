@@ -1,4 +1,4 @@
-from colourings.identify import is_hsl, is_hsla, is_rgb, is_rgba, is_rgbaf
+from colourings.identify import is_hsl, is_hsla, is_rgb, is_rgba, is_rgbaf, is_rgbf
 
 
 def test_bad_rbg():
@@ -6,6 +6,13 @@ def test_bad_rbg():
     assert not is_rgb((30, 300, 0, 0))
     assert not is_rgb("30, 300, 0, 0")
     assert not is_rgb(int)
+
+
+def test_bad_rbgf():
+    assert not is_rgbf((1.1, 0, 0))
+    assert not is_rgbf((1.1, 2, 0, 0))
+    assert not is_rgbf("30, 300, 0, 0")
+    assert not is_rgbf(int)
 
 
 def test_bad_rbgaf():

@@ -13,6 +13,7 @@ from colourings.conversions import (
     rgb2web,
     rgba2hsl,
     rgbaf2hsl,
+    rgbf2hsl,
     web2hex,
     web2hsl,
     web2rgb,
@@ -86,6 +87,19 @@ def test_bad_rgba2hsl():
         rgba2hsl((0, 0, 256, 0))
     with pytest.raises(ValueError):
         rgba2hsl((0, 0, 0, 256))
+
+
+def test_bad_rgbf2hsl():
+    with pytest.raises(ValueError):
+        rgbf2hsl("a")  # type: ignore
+    with pytest.raises(ValueError):
+        rgbf2hsl((1.1, 0, 0, 0))
+    with pytest.raises(ValueError):
+        rgbf2hsl((0, 1.1, 0, 0))
+    with pytest.raises(ValueError):
+        rgbf2hsl((0, 0, 1.1, 0))
+    with pytest.raises(ValueError):
+        rgbf2hsl((0, 0, 0, 1.1))
 
 
 def test_bad_hsla2hsl():
