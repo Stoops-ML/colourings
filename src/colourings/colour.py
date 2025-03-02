@@ -424,6 +424,15 @@ class Color:
     def set_rgb(self, value: Sequence[float]) -> None:
         self.hsl = rgb2hsl(value)
 
+    def set_rgbf(self, value: Sequence[float]) -> None:
+        self.hsl = rgbf2hsl(value)
+
+    def set_rgba(self, value: Sequence[float]) -> None:
+        self.hsl = rgba2hsl(value)
+
+    def set_rgbaf(self, value: Sequence[float]) -> None:
+        self.hsl = rgbaf2hsl(value)
+
     def set_hue(self, value: float) -> None:
         self.hsl = (value, self.hsl[1], self.hsl[2])
 
