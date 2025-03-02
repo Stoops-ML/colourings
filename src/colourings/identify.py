@@ -13,7 +13,7 @@ def is_short_hex(color: str) -> bool:
 
 
 def is_rgb(color: Any) -> bool:
-    if not isinstance(color, Sequence):
+    if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 3:
         return False
@@ -61,7 +61,7 @@ def is_web(color: str) -> bool:
 
 
 def is_hsl(color: Any) -> bool:
-    if not isinstance(color, Sequence):
+    if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 3:
         return False
@@ -74,7 +74,7 @@ def is_hsl(color: Any) -> bool:
 
 
 def is_hsla(color: Any) -> bool:
-    if not isinstance(color, Sequence):
+    if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 4:
         return False
