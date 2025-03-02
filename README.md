@@ -57,17 +57,17 @@ Let's create blue color:
 Please note that all of these are equivalent examples to create the red color:
 
 ```
-Color("red")               ## human, web compatible representation
-Color("blue", hue=0)       ## hue of blue is 0.66, hue of red is 0.0
-Color("#f00")              ## standard 3 hex digit web compatible representation
-Color("#ff0000")           ## standard 6 hex digit web compatible representation
-Color(hsl=(0, 1, 0.5))     ## full 3-uple HSL specification
-Color(hsla=(0, 1, 0.5, 1)) ## full 4-uple HSLA specification
-Color(rgb=(255, 0, 0))     ## full 3-uple RGB specification
-Color(rgba=(1, 0, 0, 1))   ## full 4-uple RGBA specification
-Color(rgbf=(1, 0, 0))     ## full 3-uple RGB float specification
-Color(rgbaf=(255, 0, 0, 255))   ## full 4-uple RGBA float specification
-Color(Color("red"))        ## recursion doesn't break object
+Color("red")                   ## human, web compatible representation
+Color("blue", hue=0)           ## hue of blue is 0.66, hue of red is 0.0
+Color("#f00")                  ## standard 3 hex digit web compatible representation
+Color("#ff0000")               ## standard 6 hex digit web compatible representation
+Color(hsl=(0, 1, 0.5))         ## full 3-uple HSL specification
+Color(hsla=(0, 1, 0.5, 1))     ## full 4-uple HSLA specification
+Color(rgb=(255, 0, 0))         ## full 3-uple RGB specification
+Color(rgba=(1, 0, 0, 1))       ## full 4-uple RGBA specification
+Color(rgbf=(1, 0, 0))          ## full 3-uple RGB float specification
+Color(rgbaf=(255, 0, 0, 255))  ## full 4-uple RGBA float specification
+Color(Color("red"))            ## recursion doesn't break object
 ```
 
 ### Reading Values
