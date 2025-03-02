@@ -12,6 +12,7 @@ from colourings.conversions import (
     rgb2hsl,
     rgb2web,
     rgba2hsl,
+    rgbaf2hsl,
     web2hex,
     web2hsl,
     web2rgb,
@@ -61,17 +62,30 @@ def test_web2hex():
     assert web2hex("#123", True) == "#112233"
 
 
+def test_bad_rgbaf2hsl():
+    with pytest.raises(ValueError):
+        rgbaf2hsl("a")  # type: ignore
+    with pytest.raises(ValueError):
+        rgbaf2hsl((2, 0, 0, 0))
+    with pytest.raises(ValueError):
+        rgbaf2hsl((0, 2, 0, 0))
+    with pytest.raises(ValueError):
+        rgbaf2hsl((0, 0, 2, 0))
+    with pytest.raises(ValueError):
+        rgbaf2hsl((0, 0, 0, 2))
+
+
 def test_bad_rgba2hsl():
     with pytest.raises(ValueError):
         rgba2hsl("a")  # type: ignore
     with pytest.raises(ValueError):
-        rgba2hsl((2, 0, 0, 0))
+        rgba2hsl((256, 0, 0, 0))
     with pytest.raises(ValueError):
-        rgba2hsl((0, 2, 0, 0))
+        rgba2hsl((0, 256, 0, 0))
     with pytest.raises(ValueError):
-        rgba2hsl((0, 0, 2, 0))
+        rgba2hsl((0, 0, 256, 0))
     with pytest.raises(ValueError):
-        rgba2hsl((0, 0, 0, 2))
+        rgba2hsl((0, 0, 0, 256))
 
 
 def test_bad_hsla2hsl():

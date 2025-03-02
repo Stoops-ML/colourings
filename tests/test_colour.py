@@ -399,7 +399,9 @@ def test_red_inputs():
         == Color(hsl=(0, 1, 0.5))
         == Color(hsla=(0, 1, 0.5, 1))
         == Color(rgb=(255, 0, 0))
-        == Color(rgba=(1, 0, 0, 1))
+        == Color(rgba=(255, 0, 0, 255))
+        == Color(rgbf=(1, 0, 0))
+        == Color(rgbaf=(1, 0, 0, 1))
         == Color(Color("red"))
     )
 
@@ -412,7 +414,9 @@ def test_blue_inputs():
         == Color(hsl=(240, 1, 0.5))
         == Color(hsla=(240 / 360, 1, 0.5, 1.0))
         == Color(rgb=(0, 0, 255))
-        == Color(rgba=(0, 0, 1, 1))
+        == Color(rgba=(0, 0, 255, 255))
+        == Color(rgbf=(0, 0, 1))
+        == Color(rgbaf=(0, 0, 1, 1))
         == Color((0, 0, 255))
         == Color(Color("blue"))
     )
@@ -513,7 +517,9 @@ def test_color_access():
     assert b.blue == 255.0
     assert b.green == 0.0
     assert b.rgb == (0.0, 0.0, 255.0)
-    assert b.rgba == (0.0, 0.0, 1.0, 1.0)
+    assert b.rgbf == (0.0, 0.0, 1.0)
+    assert b.rgba == (0.0, 0.0, 255.0, 255.0)
+    assert b.rgbaf == (0.0, 0.0, 1.0, 1.0)
     assert round(b.hsl[0] / 360.0, 4) == 0.6667
     assert b.hsl[1:] == (1.0, 0.5)
     assert b.hex == "#00f"
@@ -571,13 +577,17 @@ def test_alpha():
     c = Color("red")
     assert c.alpha == 1
     assert c.rgb == (255.0, 0.0, 0.0)
-    assert c.rgba == (1.0, 0.0, 0.0, 1.0)
+    assert c.rgba == (255.0, 0.0, 0.0, 255.0)
+    assert c.rgbf == (1.0, 0.0, 0.0)
+    assert c.rgbaf == (1.0, 0.0, 0.0, 1.0)
     assert c.hsl == (0, 1, 0.5)
     assert c.hsla == (0, 1, 0.5, 1.0)
     c.alpha = 0.5
     assert c.alpha == 0.5
     assert c.rgb == (255.0, 0.0, 0.0)
-    assert c.rgba == (1.0, 0.0, 0.0, 0.5)
+    assert c.rgba == (255.0, 0.0, 0.0, 127.5)
+    assert c.rgbf == (1.0, 0.0, 0.0)
+    assert c.rgbaf == (1.0, 0.0, 0.0, 0.5)
     assert c.hsl == (0, 1, 0.5)
     assert c.hsla == (0, 1, 0.5, 0.5)
     with pytest.raises(ValueError):

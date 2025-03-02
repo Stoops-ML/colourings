@@ -23,8 +23,30 @@ def is_rgb(color: Any) -> bool:
     return True
 
 
+def is_rgbf(color: Any) -> bool:
+    if not isinstance(color, Sequence) or isinstance(color, str):
+        return False
+    if len(color) != 3:
+        return False
+    for channel in color:
+        if not isinstance(channel, int | float) or not (0 <= channel <= 1):
+            return False
+    return True
+
+
 def is_rgba(color: Any) -> bool:
-    if not isinstance(color, Sequence):
+    if not isinstance(color, Sequence) or isinstance(color, str):
+        return False
+    if len(color) != 4:
+        return False
+    for channel in color:
+        if not isinstance(channel, int | float) or not (0 <= channel <= 255):
+            return False
+    return True
+
+
+def is_rgbaf(color: Any) -> bool:
+    if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 4:
         return False
