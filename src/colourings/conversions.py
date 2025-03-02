@@ -84,9 +84,7 @@ def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float, float, float]:
 
 
 def hsl2rgbf(hsl: Sequence[int | float]) -> tuple[float, float, float]:
-    if not is_hsl(hsl):
-        raise ValueError("Input is not an HSL type.")
-    return tuple(v / 255.0 for v in hsl2rgb(hsl))
+    return rgb2rgbf(hsl2rgb(hsl))
 
 
 def rgba2hsl(rgba: Sequence[int | float]) -> tuple[float, float, float]:
