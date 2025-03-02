@@ -29,7 +29,7 @@ def rgb2rgba(
     return rgb[0], rgb[1], rgb[2], alpha * 255.0
 
 
-def rgb2rgbf(rgb: Sequence[int | float]) -> tuple[float, float, float, float]:
+def rgb2rgbf(rgb: Sequence[int | float]) -> tuple[float, float, float]:
     return rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0
 
 
