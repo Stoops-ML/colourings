@@ -13,7 +13,10 @@ This is a fork of the [Colour](https://github.com/vaab/colour/) Python package. 
 - Add `Color.preview` method [#63](https://github.com/vaab/colour/pull/63)
 - Color scale uses shortest path [#50](https://github.com/vaab/colour/pull/50)
 - `color_scale` can interpolate between more than two colors
-- RGB values are between 0 and 255 and hue is between 0 and 360. This is in contrast to RGBA and HSLA values that are between 0 and 1
+- RGB values are between 0 and 255
+- Hue is between 0 and 360
+- Add alpha. The alpha value is between 0 and 1, and the alpha value of RGBA is between 0 and 255
+- Add RGBf and RGBAf, whose values are between 0 and 1
 - Add typing
 - Updated project structure
 
@@ -62,6 +65,8 @@ Color(hsl=(0, 1, 0.5))     ## full 3-uple HSL specification
 Color(hsla=(0, 1, 0.5, 1)) ## full 4-uple HSLA specification
 Color(rgb=(255, 0, 0))     ## full 3-uple RGB specification
 Color(rgba=(1, 0, 0, 1))   ## full 4-uple RGBA specification
+Color(rgbf=(1, 0, 0))     ## full 3-uple RGB float specification
+Color(rgbaf=(255, 0, 0, 255))   ## full 4-uple RGBA float specification
 Color(Color("red"))        ## recursion doesn't break object
 ```
 
@@ -75,7 +80,7 @@ Several representations are accessible:
 >>> c.hsl
 (0.66..., 1.0, 0.5)
 >>> c.rgb
-(0.0, 0.0, 1.0)
+(0.0, 0.0, 255.0)
 ```
 
 And their different parts are also independently accessible, as the different amount of red, blue, green, in the RGB format:

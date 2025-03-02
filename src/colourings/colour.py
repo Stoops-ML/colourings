@@ -13,11 +13,15 @@ from .conversions import (
     hex2web,
     hsl2hsla,
     hsl2rgb,
+    hsl2rgbf,
     hsla2hsl,
     rgb2hex,
     rgb2hsl,
     rgb2rgba,
+    rgb2rgbaf,
     rgba2hsl,
+    rgbaf2hsl,
+    rgbf2hsl,
     web2hex,
     web2hsl,
 )
@@ -241,6 +245,8 @@ class Color:
     hex_l: str
     rgb: tuple[float, float, float]
     rgba: tuple[float, float, float, float]
+    rgbf: tuple[float, float, float]
+    rgbaf: tuple[float, float, float, float]
     hsla: tuple[float, float, float, float]
     hue: float
     saturation: float
@@ -263,6 +269,8 @@ class Color:
         hex_l: str | None = None,
         rgb: Sequence[int | float] | None = None,
         rgba: Sequence[int | float] | None = None,
+        rgbf: Sequence[int | float] | None = None,
+        rgbaf: Sequence[int | float] | None = None,
         alpha: float | None = None,
         pick_for: Any = None,
         picker: Callable[[Any], Color] = RGB_color_picker,
@@ -283,13 +291,15 @@ class Color:
                     hex_l,
                     rgb,
                     rgba,
+                    rgbf,
+                    rgbaf,
                     pick_for,
                 )
             )
             != 1
         ):
             raise ValueError(
-                "Only one of 'color', 'web', 'hsl', 'hsla', 'hex', 'hex_l', 'rgb', 'rgba' or 'pick_for' may be entered."
+                "Only one of 'color', 'web', 'hsl', 'hsla', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
             )
 
         # convert to hsl
@@ -313,11 +323,19 @@ class Color:
         elif rgb is not None:
             self.hsl = rgb2hsl(rgb)
         elif rgba is not None:
-            if alpha is not None and alpha != rgba[3]:
+            if alpha is not None and alpha != rgba[3] / 255.0:
                 raise ValueError(
-                    f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of rgba={rgba[3]}"
+                    f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of rgba={rgba[3] / 255.0}"
                 )
-            self.hsl, alpha = rgba2hsl(rgba), rgba[3]
+            self.hsl, alpha = rgba2hsl(rgba), rgba[3] / 255.0
+        elif rgbf is not None:
+            self.hsl = rgbf2hsl(rgbf)
+        elif rgbaf is not None:
+            if alpha is not None and alpha != rgbaf[3]:
+                raise ValueError(
+                    f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of rgbaf={rgbaf[3]}"
+                )
+            self.hsl, alpha = rgbaf2hsl(rgbaf), rgbaf[3]
         elif pick_for is not None:
             self.hsl = web2hsl(picker(pick_key(pick_for)).web)
         # elif isinstance(color, Color):
@@ -358,8 +376,14 @@ class Color:
     def get_rgb(self) -> tuple[float, float, float]:
         return hsl2rgb(self.hsl)
 
+    def get_rgbf(self) -> tuple[float, float, float]:
+        return hsl2rgbf(self.hsl)
+
     def get_rgba(self) -> tuple[float, float, float, float]:
         return rgb2rgba(hsl2rgb(self.hsl), self._alpha)
+
+    def get_rgbaf(self) -> tuple[float, float, float, float]:
+        return rgb2rgbaf(hsl2rgb(self.hsl), self._alpha)
 
     def get_hsla(self) -> tuple[float, float, float, float]:
         return hsl2hsla(self.hsl, self._alpha)
@@ -374,7 +398,7 @@ class Color:
         return self.hsl[2]
 
     def get_luminance(self) -> float:
-        r, g, b, _ = self.get_rgba()
+        r, g, b = self.get_rgbf()
         return math.sqrt(0.299 * r**2 + 0.587 * g**2 + 0.114 * b**2)
 
     def get_red(self) -> float:

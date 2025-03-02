@@ -14,6 +14,8 @@ from .identify import (
     is_long_hex,
     is_rgb,
     is_rgba,
+    is_rgbaf,
+    is_rgbf,
     is_short_hex,
     is_web,
 )
@@ -22,6 +24,16 @@ from .identify import (
 
 
 def rgb2rgba(
+    rgb: Sequence[int | float], alpha: int | float
+) -> tuple[float, float, float, float]:
+    return rgb[0], rgb[1], rgb[2], alpha * 255.0
+
+
+def rgb2rgbf(rgb: Sequence[int | float]) -> tuple[float, float, float]:
+    return rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0
+
+
+def rgb2rgbaf(
     rgb: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
     return rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha
@@ -71,10 +83,20 @@ def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float, float, float]:
     return r * 255.0, g * 255.0, b * 255.0
 
 
+def hsl2rgbf(hsl: Sequence[int | float]) -> tuple[float, float, float]:
+    return rgb2rgbf(hsl2rgb(hsl))
+
+
 def rgba2hsl(rgba: Sequence[int | float]) -> tuple[float, float, float]:
     if not is_rgba(rgba):
         raise ValueError("Input is not an RGBA type.")
-    rgb = [v * 255.0 for v in rgba[:3]]
+    return rgb2hsl(rgba[:3])
+
+
+def rgbaf2hsl(rgbaf: Sequence[int | float]) -> tuple[float, float, float]:
+    if not is_rgbaf(rgbaf):
+        raise ValueError("Input is not an RGBAf type.")
+    rgb = [v * 255.0 for v in rgbaf[:3]]
     return rgb2hsl(rgb)
 
 
@@ -83,6 +105,13 @@ def hsla2hsl(hsla: Sequence[int | float]) -> tuple[float, float, float]:
         raise ValueError("Input is not an HSLA type.")
     hsl = (hsla[0] * 360, hsla[1], hsla[2])
     return hsl
+
+
+def rgbf2hsl(rgbf: Sequence[int | float]) -> tuple[float, float, float]:
+    if not is_rgbf(rgbf):
+        raise ValueError("Input is not an RGBf type.")
+    rgb = [v * 255.0 for v in rgbf]
+    return rgb2hsl(rgb)
 
 
 def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
