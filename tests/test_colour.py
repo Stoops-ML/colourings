@@ -551,6 +551,7 @@ def test_color_setters():
     b.hex = "#f00"
     assert b.hex == "#f00"
     b.hex = "#ff0000"
+    assert b.hex_l == "#ff0000"
     assert b.hex == "#f00"
     b.hsl = (0.0, 1.0, 0.5)
     assert b.hsl == (0.0, 1.0, 0.5)
