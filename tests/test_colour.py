@@ -198,6 +198,10 @@ def test_color_scale_with_exact_inputs():
 
 def test_bad_alpha():
     with pytest.raises(ValueError):
+        Color(rgb=(1, 1, 1), alpha=-1)
+    with pytest.raises(ValueError):
+        Color(rgb=(1, 1, 1), alpha=1.1)
+    with pytest.raises(ValueError):
         Color(rgba=(1, 1, 1, 1), alpha=0)
     with pytest.raises(ValueError):
         Color(rgba=(1, 1, 1, 1), alpha=1)
