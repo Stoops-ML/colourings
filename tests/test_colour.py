@@ -542,6 +542,28 @@ def test_color_access():
     assert b.hex == "#00f"
 
 
+def test_color_setters():
+    b = Color("black")
+    b.hsl = HSL.BLUE
+    assert b.hsl == (240.0, 1.0, 0.5)
+    b.rgb = (0.0, 0.0, 255.0)
+    assert b.rgb == (0.0, 0.0, 255.0)
+    b.hex = "#f00"
+    assert b.hex == "#f00"
+    b.hex = "#ff0000"
+    assert b.hex == "#f00"
+    b.hsl = (0.0, 1.0, 0.5)
+    assert b.hsl == (0.0, 1.0, 0.5)
+    b.rgba = (0.0, 0.0, 255.0, 255.0)
+    assert b.rgba == (0.0, 0.0, 255.0, 255.0)
+    b.rgbaf = (0.0, 0.0, 1.0, 1.0)
+    assert b.rgbaf == (0.0, 0.0, 1.0, 1.0)
+    b.rgb = (0.0, 0.0, 255.0)
+    assert b.rgb == (0.0, 0.0, 255.0)
+    b.rgbf = (0.0, 0.0, 1.0)
+    assert b.rgbf == (0.0, 0.0, 1.0)
+
+
 def test_color_change_values():
     b = Color("black")
     b.hsl = HSL.BLUE
