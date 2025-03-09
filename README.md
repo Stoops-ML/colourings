@@ -17,6 +17,7 @@ This is a fork of the [Colour](https://github.com/vaab/colour/) Python package. 
 - Hue is between 0 and 360
 - Add alpha. The alpha value is between 0 and 1, and the alpha value of RGBA is between 0 and 255
 - Add RGBf and RGBAf, whose values are between 0 and 1
+- Threshold numbers [#61](https://github.com/vaab/colour/issues/61)
 - Add typing
 - Updated project structure
 
