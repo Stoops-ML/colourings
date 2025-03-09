@@ -12,12 +12,12 @@ This is a fork of the [Colour](https://github.com/vaab/colour/) Python package. 
 - Add `Colour` class [#46](https://github.com/vaab/colour/pull/46)
 - Add `Color.preview` method [#63](https://github.com/vaab/colour/pull/63)
 - Color scale uses shortest path [#50](https://github.com/vaab/colour/pull/50)
+- Threshold numbers [#61](https://github.com/vaab/colour/issues/61)
 - `color_scale` can interpolate between more than two colors
 - RGB values are between 0 and 255
 - Hue is between 0 and 360
 - Add alpha. The alpha value is between 0 and 1, and the alpha value of RGBA is between 0 and 255
 - Add RGBf and RGBAf, whose values are between 0 and 1
-- Threshold numbers [#61](https://github.com/vaab/colour/issues/61)
 - Add typing
 - Updated project structure
 
