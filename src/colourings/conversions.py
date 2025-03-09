@@ -22,6 +22,7 @@ from .identify import (
 
 # add HSV, CMYK, YUV conversion
 
+
 def _threshold(value: float) -> float:
     if abs(value) < FLOAT_ERROR:
         return 0.0
