@@ -542,6 +542,12 @@ def test_color_access():
     assert b.hex == "#00f"
 
 
+def test_thresholding():
+    c = Color("lime")
+    assert c.rgb[0] == 0
+    assert c.rgb[2] == 0
+
+
 def test_color_setters():
     b = Color("black")
     b.hsl = HSL.BLUE

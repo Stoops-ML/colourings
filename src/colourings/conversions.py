@@ -22,31 +22,59 @@ from .identify import (
 
 # add HSV, CMYK, YUV conversion
 
+def _threshold(value: float) -> float:
+    if abs(value) < FLOAT_ERROR:
+        return 0.0
+    return value
+
 
 def rgbf2rgb(rgbf: Sequence[int | float]) -> tuple[float, float, float]:
-    return rgbf[0] * 255.0, rgbf[1] * 255.0, rgbf[2] * 255.0
+    return (
+        _threshold(rgbf[0] * 255.0),
+        _threshold(rgbf[1] * 255.0),
+        _threshold(rgbf[2] * 255.0),
+    )
 
 
 def rgb2rgba(
     rgb: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
-    return rgb[0], rgb[1], rgb[2], alpha * 255.0
+    return (
+        _threshold(rgb[0]),
+        _threshold(rgb[1]),
+        _threshold(rgb[2]),
+        _threshold(alpha * 255.0),
+    )
 
 
 def rgb2rgbf(rgb: Sequence[int | float]) -> tuple[float, float, float]:
-    return rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0
+    return (
+        _threshold(rgb[0] / 255.0),
+        _threshold(rgb[1] / 255.0),
+        _threshold(rgb[2] / 255.0),
+    )
 
 
 def rgb2rgbaf(
     rgb: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
-    return rgb[0] / 255.0, rgb[1] / 255.0, rgb[2] / 255.0, alpha
+    return (
+        _threshold(rgb[0] / 255.0),
+        _threshold(rgb[1] / 255.0),
+        _threshold(rgb[2] / 255.0),
+        _threshold(alpha),
+    )
 
 
 def hsl2hsla(
     hsl: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
-    return hsl[0] / 360.0, hsl[1], hsl[2], alpha
+    return (
+        _threshold(hsl[0] / 360.0),
+        _threshold(hsl[1]),
+        _threshold(hsl[2]),
+        _threshold(alpha),
+    )
 
 
 def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float, float, float]:
@@ -74,7 +102,11 @@ def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float, float, float]:
     _h /= 360.0
 
     if _s == 0:
-        return _l * 255.0, _l * 255.0, _l * 255.0
+        return (
+            _threshold(_l * 255.0),
+            _threshold(_l * 255.0),
+            _threshold(_l * 255.0),
+        )
 
     v2 = _l * (1.0 + _s) if _l < 0.5 else (_l + _s) - (_s * _l)
 
@@ -140,7 +172,7 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
     _l = vsum / 2
 
     if diff < FLOAT_ERROR:  ## This is a gray, no chroma...
-        return (0.0, 0.0, _l)
+        return (0.0, 0.0, _threshold(_l))
 
     ##
     ## Chromatic data...
@@ -165,7 +197,11 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
     if h > 1:
         h -= 1
 
-    return h * 360.0, s, _l
+    return (
+        _threshold(h * 360.0),
+        _threshold(s),
+        _threshold(_l),
+    )
 
 
 def _hue2rgb(v1, v2, vH):
@@ -229,7 +265,11 @@ def hex2rgb(hex: str) -> tuple[float, float, float]:
     except Exception as e:
         raise ValueError(f"Invalid value {hex} provided for rgb color.") from e
 
-    return (float(int(r, 16)), float(int(g, 16)), float(int(b, 16)))
+    return (
+        _threshold(float(int(r, 16))),
+        _threshold(float(int(g, 16))),
+        _threshold(float(int(b, 16))),
+    )
 
 
 def hex2web(hex: str) -> str:
