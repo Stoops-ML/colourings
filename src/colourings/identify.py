@@ -82,3 +82,38 @@ def is_hsla(color: Any) -> bool:
         if not isinstance(channel, int | float) or not (0 <= channel <= 1):
             return False
     return True
+
+
+def is_yuv(color: Any) -> bool:
+    if not isinstance(color, Sequence) or isinstance(color, str):
+        return False
+    if len(color) != 3:
+        return False
+    for channel in color:
+        if not isinstance(channel, int | float) or not (0 <= channel <= 1):
+            return False
+    return True
+
+
+def is_hsv(color: Any) -> bool:
+    if not isinstance(color, Sequence) or isinstance(color, str):
+        return False
+    if len(color) != 3:
+        return False
+    if isinstance(color[0], int | float) and not 0 <= color[0] <= 360:
+        return False
+    for channel in color[1:]:
+        if not isinstance(channel, int | float) or not (0 <= channel <= 1):
+            return False
+    return True
+
+
+def is_cmyk(color: Any) -> bool:
+    if not isinstance(color, Sequence) or isinstance(color, str):
+        return False
+    if len(color) != 4:
+        return False
+    for channel in color:
+        if not isinstance(channel, int | float) or not (0 <= channel <= 1):
+            return False
+    return True

@@ -9,8 +9,10 @@ from .definitions import (
     SHORT_HEX_COLOR,
 )
 from .identify import (
+    is_cmyk,
     is_hsl,
     is_hsla,
+    is_hsv,
     is_long_hex,
     is_rgb,
     is_rgba,
@@ -18,6 +20,7 @@ from .identify import (
     is_rgbf,
     is_short_hex,
     is_web,
+    is_yuv,
 )
 
 # add HSV, CMYK, YUV conversion
@@ -361,3 +364,138 @@ def hsl2web(hsl: Sequence[int | float]) -> str:
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSL type.")
     return rgb2web(hsl2rgb(hsl))
+
+
+def yuv2rgb(yuv: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert YUV representation to RGB
+
+    :param yuv: YUV 3-uple of float values
+    :rtype: 3-uple for RGB values in float between 0 and 255
+    """
+    if not is_yuv(yuv):
+        raise ValueError("Input is not an YUV type.")
+    y, u, v = yuv
+    r = y + 1.13983 * v
+    g = y - 0.39465 * u - 0.58060 * v
+    b = y + 2.03211 * u
+    return rgbf2rgb((r, g, b))
+
+
+def rgb2yuv(rgb: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert RGB representation to YUV
+
+    :param rgb: RGB 3-uple of float values
+    :rtype: 3-uple for YUV values in float
+    """
+    if not is_rgb(rgb):
+        raise ValueError("Input is not an RGB type.")
+    r, g, b = rgb2rgbf(rgb)
+    y = 0.299 * r + 0.587 * g + 0.114 * b
+    u = -0.14713 * r - 0.28886 * g + 0.436 * b
+    v = 0.615 * r - 0.51499 * g - 0.10001 * b
+    return (
+        _threshold(y),
+        _threshold(u),
+        _threshold(v),
+    )
+
+
+def rgb2hsv(rgb: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert RGB representation to HSV
+
+    :param rgb: RGB 3-uple of float values
+    :rtype: 3-uple for HSV values in float
+    """
+    if not is_rgb(rgb):
+        raise ValueError("Input is not an RGB type.")
+    r, g, b = rgb2rgbf(rgb)
+
+    vmax = max(r, g, b)
+    vmin = min(r, g, b)
+    diff = vmax - vmin
+
+    s = 0 if vmax == 0 else diff / vmax
+
+    if diff == 0:
+        h = 0.0
+    elif vmax == r:
+        h = (g - b) / diff + (g < b) * 6
+    elif vmax == g:
+        h = (b - r) / diff + 2
+    else:
+        h = (r - g) / diff + 4
+    return (
+        _threshold(h * 60.0),
+        _threshold(s),
+        _threshold(vmax),
+    )
+
+
+def hsv2rgb(hsv: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert HSV representation to RGB
+
+    :param hsv: HSV 3-uple of float values
+    :rtype: 3-uple for RGB values in float between 0 and 255
+    """
+    if not is_hsv(hsv):
+        raise ValueError("Input is not an HSV type.")
+    h, s, v = hsv
+    h = h / 60.0
+    i = int(h) % 6
+    f = h - int(h)
+    p = v * (1 - s)
+    q = v * (1 - f * s)
+    t = v * (1 - (1 - f) * s)
+
+    if i == 0:
+        r, g, b = v, t, p
+    elif i == 1:
+        r, g, b = q, v, p
+    elif i == 2:
+        r, g, b = p, v, t
+    elif i == 3:
+        r, g, b = p, q, v
+    elif i == 4:
+        r, g, b = t, p, v
+    else:
+        r, g, b = v, p, q
+
+    return rgbf2rgb((r, g, b))
+
+
+def cmyk2rgb(cmyk: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert CMYK representation to RGB
+
+    :param cmyk: CMYK 4-uple of float values
+    :rtype: 3-uple for RGB values in float between 0 and 255
+    """
+    if not is_cmyk(cmyk):
+        raise ValueError("Input is not an CMYK type.")
+    c, m, y, k = cmyk
+    r = (1 - c) * (1 - k)
+    g = (1 - m) * (1 - k)
+    b = (1 - y) * (1 - k)
+    return rgbf2rgb((r, g, b))
+
+
+def rgb2cmyk(rgb: Sequence[int | float]) -> tuple[float, float, float, float]:
+    """Convert RGB representation to CMYK
+
+    :param rgb: RGB 3-uple of float values
+    :rtype: 4-uple for CMYK values in float
+    """
+    if not is_rgb(rgb):
+        raise ValueError("Input is not an RGB type.")
+    r, g, b = rgb2rgbf(rgb)
+    k = 1 - max(r, g, b)
+    if k == 1:
+        return 0, 0, 0, 1
+    c = (1 - r - k) / (1 - k)
+    m = (1 - g - k) / (1 - k)
+    y = (1 - b - k) / (1 - k)
+    return (
+        _threshold(c),
+        _threshold(m),
+        _threshold(y),
+        _threshold(k),
+    )
