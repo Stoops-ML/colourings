@@ -37,7 +37,7 @@ def test_bad_hsl():
 
 
 def test_bad_hsla():
-    assert not is_hsla((1.1, 0, 0))
-    assert not is_hsla((1.1, 2, 0, 0))
+    assert not is_hsla((110, 0, 0))
+    assert not is_hsla((110, 200, 0, 0))
     assert not is_hsla("30, 300, 0, 0")
     assert not is_hsla(int)

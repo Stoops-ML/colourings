@@ -15,6 +15,7 @@ from .conversions import (
     hsl2rgb,
     hsl2rgbf,
     hsla2hsl,
+    hslf2hsl,
     rgb2hex,
     rgb2hsl,
     rgb2rgba,
@@ -241,13 +242,16 @@ class Color:
 
     _hsl: tuple[float, float, float]  # internal representation
     hsl: tuple[float, float, float]
+    hsla: tuple[float, float, float, float]
+    hslf: tuple[float, float, float]
+    hslaf: tuple[float, float, float, float]
+    hsv: tuple[float, float, float]
     hex: str
     hex_l: str
     rgb: tuple[float, float, float]
     rgba: tuple[float, float, float, float]
     rgbf: tuple[float, float, float]
     rgbaf: tuple[float, float, float, float]
-    hsla: tuple[float, float, float, float]
     hue: float
     saturation: float
     lightness: float
@@ -265,6 +269,9 @@ class Color:
         web: str | None = None,
         hsl: Sequence[int | float] | None = None,
         hsla: Sequence[int | float] | None = None,
+        hslf: Sequence[int | float] | None = None,
+        hslaf: Sequence[int | float] | None = None,
+        hsv: Sequence[int | float] | None = None,
         hex: str | None = None,
         hex_l: str | None = None,
         rgb: Sequence[int | float] | None = None,
@@ -287,6 +294,9 @@ class Color:
                     web,
                     hsl,
                     hsla,
+                    hslf,
+                    hslaf,
+                    hsv,
                     hex,
                     hex_l,
                     rgb,
@@ -299,7 +309,7 @@ class Color:
             != 1
         ):
             raise ValueError(
-                "Only one of 'color', 'web', 'hsl', 'hsla', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
+                "Only one of 'color', 'web', 'hsl', 'hsla', 'hslf', 'hslaf', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
             )
 
         # convert to hsl
@@ -315,7 +325,15 @@ class Color:
                 raise ValueError(
                     f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of hsla={hsla[3]}"
                 )
-            self.hsl, alpha = hsla2hsl(hsla), hsla[3]
+            self.hsl, alpha = hsla2hsl(hsla), hsla[3] / 100
+        elif hslf is not None:
+            self.hsl = hslf2hsl(hslf)
+        elif hslaf is not None:
+            if alpha is not None and alpha != hslaf[3]:
+                raise ValueError(
+                    f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of hslaf={hslaf[3]}"
+                )
+            self.hsl, alpha = hslf2hsl(hslaf[:3]), hslaf[3]
         elif hex is not None:
             self.hsl = hex2hsl(hex)
         elif hex_l is not None:

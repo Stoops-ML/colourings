@@ -41,18 +41,18 @@ def test_web2hsl():
 
 
 def test_hsl2web():
-    assert hsl2web((0.0, 0.0, 0.5020)) == "gray"
+    assert hsl2web((0.0, 0.0, 50.20)) == "gray"
 
 
 def test_hex2hsl():
     hsl = hex2hsl("#00ff00")
     assert round(hsl[0] / 360.0, 4) == 0.3333
-    assert hsl[1] == 1.0
-    assert hsl[2] == 0.5
+    assert hsl[1] == 100.0
+    assert hsl[2] == 50
 
 
 def test_hsl2hex():
-    assert hsl2hex((1.0, 1.0, 1.0)) == "#fff"
+    assert hsl2hex((100.0, 100.0, 100.0)) == "#fff"
 
 
 def test_hex2web_7_to_4_digits():
@@ -106,13 +106,13 @@ def test_bad_hsla2hsl():
     with pytest.raises(ValueError):
         hsla2hsl("a")  # type: ignore
     with pytest.raises(ValueError):
-        hsla2hsl((2, 0, 0, 0))
+        hsla2hsl((370, 0, 0, 0))
     with pytest.raises(ValueError):
-        hsla2hsl((0, 2, 0, 0))
+        hsla2hsl((0, 200, 0, 0))
     with pytest.raises(ValueError):
-        hsla2hsl((0, 0, 2, 0))
+        hsla2hsl((0, 0, 200, 0))
     with pytest.raises(ValueError):
-        hsla2hsl((0, 0, 0, 2))
+        hsla2hsl((0, 0, 0, 200))
 
 
 def test_bad_hex2web():
@@ -149,9 +149,9 @@ def test_bad_hsl2web():
     with pytest.raises(ValueError):
         hsl2web((361, 0, 0))
     with pytest.raises(ValueError):
-        hsl2web((0.4, 1.1, 0))
+        hsl2web((0, 110, 0))
     with pytest.raises(ValueError):
-        hsl2web((0.4, 0, 1.1))
+        hsl2web((0, 0, 110))
 
 
 def test_bad_hsl2hex():
@@ -162,9 +162,9 @@ def test_bad_hsl2hex():
     with pytest.raises(ValueError):
         hsl2hex((361, 0, 0))
     with pytest.raises(ValueError):
-        hsl2hex((0.4, 1.1, 0))
+        hsl2web((0, 110, 0))
     with pytest.raises(ValueError):
-        hsl2hex((0.4, 0, 1.1))
+        hsl2web((0, 0, 110))
 
 
 def test_bad_hex2hsl():
@@ -185,9 +185,9 @@ def test_bad_rgb2web():
 
 def test_bad_hsl2rgb():
     with pytest.raises(ValueError):
-        hsl2rgb((0, 2, 0))
+        hsl2rgb((0, 102, 0))
     with pytest.raises(ValueError):
-        hsl2rgb((0, 0, 2))
+        hsl2rgb((0, 0, 102))
     with pytest.raises(ValueError):
         hsl2rgb((0, 0, -1))
     with pytest.raises(ValueError):

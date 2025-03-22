@@ -71,10 +71,18 @@ def hsl2hsla(
     hsl: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
     return (
-        _threshold(hsl[0] / 360.0),
+        _threshold(hsl[0]),
         _threshold(hsl[1]),
         _threshold(hsl[2]),
-        _threshold(alpha),
+        _threshold(alpha * 100),
+    )
+
+
+def hslf2hsl(hslf: Sequence[int | float]) -> tuple[float, float, float]:
+    return (
+        _threshold(hslf[0] * 360.0),
+        _threshold(hslf[1] * 100.0),
+        _threshold(hslf[2] * 100.0),
     )
 
 
@@ -101,6 +109,8 @@ def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float, float, float]:
 
     _h, _s, _l = [float(v) for v in hsl]
     _h /= 360.0
+    _s /= 100.0
+    _l /= 100.0
 
     if _s == 0:
         return (
@@ -139,8 +149,7 @@ def rgbaf2hsl(rgbaf: Sequence[int | float]) -> tuple[float, float, float]:
 def hsla2hsl(hsla: Sequence[int | float]) -> tuple[float, float, float]:
     if not is_hsla(hsla):
         raise ValueError("Input is not an HSLA type.")
-    hsl = (hsla[0] * 360, hsla[1], hsla[2])
-    return hsl
+    return hsla[0], hsla[1], hsla[2]
 
 
 def rgbf2hsl(rgbf: Sequence[int | float]) -> tuple[float, float, float]:
@@ -173,7 +182,7 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
     _l = vsum / 2
 
     if diff < FLOAT_ERROR:  ## This is a gray, no chroma...
-        return (0.0, 0.0, _threshold(_l))
+        return (0.0, 0.0, _threshold(_l * 100.0))
 
     ##
     ## Chromatic data...
@@ -200,8 +209,8 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
 
     return (
         _threshold(h * 360.0),
-        _threshold(s),
-        _threshold(_l),
+        _threshold(s * 100.0),
+        _threshold(_l * 100.0),
     )
 
 

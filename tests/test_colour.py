@@ -126,11 +126,11 @@ def test_color_scale_with_fewer_inputs():
 def test_bad_color_change_HSL():
     c = Color("red")
     with pytest.raises(TypeError, match="Value is not a valid HSL"):
-        c.lightness = 2
+        c.lightness = 200
     with pytest.raises(TypeError, match="Value is not a valid HSL"):
         c.lightness = -0.5
     with pytest.raises(TypeError, match="Value is not a valid HSL"):
-        c.saturation = 2
+        c.saturation = 200
     with pytest.raises(TypeError, match="Value is not a valid HSL"):
         c.saturation = -0.5
     with pytest.raises(TypeError, match="Value is not a valid HSL"):
@@ -244,6 +244,7 @@ def test_HEX():
 
 
 def test_color_scale_num_sections():
+    Color("white")
     n = 10
     cs = color_scale(
         (Color("black"), Color("orange"), Color("blue"), Color("white")), n
@@ -283,17 +284,21 @@ def test_color_scale_num_sections():
     assert len(cs) == n
 
     n = 4
-    cs = color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), n, longer=True)
+    cs = color_scale(
+        (Color(hsl=(0, 100, 50)), Color(hsl=(360, 100, 50))), n, longer=True
+    )
     assert cs == [Color("#f00"), Color("#0f0"), Color("#00f"), Color("#f00")]
     assert len(cs) == n
 
     n = 4
-    cs = color_scale((Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), n, longer=True)
+    cs = color_scale(
+        (Color(hsl=(360, 100, 50)), Color(hsl=(0, 100, 50))), n, longer=True
+    )
     assert len(cs) == n
     assert cs == [Color("#f00"), Color("#00f"), Color("#0f0"), Color("#f00")]
 
     n = 4
-    cs = color_scale((Color(hsl=(0, 1, 0.5)), Color(hsl=(360, 1, 0.5))), n)
+    cs = color_scale((Color(hsl=(0, 100, 50)), Color(hsl=(360, 100, 50))), n)
     assert len(cs) == n
     assert cs == [
         Color("#f00"),
@@ -303,7 +308,7 @@ def test_color_scale_num_sections():
     ]
 
     n = 4
-    cs = color_scale((Color(hsl=(360, 1, 0.5)), Color(hsl=(0, 1, 0.5))), n)
+    cs = color_scale((Color(hsl=(360, 100, 50)), Color(hsl=(0, 100, 50))), n)
     assert len(cs) == n
     assert cs == [
         Color("#f00"),
@@ -314,14 +319,14 @@ def test_color_scale_num_sections():
 
     n = 4
     cs = color_scale(
-        (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))), n
+        (Color(hsl=(360.0 / 3, 100, 50)), Color(hsl=(2 * 360.0 / 3, 100, 50))), n
     )
     assert len(cs) == n
     assert cs == [Color("#0f0"), Color("#0fa"), Color("#0af"), Color("#00f")]
 
     n = 4
     cs = color_scale(
-        (Color(hsl=(360.0 / 3, 1, 0.5)), Color(hsl=(2 * 360.0 / 3, 1, 0.5))),
+        (Color(hsl=(360.0 / 3, 100, 50)), Color(hsl=(2 * 360.0 / 3, 100, 50))),
         n,
         longer=True,
     )
@@ -330,7 +335,7 @@ def test_color_scale_num_sections():
 
     n = 4
     cs = color_scale(
-        (Color(hsl=(2 * 360.0 / 3, 1, 0.5)), Color(hsl=(360.0 / 3, 1, 0.5))),
+        (Color(hsl=(2 * 360.0 / 3, 100, 50)), Color(hsl=(360.0 / 3, 100, 50))),
         n,
         longer=True,
     )
@@ -338,7 +343,7 @@ def test_color_scale_num_sections():
     assert cs == [Color("#00f"), Color("#f0a"), Color("#fa0"), Color("#0f0")]
 
     n = 16
-    cs = color_scale((Color(hsl=(0, 0, 0)), Color(hsl=(0, 0, 1))), n)
+    cs = color_scale((Color(hsl=(0, 0, 0)), Color(hsl=(0, 0, 100))), n)
     assert len(cs) == n
     assert cs == [
         Color("#000"),
@@ -400,9 +405,11 @@ def test_purple_inputs():
     assert (
         Color("purple")
         == Color("#800080")
-        == Color(hsl=(300, 1, 0.25098039215686274))
-        == Color(hsla=(300 / 360, 1, 0.25098039215686274, 1.0))
-        == Color((300, 1, 0.25098039215686274))
+        == Color(hsl=(300, 100, 25.098039215686274))
+        == Color(hsla=(300, 100, 25.098039215686274, 100.0))
+        == Color(hslf=(300 / 360, 1, 0.25098039215686274))
+        == Color(hslaf=(300 / 360, 1, 0.25098039215686274, 1.0))
+        == Color((300, 100, 25.098039215686274))
         == Color(Color("purple"))
     )
 
@@ -413,8 +420,8 @@ def test_red_inputs():
         == Color("blue", hue=0)
         == Color("#f00")
         == Color("#ff0000")
-        == Color(hsl=(0, 1, 0.5))
-        == Color(hsla=(0, 1, 0.5, 1))
+        == Color(hsl=(0, 100, 50))
+        == Color(hsla=(0, 100, 50, 100))
         == Color(rgb=(255, 0, 0))
         == Color(rgba=(255, 0, 0, 255))
         == Color(rgbf=(1, 0, 0))
@@ -428,8 +435,8 @@ def test_blue_inputs():
         Color("blue")
         == Color("#00f")
         == Color("#0000ff")
-        == Color(hsl=(240, 1, 0.5))
-        == Color(hsla=(240 / 360, 1, 0.5, 1.0))
+        == Color(hsl=(240, 100, 50))
+        == Color(hsla=(240, 100, 50, 100))
         == Color(rgb=(0, 0, 255))
         == Color(rgba=(0, 0, 255, 255))
         == Color(rgbf=(0, 0, 1))
@@ -528,8 +535,8 @@ def test_color_access():
     b = Color("black")
     b.hsl = HSL.BLUE
     assert round(b.hue / 360.0, 4) == 0.6667
-    assert b.saturation == 1.0
-    assert b.lightness == 0.5
+    assert b.saturation == 100.0
+    assert b.lightness == 50
     assert b.red == 0.0
     assert b.blue == 255.0
     assert b.green == 0.0
@@ -538,7 +545,7 @@ def test_color_access():
     assert b.rgba == (0.0, 0.0, 255.0, 255.0)
     assert b.rgbaf == (0.0, 0.0, 1.0, 1.0)
     assert round(b.hsl[0] / 360.0, 4) == 0.6667
-    assert b.hsl[1:] == (1.0, 0.5)
+    assert b.hsl[1:] == (100.0, 50)
     assert b.hex == "#00f"
 
 
@@ -551,7 +558,7 @@ def test_thresholding():
 def test_color_setters():
     b = Color("black")
     b.hsl = HSL.BLUE
-    assert b.hsl == (240.0, 1.0, 0.5)
+    assert b.hsl == (240.0, 100.0, 50.0)
     b.rgb = (0.0, 0.0, 255.0)
     assert b.rgb == (0.0, 0.0, 255.0)
     b.hex = "#f00"
@@ -559,8 +566,8 @@ def test_color_setters():
     b.hex = "#ff0000"
     assert b.hex_l == "#ff0000"
     assert b.hex == "#f00"
-    b.hsl = (0.0, 1.0, 0.5)
-    assert b.hsl == (0.0, 1.0, 0.5)
+    b.hsl = (0.0, 100.0, 50.0)
+    assert b.hsl == (0.0, 100.0, 50.0)
     b.rgba = (0.0, 0.0, 255.0, 255.0)
     assert b.rgba == (0.0, 0.0, 255.0, 255.0)
     b.rgbaf = (0.0, 0.0, 1.0, 1.0)
@@ -579,7 +586,7 @@ def test_color_change_values():
     b.hue = 2.0 / 3 * 360.0
     assert b.hex == "#00f"
     b.hex = "#f00"
-    assert b.hsl == (0.0, 1.0, 0.5)
+    assert b.hsl == (0.0, 100.0, 50.0)
 
     b.hex_l = "#123456"
     assert b.hex_l == "#123456"
@@ -596,7 +603,7 @@ def test_color_properties():
     assert c == Color("red")
 
     c.saturation = 0.0
-    assert c.hsl == (0, 0.0, 0.5)
+    assert c.hsl == (0, 0.0, 50.0)
     assert c.rgb == (0.5 * 255.0, 0.5 * 255.0, 0.5 * 255.0)
 
     c.lightness = 0.0
@@ -608,7 +615,7 @@ def test_color_properties():
     assert c.hex == "#0ff"
     assert c == Color("cyan")
 
-    c = Color("blue", lightness=0.75)
+    c = Color("blue", lightness=75)
     assert c.web == "#7f7fff"
 
     c = Color("red", red=0.5 * 255.0)
@@ -626,16 +633,16 @@ def test_alpha():
     assert c.rgba == (255.0, 0.0, 0.0, 255.0)
     assert c.rgbf == (1.0, 0.0, 0.0)
     assert c.rgbaf == (1.0, 0.0, 0.0, 1.0)
-    assert c.hsl == (0, 1, 0.5)
-    assert c.hsla == (0, 1, 0.5, 1.0)
+    assert c.hsl == (0, 100.0, 50.0)
+    assert c.hsla == (0, 100.0, 50.0, 100.0)
     c.alpha = 0.5
     assert c.alpha == 0.5
     assert c.rgb == (255.0, 0.0, 0.0)
     assert c.rgba == (255.0, 0.0, 0.0, 127.5)
     assert c.rgbf == (1.0, 0.0, 0.0)
     assert c.rgbaf == (1.0, 0.0, 0.0, 0.5)
-    assert c.hsl == (0, 1, 0.5)
-    assert c.hsla == (0, 1, 0.5, 0.5)
+    assert c.hsl == (0, 100.0, 50.0)
+    assert c.hsla == (0, 100, 50, 50)
     with pytest.raises(ValueError):
         c.alpha = -0.1
     with pytest.raises(ValueError):
@@ -660,7 +667,7 @@ def test_color_subclassing():
     class Tint(Color):
         pass
 
-    assert Tint("red").hsl == (0.0, 1.0, 0.5)
+    assert Tint("red").hsl == (0.0, 100.0, 50)
 
 
 def test_color_factory():
