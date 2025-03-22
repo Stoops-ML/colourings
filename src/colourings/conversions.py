@@ -11,6 +11,7 @@ from .definitions import (
 from .identify import (
     is_hsl,
     is_hsla,
+    is_hslf,
     is_long_hex,
     is_rgb,
     is_rgba,
@@ -79,6 +80,8 @@ def hsl2hsla(
 
 
 def hslf2hsl(hslf: Sequence[int | float]) -> tuple[float, float, float]:
+    if not is_hslf(hslf):
+        raise ValueError("Input is not an HSLf type.")
     return (
         _threshold(hslf[0] * 360.0),
         _threshold(hslf[1] * 100.0),
