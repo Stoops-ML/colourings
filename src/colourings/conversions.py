@@ -71,6 +71,8 @@ def rgb2rgbaf(
 def hsl2hsla(
     hsl: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
+    if not is_hsl(hsl):
+        raise ValueError("Input is not an HSL type.")
     return (
         _threshold(hsl[0]),
         _threshold(hsl[1]),
