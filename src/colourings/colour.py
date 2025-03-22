@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import math
-import tkinter
 import warnings
 from collections.abc import Callable, Generator, Sequence
 from typing import Any
@@ -490,6 +489,8 @@ class Color:
         yield from color_scale((self, Color(value)), steps, longer=longer)
 
     def preview(self, size_x: int | float = 200, size_y: int | float = 200) -> None:
+        import tkinter
+
         if not isinstance(size_x, int | float):
             raise TypeError("`size_x` must be of integer or float type")
         if not isinstance(size_y, int | float):
