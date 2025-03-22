@@ -3,6 +3,7 @@ from colourings.identify import (
     is_hsl,
     is_hsla,
     is_hslaf,
+    is_hslf,
     is_rgb,
     is_rgba,
     is_rgbaf,
@@ -66,13 +67,11 @@ def test_is_hslaf():
 
 
 def test_is_hslf():
-    assert is_hslaf((0, 0, 0))
-    assert is_hslaf(Color(hslaf=(0, 0, 0)).hsla)
-    assert not is_hslaf((2, 0, 0))
-    assert not is_hslaf((0, 2, 0))
-    assert not is_hslaf((0, 0, 2))
-    assert not is_hslaf((0, 0, 0))
-    assert not is_hslaf((-2, 0, 0))
-    assert not is_hslaf((0, -2, 0))
-    assert not is_hslaf((0, 0, -2))
-    assert not is_hslaf((0, 0, 0))
+    assert is_hslf((0, 0, 0))
+    assert is_hslf(Color(hslf=(0, 0, 0)).hslf)
+    assert not is_hslf((2, 0, 0))
+    assert not is_hslf((0, 2, 0))
+    assert not is_hslf((0, 0, 2))
+    assert not is_hslf((-2, 0, 0))
+    assert not is_hslf((0, -2, 0))
+    assert not is_hslf((0, 0, -2))
