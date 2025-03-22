@@ -11,6 +11,8 @@ from .conversions import (
     hex2rgb,
     hex2web,
     hsl2hsla,
+    hsl2hslaf,
+    hsl2hslf,
     hsl2rgb,
     hsl2rgbf,
     hsla2hsl,
@@ -384,6 +386,9 @@ class Color:
     def get_hsl(self) -> tuple[float, float, float]:
         return self._hsl
 
+    def get_hslf(self) -> tuple[float, float, float]:
+        return hsl2hslf(self._hsl)
+
     def get_hex(self) -> str:
         return rgb2hex(self.rgb)
 
@@ -404,6 +409,9 @@ class Color:
 
     def get_hsla(self) -> tuple[float, float, float, float]:
         return hsl2hsla(self.hsl, self._alpha)
+
+    def get_hslaf(self) -> tuple[float, float, float, float]:
+        return hsl2hslaf(self.hsl, self._alpha)
 
     def get_hue(self) -> float:
         return self.hsl[0]

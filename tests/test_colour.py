@@ -637,6 +637,8 @@ def test_alpha():
     assert c.rgbaf == (1.0, 0.0, 0.0, 1.0)
     assert c.hsl == (0, 100.0, 50.0)
     assert c.hsla == (0, 100.0, 50.0, 100.0)
+    assert c.hslf == (0, 1.0, 0.5)
+    assert c.hslaf == (0, 1.0, 0.5, 1.0)
     c.alpha = 0.5
     assert c.alpha == 0.5
     assert c.rgb == (255.0, 0.0, 0.0)
@@ -645,6 +647,8 @@ def test_alpha():
     assert c.rgbaf == (1.0, 0.0, 0.0, 0.5)
     assert c.hsl == (0, 100.0, 50.0)
     assert c.hsla == (0, 100, 50, 50)
+    assert c.hslf == (0, 1.0, 0.5)
+    assert c.hslaf == (0, 1, 0.5, 0.5)
     with pytest.raises(ValueError):
         c.alpha = -0.1
     with pytest.raises(ValueError):

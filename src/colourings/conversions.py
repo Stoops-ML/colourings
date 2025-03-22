@@ -81,6 +81,19 @@ def hsl2hsla(
     )
 
 
+def hsl2hslaf(
+    hsl: Sequence[int | float], alpha: int | float
+) -> tuple[float, float, float, float]:
+    if not is_hsl(hsl):
+        raise ValueError("Input is not an HSL type.")
+    return (
+        _threshold(hsl[0] / 360.0),
+        _threshold(hsl[1] / 100.0),
+        _threshold(hsl[2] / 100.0),
+        _threshold(alpha),
+    )
+
+
 def hslf2hsl(hslf: Sequence[int | float]) -> tuple[float, float, float]:
     if not is_hslf(hslf):
         raise ValueError("Input is not an HSLf type.")
@@ -88,6 +101,16 @@ def hslf2hsl(hslf: Sequence[int | float]) -> tuple[float, float, float]:
         _threshold(hslf[0] * 360.0),
         _threshold(hslf[1] * 100.0),
         _threshold(hslf[2] * 100.0),
+    )
+
+
+def hsl2hslf(hsl: Sequence[int | float]) -> tuple[float, float, float]:
+    if not is_hsl(hsl):
+        raise ValueError("Input is not an HSLf type.")
+    return (
+        _threshold(hsl[0] / 360.0),
+        _threshold(hsl[1] / 100.0),
+        _threshold(hsl[2] / 100.0),
     )
 
 
