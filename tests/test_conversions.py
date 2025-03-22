@@ -5,9 +5,13 @@ from colourings.conversions import (
     hex2rgb,
     hex2web,
     hsl2hex,
+    hsl2hsla,
+    hsl2hslaf,
+    hsl2hslf,
     hsl2rgb,
     hsl2web,
     hsla2hsl,
+    hslf2hsl,
     rgb2hex,
     rgb2hsl,
     rgb2web,
@@ -213,3 +217,23 @@ def test_bad_rgb2hsl():
 def test_bad_hex2rgb():
     with pytest.raises(ValueError):
         hex2rgb("#00ff000")
+
+
+def test_bad_hsl2hsla():
+    with pytest.raises(ValueError):
+        hsl2hsla((-1, 0, 0), 1)
+
+
+def test_bad_hsl2hslaf():
+    with pytest.raises(ValueError):
+        hsl2hslaf((-1, 0, 0), 1)
+
+
+def test_bad_hslf2hsl():
+    with pytest.raises(ValueError):
+        hslf2hsl((-1, 0, 0))
+
+
+def test_bad_hsl2hslf():
+    with pytest.raises(ValueError):
+        hsl2hslf((-1, 0, 0))
