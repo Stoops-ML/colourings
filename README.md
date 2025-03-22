@@ -15,9 +15,9 @@ This is a fork of the [Colour](https://github.com/vaab/colour/) Python package. 
 - Threshold numbers [#61](https://github.com/vaab/colour/issues/61)
 - `color_scale` can interpolate between more than two colors
 - RGB values are between 0 and 255
-- Hue is between 0 and 360
-- Add alpha. The alpha value is between 0 and 1, and the alpha value of RGBA is between 0 and 255
-- Add RGBf and RGBAf, whose values are between 0 and 1
+- Hue is between 0 and 360, and saturation and lightness between 0 and 100
+- Add alpha. The alpha value is between 0 and 1. The alpha value of RGBA is between 0 and 255, and for HSLA is between 0 and 100.
+- Add RGBf, RGBAf, HSLf and HSLAf, whose values are between 0 and 1
 - Add typing
 - Updated project structure
 
