@@ -64,6 +64,8 @@ def test_is_hslaf():
     assert not is_hslaf((0, -2, 0, 0))
     assert not is_hslaf((0, 0, -2, 0))
     assert not is_hslaf((0, 0, 0, -2))
+    assert not is_hslaf("nope")
+    assert not is_hslaf((0, 1, 0))
 
 
 def test_is_hslf():
@@ -75,3 +77,5 @@ def test_is_hslf():
     assert not is_hslf((-2, 0, 0))
     assert not is_hslf((0, -2, 0))
     assert not is_hslf((0, 0, -2))
+    assert not is_hslf("nope")
+    assert not is_hslf((0, 1, 0, 0))
