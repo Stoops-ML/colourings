@@ -33,11 +33,11 @@ def test_web2hsl():
     hsl = web2hsl("grey")
     assert hsl[0] == 0.0
     assert hsl[1] == 0.0
-    assert round(hsl[2], 4) == 0.5020
+    assert round(hsl[2], 4) == 50.1961
     hsl1 = web2hsl("grey")
     assert hsl1[0] == 0.0
     assert hsl1[1] == 0.0
-    assert round(hsl1[2], 4) == 0.5020
+    assert round(hsl1[2], 4) == 50.1961
 
 
 def test_hsl2web():
