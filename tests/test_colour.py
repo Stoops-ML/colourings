@@ -209,6 +209,8 @@ def test_bad_alpha():
         Color(rgbaf=(1, 1, 1, 1), alpha=0)
     with pytest.raises(ValueError):
         Color(hsla=(1, 1, 1, 1), alpha=0)
+    with pytest.raises(ValueError):
+        Color(hslaf=(1, 1, 1, 1), alpha=0)
 
 
 def test_alpha_entered_twice():
