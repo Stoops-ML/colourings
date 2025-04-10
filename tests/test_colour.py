@@ -684,3 +684,11 @@ def test_color_factory():
     black_blue = get_color("blue", lightness=0)
     assert isinstance(black_red, Color)
     assert black_red != black_blue
+
+
+def test_color_color_lower():
+    assert Color("orangered") == Color("OrangeRed")
+
+
+def test_color_web_lower():
+    assert Color(web="orangered") == Color(web="OrangeRed")

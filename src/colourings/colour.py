@@ -315,9 +315,12 @@ class Color:
 
         # convert to hsl
         if color is not None:
+            if isinstance(color, str):
+                color = color.lower()
             func = identify_color(color)
             self.hsl = func(color)
         elif web is not None:
+            web = web.lower()
             self.hsl = web2hsl(web)
         elif hsl is not None:
             self.hsl = hsl  # type: ignore
