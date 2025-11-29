@@ -1,6 +1,7 @@
 # colourings
 [![PyPI - Version](https://img.shields.io/pypi/v/colourings)](https://pypi.org/project/colourings/)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/colourings)
+[![PyPI Downloads](https://static.pepy.tech/personalized-badge/colourings?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BRIGHTGREEN&left_text=downloads)](https://pepy.tech/projects/colourings)
 [![codecov](https://codecov.io/github/Stoops-ML/colourings/graph/badge.svg?token=NQUPC3NY6S)](https://codecov.io/github/Stoops-ML/colourings)
 
 Converts and manipulates common color representation (RGB, HSL, web, ...)
