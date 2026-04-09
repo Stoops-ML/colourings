@@ -12,6 +12,7 @@ from colourings.colour import (
     RGB_color_picker,
     color_scale,
     colour_scale,
+    hash_or_str,
     identify_color,
     make_color_factory,
 )
@@ -371,6 +372,30 @@ def test_RGB_color_picker():
     assert RGB_color_picker("Something") == RGB_color_picker("Something")
     assert RGB_color_picker("Something") != RGB_color_picker("Something else")
     assert isinstance(RGB_color_picker("Something"), Color)
+
+
+def test_hash_or_str_falls_back_to_type_qualified_string_for_unhashable_objects():
+    class SameStringA:
+        def __hash__(self) -> int:
+            raise TypeError("unhashable")
+
+        def __str__(self):
+            return "shared"
+
+    class SameStringB:
+        def __hash__(self) -> int:
+            raise TypeError("unhashable")
+
+        def __str__(self):
+            return "shared"
+
+    assert hash_or_str(SameStringA()) == "SameStringAshared"
+    assert hash_or_str(SameStringB()) == "SameStringBshared"
+
+
+def test_unsupported_hsv_input_hits_constructor_error_path():
+    with pytest.raises(ValueError, match="Input not recognised"):
+        Color(hsv=(120, 50, 50))
 
 
 def test_colour():
