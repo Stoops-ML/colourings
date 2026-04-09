@@ -104,10 +104,15 @@ dev = [
     "tox>=4.24.1",
     "build",
 ]
+docs = [
+    "sphinx>=7.4",
+    "furo>=2024.8.6",
+    "myst-parser>=3.0",
+]
 
 [project.urls]
 Repository = "https://github.com/Stoops-ML/colourings"
-# Documentation = "https://colourings.readthedocs.io/en"
+Documentation = "https://colourings.readthedocs.io/en/latest/"
 
 [tool.setuptools.dynamic]
 version = {attr = "colourings.__version__"}
