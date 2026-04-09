@@ -224,9 +224,8 @@ def test_bad_hex2rgb():
 def test_hex2rgb_defensive_invalid_length_branch():
     with (
         patch("colourings.conversions.is_long_hex", return_value=True),
-        patch("colourings.conversions.is_short_hex", return_value=False),pytest.raises(
-        ValueError, match="Invalid value #1234 provided for rgb color"
-    )
+        patch("colourings.conversions.is_short_hex", return_value=False),
+        pytest.raises(ValueError, match="Invalid value #1234 provided for rgb color"),
     ):
         hex2rgb("#1234")
 
