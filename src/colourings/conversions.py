@@ -27,7 +27,7 @@ from .identify import (
 def _threshold(value: float) -> float:
     if abs(value) < FLOAT_ERROR:
         return 0.0
-    return value
+    return float(value)
 
 
 def rgbf2rgb(rgbf: Sequence[int | float]) -> tuple[float, float, float]:
