@@ -162,23 +162,23 @@ SHORT_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{3}$")
 def linspace(
     start: int | float, stop: int | float, num: int, endpoint: bool = True
 ) -> list[float]:
-    """Python implementation of numpy.linspace
+    """Return evenly spaced values over a numeric interval.
 
     Parameters
     ----------
-    start : int
-        Start number
-    stop : int
-        End number
+    start : int | float
+        Start value of the interval.
+    stop : int | float
+        End value of the interval.
     num : int
-        Number of steps
-    endpoint : bool, optional
-        Includes end number if true else doesn't, by default True
+        Number of samples to generate.
+    endpoint : bool, default=True
+        Whether to include ``stop`` as the final sample.
 
     Returns
     -------
-    list[int]
-        Linearly spaced numbers between start and end
+    list[float]
+        Evenly spaced floating-point values between ``start`` and ``stop``.
     """
     if num <= 0:
         return []

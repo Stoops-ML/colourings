@@ -5,14 +5,51 @@ from .definitions import COLOR_NAME_TO_RGB, LONG_HEX_COLOR, SHORT_HEX_COLOR
 
 
 def is_long_hex(color: str) -> bool:
+    """Check whether a string is a 6-digit hexadecimal color.
+
+    Parameters
+    ----------
+    color : str
+        Candidate color string.
+
+    Returns
+    -------
+    bool
+        True if the value matches a long hex format like ``#aabbcc``.
+    """
     return bool(LONG_HEX_COLOR.fullmatch(color))
 
 
 def is_short_hex(color: str) -> bool:
+    """Check whether a string is a 3-digit hexadecimal color.
+
+    Parameters
+    ----------
+    color : str
+        Candidate color string.
+
+    Returns
+    -------
+    bool
+        True if the value matches a short hex format like ``#abc``.
+    """
     return bool(SHORT_HEX_COLOR.fullmatch(color))
 
 
 def is_rgb(color: Any) -> bool:
+    """Validate whether a value is an RGB sequence.
+
+    Parameters
+    ----------
+    color : Any
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with each
+        component in the ``[0, 255]`` range.
+    """
     if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 3:
@@ -24,6 +61,19 @@ def is_rgb(color: Any) -> bool:
 
 
 def is_rgbf(color: Any) -> bool:
+    """Validate whether a value is a normalized RGB sequence.
+
+    Parameters
+    ----------
+    color : Any
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with each
+        component in the ``[0, 1]`` range.
+    """
     if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 3:
@@ -35,6 +85,19 @@ def is_rgbf(color: Any) -> bool:
 
 
 def is_hslf(color: Any) -> bool:
+    """Validate whether a value is a normalized HSL sequence.
+
+    Parameters
+    ----------
+    color : Any
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with each
+        component in the ``[0, 1]`` range.
+    """
     if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 3:
@@ -46,6 +109,19 @@ def is_hslf(color: Any) -> bool:
 
 
 def is_rgba(color: Any) -> bool:
+    """Validate whether a value is an RGBA sequence.
+
+    Parameters
+    ----------
+    color : Any
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 4 with each
+        component in the ``[0, 255]`` range.
+    """
     if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 4:
@@ -57,6 +133,19 @@ def is_rgba(color: Any) -> bool:
 
 
 def is_rgbaf(color: Any) -> bool:
+    """Validate whether a value is a normalized RGBA sequence.
+
+    Parameters
+    ----------
+    color : Any
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 4 with each
+        component in the ``[0, 1]`` range.
+    """
     if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 4:
@@ -68,6 +157,19 @@ def is_rgbaf(color: Any) -> bool:
 
 
 def is_hslaf(color: Any) -> bool:
+    """Validate whether a value is a normalized HSLA sequence.
+
+    Parameters
+    ----------
+    color : Any
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 4 with each
+        component in the ``[0, 1]`` range.
+    """
     if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 4:
@@ -79,10 +181,35 @@ def is_hslaf(color: Any) -> bool:
 
 
 def is_web(color: str) -> bool:
+    """Check whether a string is a valid web color representation.
+
+    Parameters
+    ----------
+    color : str
+        Candidate color string.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a known color name or a valid short/long hex.
+    """
     return color in COLOR_NAME_TO_RGB or is_long_hex(color) or is_short_hex(color)
 
 
 def is_hsl(color: Any) -> bool:
+    """Validate whether a value is an HSL sequence.
+
+    Parameters
+    ----------
+    color : Any
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with hue in
+        ``[0, 360]`` and saturation/lightness in ``[0, 100]``.
+    """
     if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 3:
@@ -96,6 +223,19 @@ def is_hsl(color: Any) -> bool:
 
 
 def is_hsla(color: Any) -> bool:
+    """Validate whether a value is an HSLA sequence.
+
+    Parameters
+    ----------
+    color : Any
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 4 with hue in
+        ``[0, 360]`` and saturation/lightness/alpha in ``[0, 100]``.
+    """
     if not isinstance(color, Sequence) or isinstance(color, str):
         return False
     if len(color) != 4:
