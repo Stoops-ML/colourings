@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from colourings.conversions import (
@@ -217,6 +219,24 @@ def test_bad_rgb2hsl():
 def test_bad_hex2rgb():
     with pytest.raises(ValueError):
         hex2rgb("#00ff000")
+
+
+def test_hex2rgb_defensive_invalid_length_branch():
+    with (
+        patch("colourings.conversions.is_long_hex", return_value=True),
+        patch("colourings.conversions.is_short_hex", return_value=False),
+        pytest.raises(ValueError, match="Invalid value #1234 provided for rgb color"),
+    ):
+        hex2rgb("#1234")
+
+
+def test_rgb2hsl_normalizes_hue_above_one_branch():
+    with patch("builtins.min", return_value=0.9):
+        hue, saturation, lightness = rgb2hsl((0, 255, 255))
+
+    assert round(hue, 6) == 360.0
+    assert saturation > 0
+    assert lightness > 0
 
 
 def test_bad_hsl2hsla():

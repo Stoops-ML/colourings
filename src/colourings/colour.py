@@ -157,7 +157,7 @@ def color_scale(
 colour_scale = color_scale
 
 
-def hash_or_str(obj) -> str | int:
+def hash_or_str(obj: Any) -> str | int:
     """Return a stable hash key for an object, with a string fallback.
 
     Parameters
@@ -178,7 +178,7 @@ def hash_or_str(obj) -> str | int:
         return type(obj).__name__ + str(obj)
 
 
-def RGB_color_picker(obj) -> Color:
+def RGB_color_picker(obj: Any) -> Color:
     """Build a color representation from the string representation of an object.
 
     This allows to quickly get a color from some data, with the
@@ -412,7 +412,7 @@ class Color:
         picker: Callable[[Any], Color] = RGB_color_picker,
         pick_key: Callable[[Any], str | int] = hash_or_str,
         equality: Callable[[Color, Color], bool] = RGB_equivalence,
-        **kwargs,
+        **kwargs: Any,
     ):
         # checks
         if (
@@ -499,7 +499,7 @@ class Color:
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    def __getattr__(self, label: str):
+    def __getattr__(self, label: str) -> Any:
         if label.startswith("get_"):
             raise AttributeError(f"'{label}' not found")
         try:
@@ -622,7 +622,10 @@ class Color:
         self.hex = web2hex(value)
 
     def range_to(
-        self, value: str | Sequence[int | float] | Color, steps, longer=False
+        self,
+        value: str | Sequence[int | float] | Color,
+        steps: int,
+        longer: bool = False,
     ) -> Generator[Color, None, None]:
         """Generate a color range from this color to another color.
 
@@ -680,7 +683,7 @@ class Color:
     def __repr__(self) -> str:
         return f"<Color {self.web}>"
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if isinstance(other, Color):
             return self.equality(self, other)
         raise NotImplementedError("Other object must be of type `Color` or `Colour`")
@@ -689,7 +692,7 @@ class Color:
 class Colour(Color): ...
 
 
-def make_color_factory(**kwargs_defaults):
+def make_color_factory(**kwargs_defaults: Any) -> Callable[..., Color]:
     """Create a factory that instantiates Color with default keyword arguments.
 
     Parameters

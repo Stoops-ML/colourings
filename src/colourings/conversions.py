@@ -415,7 +415,7 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
     )
 
 
-def _hue2rgb(v1, v2, vH):
+def _hue2rgb(v1: float, v2: float, vH: float) -> float:
     """Interpolate a single RGB channel from hue data.
 
     Parameters
@@ -544,7 +544,7 @@ def hex2web(hex: str) -> str:
     return hex
 
 
-def web2hex(web: str, force_long=False) -> str:
+def web2hex(web: str, force_long: bool = False) -> str:
     """Convert a web color representation to hexadecimal form.
 
     Parameters
