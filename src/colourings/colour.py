@@ -51,14 +51,26 @@ HSL = C_HSL()
 
 
 class C_RGB:
-    """RGB colors container. Provides a quick color access."""
+    """Container exposing named colors as RGB tuples.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        RGB values for a known color name.
+    """
 
     def __getattr__(self, value):
         return hsl2rgb(getattr(HSL, value))
 
 
 class C_HEX:
-    """RGB colors container. Provides a quick color access."""
+    """Container exposing named colors as hexadecimal strings.
+
+    Returns
+    -------
+    str
+        Hexadecimal color value for a known color name.
+    """
 
     def __getattr__(self, value):
         return rgb2hex(getattr(RGB, value))
@@ -71,28 +83,30 @@ HEX = C_HEX()
 def color_scale(
     colors: Sequence[Color | Colour], num_steps: int, longer: bool = False
 ) -> list[Color]:
-    """Create a color scale using many colours via linear interpolation of hsl.
+    """Create a color scale by linearly interpolating in HSL space.
 
     TODO: implement better interpolation technique: https://www.alanzucconi.com/2016/01/06/colour-interpolation/
 
     Parameters
     ----------
-    colors : Sequence[Color  |  Colour]
-        Sequence of Color objects
-    nb : int
-        Total number of steps
-    longer : bool, optional
-        Long or short path, by default False
+    colors : Sequence[Color | Colour]
+        Ordered color sequence used as interpolation control points.
+    num_steps : int
+        Total number of colors to generate, including endpoints.
+    longer : bool, default=False
+        Whether to take the longer hue arc instead of the shortest arc.
 
-    Yields
-    ------
+    Returns
+    -------
     list[Color]
-        List of Color objects
+        Interpolated color list of length ``num_steps``.
 
     Raises
     ------
     ValueError
-        Number of colors specified must be at least two
+        Raised when fewer than two colors are provided.
+    ValueError
+        Raised when ``num_steps`` is less than the number of control colors.
     """
     # checks
     if len(colors) < 2:
@@ -144,6 +158,18 @@ colour_scale = color_scale
 
 
 def hash_or_str(obj) -> str | int:
+    """Return a stable hash key for an object, with a string fallback.
+
+    Parameters
+    ----------
+    obj : Any
+        Object to key.
+
+    Returns
+    -------
+    str | int
+        Hash-based key when hashable; otherwise a type-qualified string key.
+    """
     try:
         return hash((type(obj).__name__, obj))
     except TypeError:
@@ -158,6 +184,16 @@ def RGB_color_picker(obj) -> Color:
     This allows to quickly get a color from some data, with the
     additional benefit that the color will be the same as long as the
     (string representation of the) data is the same.
+
+    Parameters
+    ----------
+    obj : Any
+        Object used to derive a deterministic color.
+
+    Returns
+    -------
+    Color
+        Color generated from the SHA-384 digest of the object string.
     """
 
     ## Turn the input into a by 3-dividable string. SHA-384 is good because it
@@ -182,16 +218,63 @@ def RGB_color_picker(obj) -> Color:
 
 
 def RGB_equivalence(c1: Color, c2: Color) -> bool:
+    """Compare two colors by long hexadecimal RGB equivalence.
+
+    Parameters
+    ----------
+    c1 : Color
+        First color.
+    c2 : Color
+        Second color.
+
+    Returns
+    -------
+    bool
+        ``True`` when both colors have the same ``hex_l`` value.
+    """
     return c1.hex_l == c2.hex_l
 
 
 def HSL_equivalence(c1: Color, c2: Color) -> bool:
+    """Compare two colors by internal HSL tuple equivalence.
+
+    Parameters
+    ----------
+    c1 : Color
+        First color.
+    c2 : Color
+        Second color.
+
+    Returns
+    -------
+    bool
+        ``True`` when both colors have identical internal HSL values.
+    """
     return c1._hsl == c2._hsl
 
 
 def identify_color(
     color: str | Sequence[int | float] | Color | Colour,
 ) -> Callable[[Any], Any]:
+    """Identify a color input format and return its HSL conversion callable.
+
+    Parameters
+    ----------
+    color : str | Sequence[int | float] | Color | Colour
+        Candidate color value in one supported representation.
+
+    Returns
+    -------
+    Callable[[Any], Any]
+        Converter function that maps the provided representation to HSL.
+
+    Raises
+    ------
+    TypeError
+        Raised when the value is ambiguous between RGB/HSL or RGBA/HSLA.
+    TypeError
+        Raised when the format cannot be identified.
+    """
     # checks
     if (
         isinstance(color, Sequence)
@@ -235,10 +318,55 @@ def identify_color(
 
 
 class Color:
-    """Abstraction of a color object
+    """Abstraction over a color with multi-format conversion properties.
 
-    Color object keeps information of a color. It can input/output to different
-    format (HSL, RGB, HEX, WEB) and their partial representation.
+    Parameters
+    ----------
+    color : str | Sequence[int | float] | Color | None, optional
+        Generic color input in any supported format.
+    web : str | None, optional
+        Web color name or hex string.
+    hsl : Sequence[int | float] | None, optional
+        HSL components as ``(h, s, l)``.
+    hsla : Sequence[int | float] | None, optional
+        HSLA components as ``(h, s, l, a)`` with alpha in percent.
+    hslf : Sequence[int | float] | None, optional
+        Normalized HSL components in ``[0, 1]``.
+    hslaf : Sequence[int | float] | None, optional
+        Normalized HSLA components in ``[0, 1]``.
+    hsv : Sequence[int | float] | None, optional
+        Reserved parameter for HSV input.
+    hex : str | None, optional
+        Hexadecimal color string.
+    hex_l : str | None, optional
+        Long hexadecimal color string.
+    rgb : Sequence[int | float] | None, optional
+        RGB components in ``[0, 255]``.
+    rgba : Sequence[int | float] | None, optional
+        RGBA components with alpha in ``[0, 255]``.
+    rgbf : Sequence[int | float] | None, optional
+        Normalized RGB components in ``[0, 1]``.
+    rgbaf : Sequence[int | float] | None, optional
+        Normalized RGBA components in ``[0, 1]``.
+    alpha : float | None, optional
+        Explicit alpha value in ``[0, 1]``.
+    pick_for : Any, optional
+        Arbitrary value used to deterministically pick a color.
+    picker : Callable[[Any], Color], default=RGB_color_picker
+        Picker function used with ``pick_for``.
+    pick_key : Callable[[Any], str | int], default=hash_or_str
+        Key function used before passing values to ``picker``.
+    equality : Callable[[Color, Color], bool], default=RGB_equivalence
+        Equality strategy used by ``__eq__``.
+    **kwargs : Any
+        Additional attributes attached to the instance.
+
+    Raises
+    ------
+    ValueError
+        Raised when none or more than one primary color input is provided.
+    ValueError
+        Raised when alpha is provided inconsistently across inputs.
     """
 
     _hsl: tuple[float, float, float]  # internal representation
@@ -496,10 +624,39 @@ class Color:
     def range_to(
         self, value: str | Sequence[int | float] | Color, steps, longer=False
     ) -> Generator[Color, None, None]:
-        """range of color generation"""
+        """Generate a color range from this color to another color.
+
+        Parameters
+        ----------
+        value : str | Sequence[int | float] | Color
+            Target color in any supported input format.
+        steps : int
+            Number of colors to generate including both endpoints.
+        longer : bool, default=False
+            Whether to interpolate along the longer hue path.
+
+        Returns
+        -------
+        Generator[Color, None, None]
+            Generator yielding interpolated colors.
+        """
         yield from color_scale((self, Color(value)), steps, longer=longer)
 
     def preview(self, size_x: int | float = 200, size_y: int | float = 200) -> None:
+        """Display a Tkinter preview window filled with the current color.
+
+        Parameters
+        ----------
+        size_x : int | float, default=200
+            Window width in pixels.
+        size_y : int | float, default=200
+            Window height in pixels.
+
+        Returns
+        -------
+        None
+            This method displays a GUI window and does not return a value.
+        """
         import tkinter
 
         if not isinstance(size_x, int | float):
@@ -533,6 +690,19 @@ class Colour(Color): ...
 
 
 def make_color_factory(**kwargs_defaults):
+    """Create a factory that instantiates Color with default keyword arguments.
+
+    Parameters
+    ----------
+    **kwargs_defaults : Any
+        Default keyword arguments merged into each factory call.
+
+    Returns
+    -------
+    Callable[..., Color]
+        Callable that creates ``Color`` instances with merged defaults.
+    """
+
     def ColorFactory(*args, **kwargs):
         new_kwargs = kwargs_defaults.copy()
         new_kwargs.update(kwargs)

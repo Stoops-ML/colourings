@@ -87,6 +87,15 @@ classifiers = [
 dependencies = []
 dynamic = ["version"]
 
+[dependency-groups]
+dev = [
+    "build>=1.4.2",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.10",
+    "tox>=4.52.1",
+]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.4",
@@ -95,10 +104,15 @@ dev = [
     "tox>=4.24.1",
     "build",
 ]
+docs = [
+    "sphinx>=7.4",
+    "furo>=2024.8.6",
+    "myst-parser>=3.0",
+]
 
 [project.urls]
 Repository = "https://github.com/Stoops-ML/colourings"
-# Documentation = "https://colourings.readthedocs.io/en"
+Documentation = "https://colourings.readthedocs.io/en/latest/"
 
 [tool.setuptools.dynamic]
 version = {attr = "colourings.__version__"}

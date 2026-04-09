@@ -25,12 +25,36 @@ from .identify import (
 
 
 def _threshold(value: float) -> float:
+    """Clamp tiny floating-point noise to zero.
+
+    Parameters
+    ----------
+    value : float
+        Floating-point value to normalize.
+
+    Returns
+    -------
+    float
+        ``0.0`` when ``abs(value) < FLOAT_ERROR``; otherwise ``value`` as float.
+    """
     if abs(value) < FLOAT_ERROR:
         return 0.0
-    return value
+    return float(value)
 
 
 def rgbf2rgb(rgbf: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert normalized RGB components into 0-255 RGB components.
+
+    Parameters
+    ----------
+    rgbf : Sequence[int | float]
+        RGB sequence in the ``[0, 1]`` range.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        RGB tuple in the ``[0, 255]`` range.
+    """
     return (
         _threshold(rgbf[0] * 255.0),
         _threshold(rgbf[1] * 255.0),
@@ -41,6 +65,20 @@ def rgbf2rgb(rgbf: Sequence[int | float]) -> tuple[float, float, float]:
 def rgb2rgba(
     rgb: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
+    """Build an RGBA tuple from RGB values and normalized alpha.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+    alpha : int | float
+        Alpha channel in the ``[0, 1]`` range.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        RGBA tuple with alpha scaled to ``[0, 255]``.
+    """
     return (
         _threshold(rgb[0]),
         _threshold(rgb[1]),
@@ -50,6 +88,18 @@ def rgb2rgba(
 
 
 def rgb2rgbf(rgb: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert 0-255 RGB components into normalized RGB components.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        RGB tuple in the ``[0, 1]`` range.
+    """
     return (
         _threshold(rgb[0] / 255.0),
         _threshold(rgb[1] / 255.0),
@@ -60,6 +110,20 @@ def rgb2rgbf(rgb: Sequence[int | float]) -> tuple[float, float, float]:
 def rgb2rgbaf(
     rgb: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
+    """Build an RGBAf tuple from RGB values and alpha.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+    alpha : int | float
+        Alpha channel in the ``[0, 1]`` range.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        RGBAf tuple with RGB normalized to ``[0, 1]`` and alpha unchanged.
+    """
     return (
         _threshold(rgb[0] / 255.0),
         _threshold(rgb[1] / 255.0),
@@ -71,6 +135,20 @@ def rgb2rgbaf(
 def hsl2hsla(
     hsl: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
+    """Build an HSLA tuple from HSL values and normalized alpha.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)`` with ``h`` in ``[0, 360]`` and ``s``, ``l`` in ``[0, 100]``.
+    alpha : int | float
+        Alpha channel in the ``[0, 1]`` range.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        HSLA tuple with alpha scaled to ``[0, 100]``.
+    """
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSL type.")
     return (
@@ -84,6 +162,20 @@ def hsl2hsla(
 def hsl2hslaf(
     hsl: Sequence[int | float], alpha: int | float
 ) -> tuple[float, float, float, float]:
+    """Convert HSL values and alpha to normalized HSLAf representation.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)`` with ``h`` in ``[0, 360]`` and ``s``, ``l`` in ``[0, 100]``.
+    alpha : int | float
+        Alpha channel in the ``[0, 1]`` range.
+
+    Returns
+    -------
+    tuple[float, float, float, float]
+        HSLAf tuple where hue is scaled to ``[0, 1]`` and saturation/lightness to ``[0, 1]``.
+    """
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSL type.")
     return (
@@ -95,6 +187,18 @@ def hsl2hslaf(
 
 
 def hslf2hsl(hslf: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert normalized HSL components to standard HSL representation.
+
+    Parameters
+    ----------
+    hslf : Sequence[int | float]
+        Normalized HSL sequence in ``[0, 1]``.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        HSL tuple with hue in ``[0, 360]`` and saturation/lightness in ``[0, 100]``.
+    """
     if not is_hslf(hslf):
         raise ValueError("Input is not an HSLf type.")
     return (
@@ -105,6 +209,18 @@ def hslf2hsl(hslf: Sequence[int | float]) -> tuple[float, float, float]:
 
 
 def hsl2hslf(hsl: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert standard HSL components to normalized HSLf representation.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)`` with hue in degrees and saturation/lightness in percent.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        HSLf tuple normalized to ``[0, 1]``.
+    """
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSLf type.")
     return (
@@ -115,22 +231,17 @@ def hsl2hslf(hsl: Sequence[int | float]) -> tuple[float, float, float]:
 
 
 def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float, float, float]:
-    """Convert HSL representation towards RGB
+    """Convert HSL representation to RGB representation.
 
-    :param h: Hue, position around the chromatic circle (h=1 equiv h=0)
-    :param s: Saturation, color saturation (0=full gray, 1=full color)
-    :param l: Ligthness, Overhaul lightness (0=full black, 1=full white)
-    :rtype: 3-uple for RGB values in float between 0 and 1
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)`` where hue is in degrees and saturation/lightness are percentages.
 
-    Hue, Saturation, Range from Lightness is a float between 0 and 1
-
-    Note that Hue can be set to any value but as it is a rotation
-    around the chromatic circle, any value above 1 or below 0 can
-    be expressed by a value between 0 and 1 (Note that h=0 is equiv
-    to h=1).
-
-    This algorithm came from:
-    http://www.easyrgb.com/index.php?X=MATH&H=19#text19
+    Returns
+    -------
+    tuple[float, float, float]
+        RGB tuple in the ``[0, 255]`` range.
     """
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSL type.")
@@ -159,43 +270,105 @@ def hsl2rgb(hsl: Sequence[int | float]) -> tuple[float, float, float]:
 
 
 def hsl2rgbf(hsl: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert HSL representation to normalized RGB representation.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        RGBf tuple in the ``[0, 1]`` range.
+    """
     return rgb2rgbf(hsl2rgb(hsl))
 
 
 def rgba2hsl(rgba: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert RGBA values to HSL values, ignoring alpha.
+
+    Parameters
+    ----------
+    rgba : Sequence[int | float]
+        RGBA sequence with RGB in ``[0, 255]`` and alpha in ``[0, 255]``.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        HSL tuple.
+    """
     if not is_rgba(rgba):
         raise ValueError("Input is not an RGBA type.")
     return rgb2hsl(rgba[:3])
 
 
 def rgbaf2hsl(rgbaf: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert RGBAf values to HSL values, ignoring alpha.
+
+    Parameters
+    ----------
+    rgbaf : Sequence[int | float]
+        RGBAf sequence with RGB and alpha in ``[0, 1]``.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        HSL tuple.
+    """
     if not is_rgbaf(rgbaf):
         raise ValueError("Input is not an RGBAf type.")
     return rgb2hsl(rgbf2rgb(rgbaf[:3]))
 
 
 def hsla2hsl(hsla: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert HSLA values to HSL values, ignoring alpha.
+
+    Parameters
+    ----------
+    hsla : Sequence[int | float]
+        HSLA sequence with hue in degrees, saturation/lightness in percent, and alpha in percent.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        HSL tuple.
+    """
     if not is_hsla(hsla):
         raise ValueError("Input is not an HSLA type.")
     return hsla[0], hsla[1], hsla[2]
 
 
 def rgbf2hsl(rgbf: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert normalized RGB values to HSL values.
+
+    Parameters
+    ----------
+    rgbf : Sequence[int | float]
+        RGBf sequence in ``[0, 1]``.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        HSL tuple.
+    """
     if not is_rgbf(rgbf):
         raise ValueError("Input is not an RGBf type.")
     return rgb2hsl(rgbf2rgb(rgbf))
 
 
 def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
-    """Convert RGB representation towards HSL
+    """Convert RGB representation to HSL representation.
 
-    :param r: Red amount (float between 0 and 255)
-    :param g: Green amount (float between 0 and 255)
-    :param b: Blue amount (float between 0 and 255)
-    :rtype: 3-uple for HSL values in float between 0 and 255
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
 
-    This algorithm came from:
-    http://www.easyrgb.com/index.php?X=MATH&H=19#text19
+    Returns
+    -------
+    tuple[float, float, float]
+        HSL tuple where hue is in ``[0, 360]`` and saturation/lightness are in ``[0, 100]``.
     """
     if not is_rgb(rgb):
         raise ValueError("Input is not an RGB type.")
@@ -243,10 +416,21 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
 
 
 def _hue2rgb(v1, v2, vH):
-    """Private helper function (Do not call directly)
+    """Interpolate a single RGB channel from hue data.
 
-    :param vH: rotation around the chromatic circle (between 0..1)
+    Parameters
+    ----------
+    v1 : float
+        Lower interpolation bound.
+    v2 : float
+        Upper interpolation bound.
+    vH : float
+        Hue phase in normalized turns.
 
+    Returns
+    -------
+    float
+        Interpolated channel value in ``[0, 1]``.
     """
 
     while vH < 0:
@@ -265,10 +449,19 @@ def _hue2rgb(v1, v2, vH):
 
 
 def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
-    """Transform RGB tuple to hex RGB representation
+    """Convert RGB components to a hexadecimal color string.
 
-    :param rgb: RGB 3-uple of float between 0 and 1
-    :rtype: 3 hex char or 6 hex char string representation
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+    force_long : bool, default=False
+        Whether to force 6-digit output even when shorthand form is possible.
+
+    Returns
+    -------
+    str
+        Hex color string prefixed with ``#``.
     """
     if not is_rgb(rgb):
         raise ValueError("Input is not of RGB type.")
@@ -282,10 +475,17 @@ def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
 
 
 def hex2rgb(hex: str) -> tuple[float, float, float]:
-    """Transform hex RGB representation to RGB tuple
+    """Convert a hexadecimal color string to RGB components.
 
-    :param str_rgb: 3 hex char or 6 hex char string representation
-    :rtype: RGB 3-uple of float between 0 and 1
+    Parameters
+    ----------
+    hex : str
+        3-digit or 6-digit hexadecimal color string prefixed with ``#``.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        RGB tuple in the ``[0, 255]`` range.
     """
 
     if not (is_long_hex(hex) or is_short_hex(hex)):
@@ -311,13 +511,17 @@ def hex2rgb(hex: str) -> tuple[float, float, float]:
 
 
 def hex2web(hex: str) -> str:
-    """Converts HEX representation to WEB
+    """Convert a hexadecimal color to a web representation.
 
-    :param rgb: 3 hex char or 6 hex char string representation
-    :rtype: web string representation (human readable if possible)
+    Parameters
+    ----------
+    hex : str
+        3-digit or 6-digit hexadecimal color string prefixed with ``#``.
 
-    WEB representation uses X11 rgb.txt to define conversion
-    between RGB and english color names.
+    Returns
+    -------
+    str
+        Named CSS color when available, otherwise a hex string (possibly shortened).
     """
     if not (is_long_hex(hex) or is_short_hex(hex)):
         raise ValueError("Input is not of hex type.")
@@ -341,13 +545,19 @@ def hex2web(hex: str) -> str:
 
 
 def web2hex(web: str, force_long=False) -> str:
-    """Converts WEB representation to HEX
+    """Convert a web color representation to hexadecimal form.
 
-    :param rgb: web string representation (human readable if possible)
-    :rtype: 3 hex char or 6 hex char string representation
+    Parameters
+    ----------
+    web : str
+        CSS color name or hexadecimal color string.
+    force_long : bool, default=False
+        Whether to force 6-digit output for shorthand hex inputs.
 
-    WEB representation uses X11 rgb.txt to define conversion
-    between RGB and english color names.
+    Returns
+    -------
+    str
+        Hex color string prefixed with ``#``.
     """
     web = web.lower()
     if web.startswith("#"):
@@ -365,36 +575,108 @@ def web2hex(web: str, force_long=False) -> str:
 
 
 def hsl2hex(hsl: Sequence[int | float]) -> str:
+    """Convert HSL values to a hexadecimal color string.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    str
+        Hex color string.
+    """
     if not is_hsl(hsl):
         raise ValueError("Input is not of hsl type.")
     return rgb2hex(hsl2rgb(hsl))
 
 
 def hex2hsl(hex: str) -> tuple[float, float, float]:
+    """Convert a hexadecimal color string to HSL values.
+
+    Parameters
+    ----------
+    hex : str
+        3-digit or 6-digit hexadecimal color string.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        HSL tuple.
+    """
     if not (is_long_hex(hex) or is_short_hex(hex)):
         raise ValueError("Input is not of hex type.")
     return rgb2hsl(hex2rgb(hex))
 
 
 def rgb2web(rgb: Sequence[int | float]) -> str:
+    """Convert RGB values to a web color representation.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    str
+        Named CSS color when available, otherwise hex.
+    """
     if not is_rgb(rgb):
         raise ValueError("Input is not an RGB type.")
     return hex2web(rgb2hex(rgb))
 
 
 def web2rgb(web: str) -> tuple[float, float, float]:
+    """Convert a web color representation to RGB values.
+
+    Parameters
+    ----------
+    web : str
+        CSS color name or hex color string.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        RGB tuple in the ``[0, 255]`` range.
+    """
     if not is_web(web):
         raise ValueError("Input is not of web type.")
     return hex2rgb(web2hex(web))
 
 
 def web2hsl(web: str) -> tuple[float, float, float]:
+    """Convert a web color representation to HSL values.
+
+    Parameters
+    ----------
+    web : str
+        CSS color name or hex color string.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        HSL tuple.
+    """
     if not is_web(web):
         raise ValueError("Input is not an web type.")
     return rgb2hsl(web2rgb(web))
 
 
 def hsl2web(hsl: Sequence[int | float]) -> str:
+    """Convert HSL values to a web color representation.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    str
+        Named CSS color when available, otherwise hex.
+    """
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSL type.")
     return rgb2web(hsl2rgb(hsl))
