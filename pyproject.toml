@@ -99,11 +99,12 @@ dev = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3.4",
-    "pytest-cov>=6.0.0",
-    "ruff>=0.9.4",
-    "tox>=4.24.1",
-    "build",
+    "build>=1.4.2",
+    "mypy>=1.20.0",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.10",
+    "tox>=4.52.1",
 ]
 docs = [
     "sphinx>=7.4",
