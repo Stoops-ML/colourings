@@ -239,6 +239,22 @@ assert rgb2hsl((255, 0, 0)) is rgb2hsl((255, 0, 0))
 clear_caches()  # release cached results; never needed for correctness
 ```
 
+Comparing against anything that is not a color is `False` rather than an error,
+and colors are hashable, so they work in sets and as dict keys:
+
+```python
+assert Color("red") != "red"
+assert len({Color("red"), Color("#f00"), Color("blue")}) == 2
+assert {Color("red"): "warm"}[Color("#f00")] == "warm"
+```
+
+`==` consults both operands' strategies, so it is symmetric even when the two
+colors carry different ones. The hash follows `hex_l`, which matches both
+built-in strategies; a custom `equality` that treats colors with different
+`hex_l` as equal breaks that correspondence, and those colors should not be
+used as dict keys. `Color` is mutable, so do not mutate one while it is held
+in a set.
+
 ## Error Handling
 
 Every failure caused by a value that is not a usable color derives from

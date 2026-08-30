@@ -480,9 +480,21 @@ def test_blue_inputs():
     )
 
 
-def test_no_eq():
-    with pytest.raises(NotImplementedError):
-        Color("red") == "red"  # noqa: B015
+def test_comparison_with_non_color_is_false():
+    """Comparing against a non-color returns NotImplemented, and so is False."""
+    assert Color("red") != "red"
+    ## `==` is exercised directly: it is the operator that used to raise.
+    assert not (Color("red") == "red")  # noqa: SIM201
+    assert Color("red") != 42
+    assert Color("red") != None  # noqa: E711
+    assert Color("red") != "red"
+
+
+def test_comparison_with_non_color_does_not_raise_in_containers():
+    """The old NotImplementedError broke any mixed collection."""
+    assert Color("red") in [1, "red", Color("red")]
+    assert Color("blue") not in [1, "red", Color("red")]
+    assert [Color("red"), "red"].count("red") == 1
 
 
 def test_no_attribute():
@@ -895,3 +907,60 @@ def test_usage_errors_are_not_color_errors():
     with pytest.raises(TypeError) as excinfo:
         Color("red").preview(size_x="wide")  # type: ignore
     assert not isinstance(excinfo.value, ColorError)
+
+
+def test_color_is_hashable():
+    assert hash(Color("red")) == hash(Color("#f00"))
+    assert len({Color("red"), Color("#ff0000"), Color("blue")}) == 2
+    assert {Color("red"): "warm"}[Color("#f00")] == "warm"
+
+
+def test_hash_matches_equality():
+    """Equal colors must hash equally, for both built-in strategies."""
+    for a, b in [
+        (Color("red"), Color("#f00")),
+        (Color("red", alpha=0.5), Color("red")),
+        (Color("red", equality=HSL_equivalence), Color("#ff0000")),
+    ]:
+        assert a == b
+        assert hash(a) == hash(b)
+
+
+def test_hash_follows_mutation():
+    c = Color("red")
+    before = hash(c)
+    c.hue = 240
+    assert hash(c) == hash(Color("blue"))
+    assert hash(c) != before
+
+
+def test_equality_is_symmetric_across_strategies():
+    """a == b and b == a used to disagree when strategies differed."""
+    a = Color("red", lightness=0, equality=HSL_equivalence)
+    b = Color("blue", lightness=0)
+    assert (a == b) == (b == a)
+
+    def never_equal(c1, c2):
+        return False
+
+    c = Color("red", equality=never_equal)
+    d = Color("red")
+    assert (c == d) == (d == c)
+
+
+def test_equality_unchanged_when_strategies_agree():
+    assert Color("red") == Color("#f00")
+    assert Color("red") != Color("blue")
+    black_red = Color("red", hue=0, equality=HSL_equivalence)
+    black_blue = Color("blue", hue=0, equality=HSL_equivalence)
+    assert black_red == black_blue
+    red = Color("red", lightness=0, equality=HSL_equivalence)
+    blue = Color("blue", lightness=0, equality=HSL_equivalence)
+    assert red != blue
+
+
+def test_colour_alias_compares_and_hashes_with_color():
+    assert Colour("red") == Color("red")
+    assert Color("red") == Colour("red")
+    assert hash(Colour("red")) == hash(Color("red"))
+    assert len({Color("red"), Colour("red")}) == 1

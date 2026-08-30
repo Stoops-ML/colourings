@@ -718,9 +718,47 @@ class Color:
         return f"<Color {self.web}>"
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, Color):
-            return self.equality(self, other)
-        raise NotImplementedError("Other object must be of type `Color` or `Colour`")
+        """Compare two colors using their equality strategies.
+
+        Both operands are consulted, because the strategy is per-instance and
+        consulting only ``self`` made ``==`` asymmetric: ``a == b`` and
+        ``b == a`` could disagree when the two carried different strategies.
+        When they share one, which is the usual case, the result is unchanged.
+
+        Parameters
+        ----------
+        other : object
+            Value to compare against.
+
+        Returns
+        -------
+        bool
+            ``True`` when either color's strategy considers the two equal.
+            ``NotImplemented`` for a non-color, so Python falls back to
+            identity rather than raising.
+        """
+        if not isinstance(other, Color):
+            return NotImplemented
+        return self.equality(self, other) or other.equality(self, other)
+
+    def __hash__(self) -> int:
+        """Hash the color by its long hexadecimal form.
+
+        This matches both built-in equality strategies: ``RGB_equivalence``
+        compares ``hex_l`` directly, and two colors with equal HSL always
+        render the same ``hex_l``. A custom ``equality`` that treats colors
+        with different ``hex_l`` as equal breaks that correspondence, and such
+        colors should not be relied on as dict keys or set members.
+
+        ``Color`` is mutable, so the hash follows the current value. Do not
+        mutate a color while it is held in a set or used as a dict key.
+
+        Returns
+        -------
+        int
+            Hash of the color's ``hex_l`` value.
+        """
+        return hash(self.hex_l)
 
 
 class Colour(Color):

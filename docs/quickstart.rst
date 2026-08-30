@@ -200,6 +200,19 @@ You can plug in a custom comparison function:
 
    print(c1 == c2)  # False
 
+Comparing against anything that is not a color is ``False`` rather than an
+error, and colors are hashable:
+
+.. code-block:: python
+
+   assert Color("red") != "red"
+   assert len({Color("red"), Color("#f00"), Color("blue")}) == 2
+
+``==`` consults both operands' strategies, so it is symmetric even when the two
+colors carry different ones. The hash follows ``hex_l``, matching both built-in
+strategies. ``Color`` is mutable, so do not mutate one while it is held in a
+set or used as a dict key.
+
 Deterministic color picking
 ---------------------------
 
