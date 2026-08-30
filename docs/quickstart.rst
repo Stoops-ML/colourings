@@ -33,6 +33,7 @@ All of the following produce equivalent red colors:
    Color(rgba=(255, 0, 0, 255))
    Color(rgbf=(1, 0, 0))
    Color(rgbaf=(1, 0, 0, 1))
+   Color(hsv=(0, 100, 100))
    Color(Color("red"))
 
 Read and update channels
@@ -255,4 +256,5 @@ The library uses explicit ranges for each representation:
 * ``hsl`` uses ``hue in [0, 360]`` and saturation/lightness in ``[0, 100]``
 * ``hsla`` is the same as ``hsl`` with alpha in ``[0, 100]``
 * ``hslf`` / ``hslaf`` channels are in ``[0, 1]``
+* ``hsv`` uses ``hue in [0, 360]`` and saturation/value in ``[0, 100]``
 * ``Color.alpha`` is always in ``[0, 1]``

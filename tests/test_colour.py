@@ -400,9 +400,11 @@ def test_hash_or_str_falls_back_to_type_qualified_string_for_unhashable_objects(
     assert hash_or_str(SameStringB()) == "SameStringBshared"
 
 
-def test_unsupported_hsv_input_hits_constructor_error_path():
-    with pytest.raises(ValueError, match="Input not recognised"):
-        Color(hsv=(120, 50, 50))
+def test_hsv_constructor():
+    assert Color(hsv=(0, 100, 100)) == Color("red")
+    assert Color(hsv=(120, 100, 100)) == Color("lime")
+    assert Color(hsv=(0, 0, 100)) == Color("white")
+    assert Color(hsv=(0, 0, 0)) == Color("black")
 
 
 def test_colour():
@@ -855,7 +857,6 @@ def test_color_errors_are_catchable_as_one_kind():
         lambda: Color("nope"),
         lambda: Color((0, 0, 0)),
         lambda: Color(hslf=(2, 0, 0)),
-        lambda: Color(hsv=(0, 1, 1)),
         lambda: setattr(Color("red"), "hsl", (0, 102, 0)),
         lambda: setattr(Color("red"), "alpha", 2),
     ]
@@ -877,8 +878,6 @@ def test_error_kinds_are_distinguishable():
         Color((0, 0, 0))
     with pytest.raises(UnknownColorError):
         Color("nope")
-    with pytest.raises(UnknownColorError):
-        Color(hsv=(0, 1, 1))
     with pytest.raises(InvalidColorError):
         Color(hslf=(2, 0, 0))
 
@@ -964,3 +963,52 @@ def test_colour_alias_compares_and_hashes_with_color():
     assert Color("red") == Colour("red")
     assert hash(Colour("red")) == hash(Color("red"))
     assert len({Color("red"), Colour("red")}) == 1
+
+
+def test_hsv_attribute():
+    assert Color("red").hsv == pytest.approx((0.0, 100.0, 100.0))
+    assert Color("white").hsv == pytest.approx((0.0, 0.0, 100.0))
+    assert Color("black").hsv == pytest.approx((0.0, 0.0, 0.0))
+    assert Color("blue").hsv.value == 100.0
+    assert Color("red").hsv.hue == 0.0
+    assert Color("red").hsv.saturation == 100.0
+
+
+def test_hsv_is_settable():
+    c = Color("red")
+    c.hsv = (240, 100, 100)
+    assert c.web == "blue"
+    c.hsv = (0, 0, 100)
+    assert c.web == "white"
+
+
+def test_hsv_round_trips_through_color():
+    for name in ("red", "rebeccapurple", "white", "black", "olive", "teal"):
+        original = Color(name)
+        assert Color(hsv=original.hsv).hex_l == original.hex_l
+
+
+def test_hsv_components_are_floats():
+    assert [type(v) for v in Color(hsv=(120, 50, 50)).hsv] == [float, float, float]
+
+
+def test_hsv_must_be_named():
+    """An HSV triple is indistinguishable from an HSL one, so it is not guessed."""
+    with pytest.raises(AmbiguousColorError):
+        Color((0, 100, 100))
+    assert Color(hsv=(0, 100, 100)) == Color("red")
+    assert Color(hsl=(0, 100, 100)) == Color("white")
+
+
+def test_hsv_conflicts_with_other_inputs():
+    with pytest.raises(ValueError, match="Only one of"):
+        Color(hsv=(0, 100, 100), rgb=(255, 0, 0))
+    with pytest.raises(ValueError, match="'hsv'"):
+        Color()
+
+
+def test_bad_hsv_via_color():
+    with pytest.raises(InvalidColorError):
+        Color(hsv=(361, 0, 0))
+    with pytest.raises(InvalidColorError):
+        Color("red").set_hsv((0, 101, 0))

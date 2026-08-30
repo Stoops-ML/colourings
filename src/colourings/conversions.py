@@ -8,6 +8,7 @@ from .definitions import (
     FLOAT_ERROR,
     HSL,
     HSLA,
+    HSV,
     LONG_HEX_COLOR,
     RGB,
     RGB_TO_COLOR_NAMES,
@@ -23,6 +24,7 @@ from .identify import (
     is_hsl,
     is_hsla,
     is_hslf,
+    is_hsv,
     is_long_hex,
     is_rgb,
     is_rgba,
@@ -850,3 +852,185 @@ def hsl2web(hsl: Sequence[int | float]) -> str:
     if not is_hsl(hsl):
         raise InvalidColorError("Input is not an HSL type.")
     return rgb2web(hsl2rgb(hsl))
+
+
+@_cached
+def hsl2hsv(hsl: Sequence[int | float]) -> HSV:
+    """Convert HSL representation to HSV representation.
+
+    Both models share a hue; only the saturation and the third component
+    differ, so the conversion is exact rather than a round trip through RGB.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)`` with hue in degrees and
+        saturation/lightness in percent.
+
+    Returns
+    -------
+    HSV
+        HSV tuple where hue is in ``[0, 360]`` and saturation/value are in
+        ``[0, 100]``.
+    """
+    if not is_hsl(hsl):
+        raise InvalidColorError("Input is not an HSL type.")
+    _h, _s, _l = (float(v) for v in hsl)
+    _s /= 100.0
+    _l /= 100.0
+
+    value = _l + _s * min(_l, 1.0 - _l)
+    saturation = 0.0 if value == 0 else 2.0 * (1.0 - _l / value)
+
+    return HSV(
+        _threshold(_h),
+        _threshold(saturation * 100.0),
+        _threshold(value * 100.0),
+    )
+
+
+@_cached
+def hsv2hsl(hsv: Sequence[int | float]) -> HSL:
+    """Convert HSV representation to HSL representation.
+
+    Parameters
+    ----------
+    hsv : Sequence[int | float]
+        HSV sequence as ``(h, s, v)`` with hue in degrees and saturation/value
+        in percent.
+
+    Returns
+    -------
+    HSL
+        HSL tuple where hue is in ``[0, 360]`` and saturation/lightness are in
+        ``[0, 100]``.
+    """
+    if not is_hsv(hsv):
+        raise InvalidColorError("Input is not an HSV type.")
+    _h, _s, _v = (float(v) for v in hsv)
+    _s /= 100.0
+    _v /= 100.0
+
+    lightness = _v * (1.0 - _s / 2.0)
+    denominator = min(lightness, 1.0 - lightness)
+    saturation = 0.0 if denominator == 0 else (_v - lightness) / denominator
+
+    return HSL(
+        _threshold(_h),
+        _threshold(saturation * 100.0),
+        _threshold(lightness * 100.0),
+    )
+
+
+@_cached
+def rgb2hsv(rgb: Sequence[int | float]) -> HSV:
+    """Convert RGB representation to HSV representation.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    HSV
+        HSV tuple.
+    """
+    if not is_rgb(rgb):
+        raise InvalidColorError("Input is not an RGB type.")
+    return hsl2hsv(rgb2hsl(rgb))
+
+
+@_cached
+def hsv2rgb(hsv: Sequence[int | float]) -> RGB:
+    """Convert HSV representation to RGB representation.
+
+    Parameters
+    ----------
+    hsv : Sequence[int | float]
+        HSV sequence as ``(h, s, v)``.
+
+    Returns
+    -------
+    RGB
+        RGB tuple in the ``[0, 255]`` range.
+    """
+    if not is_hsv(hsv):
+        raise InvalidColorError("Input is not an HSV type.")
+    return hsl2rgb(hsv2hsl(hsv))
+
+
+@_cached
+def hsv2hex(hsv: Sequence[int | float]) -> str:
+    """Convert HSV values to a hexadecimal color string.
+
+    Parameters
+    ----------
+    hsv : Sequence[int | float]
+        HSV sequence as ``(h, s, v)``.
+
+    Returns
+    -------
+    str
+        Hex color string.
+    """
+    if not is_hsv(hsv):
+        raise InvalidColorError("Input is not an HSV type.")
+    return rgb2hex(hsv2rgb(hsv))
+
+
+@_cached
+def hex2hsv(hex: str) -> HSV:
+    """Convert a hexadecimal color string to HSV values.
+
+    Parameters
+    ----------
+    hex : str
+        3-digit or 6-digit hexadecimal color string.
+
+    Returns
+    -------
+    HSV
+        HSV tuple.
+    """
+    if not (is_long_hex(hex) or is_short_hex(hex)):
+        raise InvalidColorError("Input is not of hex type.")
+    return hsl2hsv(hex2hsl(hex))
+
+
+@_cached
+def hsv2web(hsv: Sequence[int | float]) -> str:
+    """Convert HSV values to a web color representation.
+
+    Parameters
+    ----------
+    hsv : Sequence[int | float]
+        HSV sequence as ``(h, s, v)``.
+
+    Returns
+    -------
+    str
+        Named CSS color when available, otherwise hex.
+    """
+    if not is_hsv(hsv):
+        raise InvalidColorError("Input is not an HSV type.")
+    return rgb2web(hsv2rgb(hsv))
+
+
+@_cached
+def web2hsv(web: str) -> HSV:
+    """Convert a web color representation to HSV values.
+
+    Parameters
+    ----------
+    web : str
+        CSS color name or hex color string.
+
+    Returns
+    -------
+    HSV
+        HSV tuple.
+    """
+    if not is_web(web):
+        raise InvalidColorError("Input is not of web type.")
+    return hsl2hsv(web2hsl(web))

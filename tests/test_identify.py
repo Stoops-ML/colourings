@@ -7,6 +7,7 @@ from colourings.identify import (
     is_hsla,
     is_hslaf,
     is_hslf,
+    is_hsv,
     is_rgb,
     is_rgba,
     is_rgbaf,
@@ -137,3 +138,18 @@ def test_every_named_color_is_constructible():
         c = Color(name)
         assert Color(hsl=c.hsl).hex_l == c.hex_l
         assert Color(rgb=c.rgb).hex_l == c.hex_l
+
+
+def test_is_hsv():
+    assert is_hsv((0, 0, 0))
+    assert is_hsv((360, 100, 100))
+    assert is_hsv(Color("red").hsv)
+    assert not is_hsv((361, 0, 0))
+    assert not is_hsv((0, 101, 0))
+    assert not is_hsv((0, 0, 101))
+    assert not is_hsv((0, 0, -1))
+    assert not is_hsv((0, 0))
+    assert not is_hsv((0, 0, 0, 0))
+    assert not is_hsv("0, 0, 0")
+    assert not is_hsv(int)
+    assert not is_hsv(("a", 0, 0))

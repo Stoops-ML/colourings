@@ -47,6 +47,7 @@ The library uses explicit numeric ranges (not mixed 0..1 + 0..255 conventions):
 - `hsl`: `(hue, saturation, lightness)` as `hue in [0, 360]`, `saturation/lightness in [0, 100]`
 - `hsla`: same as `hsl`, with alpha in `[0, 100]`
 - `hslf` / `hslaf`: channels in `[0, 1]`
+- `hsv`: `(hue, saturation, value)` as `hue in [0, 360]`, `saturation/value in [0, 100]`
 - `Color.alpha`: always `[0, 1]`
 
 ## Constructing Colors
@@ -65,6 +66,7 @@ Color(rgb=(255, 0, 0))
 Color(rgba=(255, 0, 0, 255))
 Color(rgbf=(1, 0, 0))
 Color(rgbaf=(1, 0, 0, 1))
+Color(hsv=(0, 100, 100))
 Color(Color("red"))
 ```
 
@@ -225,6 +227,7 @@ print(hsl2web((0, 0, 50.2)))  # gray
 Available helpers include conversion paths across:
 - `rgb`, `rgba`, `rgbf`, `rgbaf`
 - `hsl`, `hsla`, `hslf`, `hslaf`
+- `hsv`
 - `hex` and `web`
 
 Conversions are memoized with a bounded LRU cache, so repeated lookups of the

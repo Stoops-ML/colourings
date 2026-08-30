@@ -13,10 +13,12 @@ from .conversions import (
     hsl2hsla,
     hsl2hslaf,
     hsl2hslf,
+    hsl2hsv,
     hsl2rgb,
     hsl2rgbf,
     hsla2hsl,
     hslf2hsl,
+    hsv2hsl,
     rgb2hex,
     rgb2hsl,
     rgb2rgba,
@@ -33,6 +35,7 @@ from .conversions import (
 from .definitions import COLOR_NAME_TO_RGB, linspace
 from .definitions import HSL as HSLTuple
 from .definitions import HSLA as HSLATuple
+from .definitions import HSV as HSVTuple
 from .definitions import RGB as RGBTuple
 from .definitions import RGBA as RGBATuple
 from .definitions import HSLAf as HSLAfTuple
@@ -369,7 +372,8 @@ class Color:
     hslaf : Sequence[int | float] | None, optional
         Normalized HSLA components in ``[0, 1]``.
     hsv : Sequence[int | float] | None, optional
-        Reserved parameter for HSV input.
+        HSV components as ``(h, s, v)`` with hue in ``[0, 360]`` and
+        saturation/value in ``[0, 100]``.
     hex : str | None, optional
         Hexadecimal color string.
     hex_l : str | None, optional
@@ -461,7 +465,7 @@ class Color:
             != 1
         ):
             raise ValueError(
-                "Only one of 'color', 'web', 'hsl', 'hsla', 'hslf', 'hslaf', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
+                "Only one of 'color', 'web', 'hsl', 'hsla', 'hslf', 'hslaf', 'hsv', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
             )
 
         # convert to hsl
@@ -481,6 +485,8 @@ class Color:
                     f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of hsla={hsla[3]}"
                 )
             self.hsl, alpha = hsla2hsl(hsla), hsla[3] / 100
+        elif hsv is not None:
+            self.hsl = hsv2hsl(hsv)
         elif hslf is not None:
             self.hsl = hslf2hsl(hslf)
         elif hslaf is not None:
@@ -513,7 +519,10 @@ class Color:
             self.hsl = web2hsl(picker(pick_key(pick_for)).web)
         # elif isinstance(color, Color):
         #     self.web = web2hsl(color.web)
-        else:
+        else:  # pragma: no cover
+            ## Unreachable: the check above proves exactly one input is set and
+            ## every one of them has a branch. Kept so that adding a new input
+            ## without a branch fails loudly instead of leaving _hsl unset.
             raise UnknownColorError("Input not recognised")
 
         # set attributes
@@ -524,6 +533,9 @@ class Color:
 
     def get_hsl(self) -> HSLTuple:
         return self._hsl
+
+    def get_hsv(self) -> HSVTuple:
+        return hsl2hsv(self._hsl)
 
     def get_hslf(self) -> HSLfTuple:
         return hsl2hslf(self._hsl)
@@ -587,6 +599,9 @@ class Color:
         ## whatever numeric type the caller supplied.
         self._hsl = HSLTuple(float(value[0]), float(value[1]), float(value[2]))
 
+    def set_hsv(self, value: Sequence[float]) -> None:
+        self.hsl = hsv2hsl(value)
+
     def set_rgb(self, value: Sequence[float]) -> None:
         self.hsl = rgb2hsl(value)
 
@@ -635,6 +650,7 @@ class Color:
     ## visible to type checkers, editors and dir(), and reading one is a plain
     ## descriptor call. Those without a ``set_*`` accessor are read-only.
     hsl = property(get_hsl, set_hsl)
+    hsv = property(get_hsv, set_hsv)
     rgb = property(get_rgb, set_rgb)
     rgbf = property(get_rgbf, set_rgbf)
     rgba = property(get_rgba, set_rgba)

@@ -236,6 +236,30 @@ def is_hsl(color: object) -> bool:
     )
 
 
+def is_hsv(color: object) -> bool:
+    """Validate whether a value is an HSV sequence.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with hue in
+        ``[0, 360]`` and saturation/value in ``[0, 100]``, each within
+        ``FLOAT_ERROR``.
+    """
+    if not isinstance(color, Sequence) or isinstance(color, str):
+        return False
+    if len(color) != 3:
+        return False
+    return _in_range(color[0], 0, 360) and all(
+        _in_range(channel, 0, 100) for channel in color[1:]
+    )
+
+
 def is_hsla(color: object) -> bool:
     """Validate whether a value is an HSLA sequence.
 

@@ -5,19 +5,26 @@ import pytest
 from colourings.conversions import (
     clear_caches,
     hex2hsl,
+    hex2hsv,
     hex2rgb,
     hex2web,
     hsl2hex,
     hsl2hsla,
     hsl2hslaf,
     hsl2hslf,
+    hsl2hsv,
     hsl2rgb,
     hsl2rgbf,
     hsl2web,
     hsla2hsl,
     hslf2hsl,
+    hsv2hex,
+    hsv2hsl,
+    hsv2rgb,
+    hsv2web,
     rgb2hex,
     rgb2hsl,
+    rgb2hsv,
     rgb2web,
     rgba2hsl,
     rgbaf2hsl,
@@ -25,6 +32,7 @@ from colourings.conversions import (
     rgbf2rgb,
     web2hex,
     web2hsl,
+    web2hsv,
     web2rgb,
 )
 from colourings.errors import InvalidColorError
@@ -350,3 +358,79 @@ def test_hsla2hsl_returns_floats_for_integer_input():
     hsl = hsla2hsl((240, 100, 50, 100))
     assert hsl == (240.0, 100.0, 50.0)
     assert [type(v) for v in hsl] == [float, float, float]
+
+
+HSV_CASES = [
+    ## (rgb, hsv) -- reference values from the HSV definition
+    ((255, 0, 0), (0.0, 100.0, 100.0)),
+    ((0, 255, 0), (120.0, 100.0, 100.0)),
+    ((0, 0, 255), (240.0, 100.0, 100.0)),
+    ((255, 255, 255), (0.0, 0.0, 100.0)),
+    ((0, 0, 0), (0.0, 0.0, 0.0)),
+    ((128, 128, 0), (60.0, 100.0, 50.19607843137255)),
+    ((0, 128, 128), (180.0, 100.0, 50.19607843137255)),
+    ((192, 192, 192), (0.0, 0.0, 75.29411764705883)),
+]
+
+
+@pytest.mark.parametrize(("rgb", "hsv"), HSV_CASES)
+def test_rgb2hsv(rgb, hsv):
+    assert rgb2hsv(rgb) == pytest.approx(hsv)
+
+
+@pytest.mark.parametrize(("rgb", "hsv"), HSV_CASES)
+def test_hsv2rgb(rgb, hsv):
+    assert hsv2rgb(hsv) == pytest.approx(rgb)
+
+
+def test_hsv_matches_colorsys():
+    """Cross-check the maths against the standard library."""
+    import colorsys
+
+    for rgb in [(255, 0, 0), (10, 20, 205), (128, 128, 0), (7, 3, 1), (250, 251, 252)]:
+        h, s, v = colorsys.rgb_to_hsv(*[c / 255 for c in rgb])
+        assert rgb2hsv(rgb) == pytest.approx((h * 360, s * 100, v * 100))
+
+
+def test_hsl_hsv_round_trip():
+    for hsl in [(0, 100, 50), (120, 50, 25), (240, 0, 100), (37, 63, 81), (0, 0, 0)]:
+        assert hsv2hsl(hsl2hsv(hsl)) == pytest.approx(hsl)
+
+
+def test_hsl2hsv_known_values():
+    assert hsl2hsv((0, 100, 50)) == pytest.approx((0.0, 100.0, 100.0))
+    assert hsl2hsv((0, 0, 100)) == pytest.approx((0.0, 0.0, 100.0))
+    assert hsl2hsv((0, 0, 0)) == pytest.approx((0.0, 0.0, 0.0))
+
+
+def test_hsv2hsl_known_values():
+    assert hsv2hsl((0, 100, 100)) == pytest.approx((0.0, 100.0, 50.0))
+    assert hsv2hsl((0, 0, 100)) == pytest.approx((0.0, 0.0, 100.0))
+    assert hsv2hsl((0, 0, 0)) == pytest.approx((0.0, 0.0, 0.0))
+
+
+def test_hsv_hex_and_web():
+    assert hsv2hex((0, 100, 100)) == "#f00"
+    assert hex2hsv("#f00") == pytest.approx((0.0, 100.0, 100.0))
+    assert hex2hsv("#ff0000") == pytest.approx((0.0, 100.0, 100.0))
+    assert hsv2web((240, 100, 100)) == "blue"
+    assert web2hsv("blue") == pytest.approx((240.0, 100.0, 100.0))
+    assert web2hsv("#f00") == pytest.approx((0.0, 100.0, 100.0))
+
+
+@pytest.mark.parametrize("func", [hsv2hsl, hsv2rgb, hsv2hex, hsv2web])
+def test_bad_hsv_input(func):
+    for bad in [(361, 0, 0), (0, 101, 0), (0, 0, 101), (0, 0, -1), (0, 0), "a"]:
+        with pytest.raises(InvalidColorError):
+            func(bad)
+
+
+def test_bad_input_to_hsv_producers():
+    with pytest.raises(InvalidColorError):
+        hsl2hsv((361, 0, 0))
+    with pytest.raises(InvalidColorError):
+        rgb2hsv((256, 0, 0))
+    with pytest.raises(InvalidColorError):
+        hex2hsv("nope")
+    with pytest.raises(InvalidColorError):
+        web2hsv("nope")

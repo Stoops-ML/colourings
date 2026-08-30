@@ -53,6 +53,14 @@ class HSL(NamedTuple):
     lightness: float
 
 
+class HSV(NamedTuple):
+    """Hue in ``[0, 360]`` with saturation and value in ``[0, 100]``."""
+
+    hue: float
+    saturation: float
+    value: float
+
+
 class HSLA(NamedTuple):
     """Hue in ``[0, 360]`` with saturation, lightness and alpha in ``[0, 100]``."""
 
