@@ -7,18 +7,26 @@ from collections.abc import Callable, Generator, Sequence
 from typing import Any, Protocol
 
 from .conversions import (
+    cmyk2hsl,
     hex2hsl,
     hex2rgb,
     hex2web,
+    hsl2cmyk,
     hsl2hsla,
     hsl2hslaf,
     hsl2hslf,
     hsl2hsv,
+    hsl2lab,
+    hsl2lch,
     hsl2rgb,
     hsl2rgbf,
+    hsl2xyz,
+    hsl2yuv,
     hsla2hsl,
     hslf2hsl,
     hsv2hsl,
+    lab2hsl,
+    lch2hsl,
     rgb2hex,
     rgb2hsl,
     rgb2rgba,
@@ -28,7 +36,10 @@ from .conversions import (
     rgbf2hsl,
     web2hex,
     web2hsl,
+    xyz2hsl,
+    yuv2hsl,
 )
+from .definitions import CMYK as CMYKTuple
 
 ## The colour tuple types are aliased because this module already exposes
 ## ``HSL`` and ``RGB`` as the named-colour accessor singletons defined below.
@@ -36,8 +47,12 @@ from .definitions import COLOR_NAME_TO_RGB, linspace
 from .definitions import HSL as HSLTuple
 from .definitions import HSLA as HSLATuple
 from .definitions import HSV as HSVTuple
+from .definitions import LAB as LABTuple
+from .definitions import LCH as LCHTuple
 from .definitions import RGB as RGBTuple
 from .definitions import RGBA as RGBATuple
+from .definitions import XYZ as XYZTuple
+from .definitions import YUV as YUVTuple
 from .definitions import HSLAf as HSLAfTuple
 from .definitions import HSLf as HSLfTuple
 from .definitions import RGBAf as RGBAfTuple
@@ -374,6 +389,16 @@ class Color:
     hsv : Sequence[int | float] | None, optional
         HSV components as ``(h, s, v)`` with hue in ``[0, 360]`` and
         saturation/value in ``[0, 100]``.
+    xyz : Sequence[int | float] | None, optional
+        CIE XYZ components under D65, scaled so that white has ``y`` of 100.
+    lab : Sequence[int | float] | None, optional
+        CIE L*a*b* components with lightness in ``[0, 100]``.
+    lch : Sequence[int | float] | None, optional
+        Cylindrical CIE LCh components with hue in ``[0, 360]``.
+    cmyk : Sequence[int | float] | None, optional
+        CMYK components, each in ``[0, 100]``.
+    yuv : Sequence[int | float] | None, optional
+        BT.601 YUV components with luma in ``[0, 1]``.
     hex : str | None, optional
         Hexadecimal color string.
     hex_l : str | None, optional
@@ -428,6 +453,11 @@ class Color:
         hslf: Sequence[int | float] | None = None,
         hslaf: Sequence[int | float] | None = None,
         hsv: Sequence[int | float] | None = None,
+        xyz: Sequence[int | float] | None = None,
+        lab: Sequence[int | float] | None = None,
+        lch: Sequence[int | float] | None = None,
+        cmyk: Sequence[int | float] | None = None,
+        yuv: Sequence[int | float] | None = None,
         hex: str | None = None,
         hex_l: str | None = None,
         rgb: Sequence[int | float] | None = None,
@@ -453,6 +483,11 @@ class Color:
                     hslf,
                     hslaf,
                     hsv,
+                    xyz,
+                    lab,
+                    lch,
+                    cmyk,
+                    yuv,
                     hex,
                     hex_l,
                     rgb,
@@ -465,7 +500,7 @@ class Color:
             != 1
         ):
             raise ValueError(
-                "Only one of 'color', 'web', 'hsl', 'hsla', 'hslf', 'hslaf', 'hsv', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
+                "Only one of 'color', 'web', 'hsl', 'hsla', 'hslf', 'hslaf', 'hsv', 'xyz', 'lab', 'lch', 'cmyk', 'yuv', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
             )
 
         # convert to hsl
@@ -487,6 +522,16 @@ class Color:
             self.hsl, alpha = hsla2hsl(hsla), hsla[3] / 100
         elif hsv is not None:
             self.hsl = hsv2hsl(hsv)
+        elif xyz is not None:
+            self.hsl = xyz2hsl(xyz)
+        elif lab is not None:
+            self.hsl = lab2hsl(lab)
+        elif lch is not None:
+            self.hsl = lch2hsl(lch)
+        elif cmyk is not None:
+            self.hsl = cmyk2hsl(cmyk)
+        elif yuv is not None:
+            self.hsl = yuv2hsl(yuv)
         elif hslf is not None:
             self.hsl = hslf2hsl(hslf)
         elif hslaf is not None:
@@ -536,6 +581,21 @@ class Color:
 
     def get_hsv(self) -> HSVTuple:
         return hsl2hsv(self._hsl)
+
+    def get_xyz(self) -> XYZTuple:
+        return hsl2xyz(self._hsl)
+
+    def get_lab(self) -> LABTuple:
+        return hsl2lab(self._hsl)
+
+    def get_lch(self) -> LCHTuple:
+        return hsl2lch(self._hsl)
+
+    def get_cmyk(self) -> CMYKTuple:
+        return hsl2cmyk(self._hsl)
+
+    def get_yuv(self) -> YUVTuple:
+        return hsl2yuv(self._hsl)
 
     def get_hslf(self) -> HSLfTuple:
         return hsl2hslf(self._hsl)
@@ -602,6 +662,21 @@ class Color:
     def set_hsv(self, value: Sequence[float]) -> None:
         self.hsl = hsv2hsl(value)
 
+    def set_xyz(self, value: Sequence[float]) -> None:
+        self.hsl = xyz2hsl(value)
+
+    def set_lab(self, value: Sequence[float]) -> None:
+        self.hsl = lab2hsl(value)
+
+    def set_lch(self, value: Sequence[float]) -> None:
+        self.hsl = lch2hsl(value)
+
+    def set_cmyk(self, value: Sequence[float]) -> None:
+        self.hsl = cmyk2hsl(value)
+
+    def set_yuv(self, value: Sequence[float]) -> None:
+        self.hsl = yuv2hsl(value)
+
     def set_rgb(self, value: Sequence[float]) -> None:
         self.hsl = rgb2hsl(value)
 
@@ -651,6 +726,11 @@ class Color:
     ## descriptor call. Those without a ``set_*`` accessor are read-only.
     hsl = property(get_hsl, set_hsl)
     hsv = property(get_hsv, set_hsv)
+    xyz = property(get_xyz, set_xyz)
+    lab = property(get_lab, set_lab)
+    lch = property(get_lch, set_lch)
+    cmyk = property(get_cmyk, set_cmyk)
+    yuv = property(get_yuv, set_yuv)
     rgb = property(get_rgb, set_rgb)
     rgbf = property(get_rgbf, set_rgbf)
     rgba = property(get_rgba, set_rgba)

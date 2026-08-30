@@ -34,6 +34,11 @@ All of the following produce equivalent red colors:
    Color(rgbf=(1, 0, 0))
    Color(rgbaf=(1, 0, 0, 1))
    Color(hsv=(0, 100, 100))
+   Color(lab=(53.2408, 80.0925, 67.2032))
+   Color(lch=(53.2408, 104.5518, 40))
+   Color(xyz=(41.2456, 21.2673, 1.9334))
+   Color(cmyk=(0, 100, 100, 0))
+   Color(yuv=(0.299, -0.147108, 0.614777))
    Color(Color("red"))
 
 Read and update channels
@@ -158,6 +163,24 @@ share them safely, and repeated calls return the identical object:
 
    clear_caches()  # release cached results; never needed for correctness
 
+Work in a perceptual space
+--------------------------
+
+``lab`` and ``lch`` are perceptually uniform, so they are the ones to
+interpolate or measure distance in. ``lch`` is ``lab`` in polar form, which
+makes it convenient for adjusting lightness or chroma without shifting hue:
+
+.. code-block:: python
+
+   from colourings import Color
+
+   c = Color("rebeccapurple")
+   lighter = Color(lch=(c.lch.lightness + 20, c.lch.chroma, c.lch.hue))
+
+The CIE conversions use the D65 illuminant, which sRGB is defined against, so
+values are not interchangeable with a library that uses D50. Converting into
+sRGB clamps anything outside its gamut.
+
 Handle errors
 -------------
 
@@ -257,4 +280,9 @@ The library uses explicit ranges for each representation:
 * ``hsla`` is the same as ``hsl`` with alpha in ``[0, 100]``
 * ``hslf`` / ``hslaf`` channels are in ``[0, 1]``
 * ``hsv`` uses ``hue in [0, 360]`` and saturation/value in ``[0, 100]``
+* ``xyz`` is CIE XYZ under D65, scaled so that white has ``y`` of 100
+* ``lab`` has lightness in ``[0, 100]`` and a/b in ``[-128, 127]``
+* ``lch`` has chroma in ``[0, 182]`` and hue in ``[0, 360]``
+* ``cmyk`` channels are in ``[0, 100]``
+* ``yuv`` is BT.601, luma in ``[0, 1]``
 * ``Color.alpha`` is always in ``[0, 1]``

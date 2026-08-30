@@ -3,15 +3,20 @@ import pytest
 from colourings import Color
 from colourings.definitions import COLOR_NAME_TO_RGB, FLOAT_ERROR
 from colourings.identify import (
+    is_cmyk,
     is_hsl,
     is_hsla,
     is_hslaf,
     is_hslf,
     is_hsv,
+    is_lab,
+    is_lch,
     is_rgb,
     is_rgba,
     is_rgbaf,
     is_rgbf,
+    is_xyz,
+    is_yuv,
 )
 
 
@@ -153,3 +158,48 @@ def test_is_hsv():
     assert not is_hsv("0, 0, 0")
     assert not is_hsv(int)
     assert not is_hsv(("a", 0, 0))
+
+
+def test_is_xyz():
+    assert is_xyz((0, 0, 0))
+    assert is_xyz(Color("red").xyz)
+    assert not is_xyz((-1, 0, 0))
+    assert not is_xyz((0, 0, 111))
+    assert not is_xyz((0, 0))
+    assert not is_xyz("0, 0, 0")
+
+
+def test_is_lab():
+    assert is_lab((0, 0, 0))
+    assert is_lab((100, -128, 127))
+    assert is_lab(Color("red").lab)
+    assert not is_lab((101, 0, 0))
+    assert not is_lab((0, -129, 0))
+    assert not is_lab((0, 0, 128))
+    assert not is_lab((0, 0))
+
+
+def test_is_lch():
+    assert is_lch((0, 0, 0))
+    assert is_lch(Color("red").lch)
+    assert not is_lch((0, -1, 0))
+    assert not is_lch((0, 0, 361))
+    assert not is_lch((0, 183, 0))
+    assert not is_lch((0, 0))
+
+
+def test_is_cmyk():
+    assert is_cmyk((0, 0, 0, 0))
+    assert is_cmyk(Color("red").cmyk)
+    assert not is_cmyk((0, 0, 0))
+    assert not is_cmyk((101, 0, 0, 0))
+    assert not is_cmyk((-1, 0, 0, 0))
+
+
+def test_is_yuv():
+    assert is_yuv((0, 0, 0))
+    assert is_yuv(Color("red").yuv)
+    assert not is_yuv((1.1, 0, 0))
+    assert not is_yuv((0, 0.5, 0))
+    assert not is_yuv((0, 0, 0.7))
+    assert not is_yuv((0, 0))

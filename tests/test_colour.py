@@ -1012,3 +1012,70 @@ def test_bad_hsv_via_color():
         Color(hsv=(361, 0, 0))
     with pytest.raises(InvalidColorError):
         Color("red").set_hsv((0, 101, 0))
+
+
+SPACES = ("xyz", "lab", "lch", "cmyk", "yuv", "hsv")
+
+
+@pytest.mark.parametrize("space", SPACES)
+def test_space_round_trips_through_color(space):
+    for name in ("red", "rebeccapurple", "white", "black", "olive", "teal", "gold"):
+        original = Color(name)
+        assert Color(**{space: getattr(original, space)}).hex_l == original.hex_l
+
+
+@pytest.mark.parametrize("space", SPACES)
+def test_space_components_are_floats(space):
+    assert all(type(v) is float for v in getattr(Color("rebeccapurple"), space))
+
+
+def test_space_reference_values_via_color():
+    red = Color("red")
+    assert red.xyz == pytest.approx((41.2456, 21.2673, 1.9334), abs=1e-3)
+    assert red.lab == pytest.approx((53.2408, 80.0925, 67.2032), abs=1e-3)
+    assert red.lch == pytest.approx((53.2408, 104.5518, 39.999), abs=1e-3)
+    assert red.cmyk == (0.0, 100.0, 100.0, 0.0)
+    assert red.yuv == pytest.approx((0.299, -0.147108, 0.614777), abs=1e-6)
+
+
+def test_spaces_are_settable():
+    c = Color("red")
+    c.lab = Color("blue").lab
+    assert c.web == "blue"
+    c.cmyk = (100, 0, 0, 0)
+    assert c.hex_l == "#00ffff"
+    c.yuv = Color("lime").yuv
+    assert c.web == "lime"
+
+
+def test_space_named_fields():
+    red = Color("red")
+    assert red.lab.lightness == pytest.approx(53.2408, abs=1e-3)
+    assert red.lch.chroma == pytest.approx(104.5518, abs=1e-3)
+    assert red.cmyk.key == 0.0
+    assert red.yuv.luma == pytest.approx(0.299)
+    assert red.xyz.y == pytest.approx(21.2673, abs=1e-3)
+
+
+def test_spaces_conflict_with_other_inputs():
+    with pytest.raises(ValueError, match="Only one of"):
+        Color(lab=(50, 0, 0), rgb=(255, 0, 0))
+    with pytest.raises(ValueError, match="'lab'"):
+        Color()
+
+
+@pytest.mark.parametrize(
+    ("space", "bad"),
+    [
+        ("xyz", (-1, 0, 0)),
+        ("lab", (101, 0, 0)),
+        ("lch", (0, 0, 361)),
+        ("cmyk", (101, 0, 0, 0)),
+        ("yuv", (1.1, 0, 0)),
+    ],
+)
+def test_bad_space_input_via_color(space, bad):
+    with pytest.raises(InvalidColorError):
+        Color(**{space: bad})
+    with pytest.raises(InvalidColorError):
+        setattr(Color("red"), space, bad)

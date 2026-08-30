@@ -4,6 +4,7 @@ import pytest
 
 from colourings.conversions import (
     clear_caches,
+    cmyk2rgb,
     hex2hsl,
     hex2hsv,
     hex2rgb,
@@ -22,10 +23,20 @@ from colourings.conversions import (
     hsv2hsl,
     hsv2rgb,
     hsv2web,
+    lab2lch,
+    lab2rgb,
+    lab2xyz,
+    lch2lab,
+    lch2rgb,
+    rgb2cmyk,
     rgb2hex,
     rgb2hsl,
     rgb2hsv,
+    rgb2lab,
+    rgb2lch,
     rgb2web,
+    rgb2xyz,
+    rgb2yuv,
     rgba2hsl,
     rgbaf2hsl,
     rgbf2hsl,
@@ -34,6 +45,9 @@ from colourings.conversions import (
     web2hsl,
     web2hsv,
     web2rgb,
+    xyz2lab,
+    xyz2rgb,
+    yuv2rgb,
 )
 from colourings.errors import InvalidColorError
 
@@ -434,3 +448,148 @@ def test_bad_input_to_hsv_producers():
         hex2hsv("nope")
     with pytest.raises(InvalidColorError):
         web2hsv("nope")
+
+
+## Reference values for sRGB primaries under D65, as published for CIE XYZ and
+## CIE L*a*b*.
+SPACE_REFERENCES = [
+    ((255, 255, 255), (95.047, 100.0, 108.883), (100.0, 0.0, 0.0)),
+    ((0, 0, 0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+    ((255, 0, 0), (41.2456, 21.2673, 1.9334), (53.2408, 80.0925, 67.2032)),
+    ((0, 255, 0), (35.7576, 71.5152, 11.9192), (87.7347, -86.1827, 83.1793)),
+    ((0, 0, 255), (18.0437, 7.2175, 95.0304), (32.2970, 79.1875, -107.8602)),
+    ((128, 128, 128), (20.516893, 21.586052, 23.503539), (53.5850, 0.0, 0.0)),
+]
+
+
+@pytest.mark.parametrize(("rgb", "xyz", "lab"), SPACE_REFERENCES)
+def test_rgb2xyz_reference_values(rgb, xyz, lab):
+    assert rgb2xyz(rgb) == pytest.approx(xyz, abs=1e-3)
+
+
+@pytest.mark.parametrize(("rgb", "xyz", "lab"), SPACE_REFERENCES)
+def test_rgb2lab_reference_values(rgb, xyz, lab):
+    assert rgb2lab(rgb) == pytest.approx(lab, abs=1e-3)
+
+
+@pytest.mark.parametrize(("rgb", "xyz", "lab"), SPACE_REFERENCES)
+def test_xyz2rgb_and_lab2rgb_invert(rgb, xyz, lab):
+    assert xyz2rgb(xyz) == pytest.approx(rgb, abs=1e-2)
+    assert lab2rgb(lab) == pytest.approx(rgb, abs=1e-2)
+
+
+def test_white_is_exactly_l100():
+    """The white point is derived from the matrix so this is exact."""
+    assert rgb2lab((255, 255, 255)) == (100.0, 0.0, 0.0)
+
+
+def test_xyz2lab_and_lab2xyz():
+    assert xyz2lab((95.047, 100.0, 108.883)) == pytest.approx((100, 0, 0), abs=1e-3)
+    assert lab2xyz((100, 0, 0)) == pytest.approx((95.047, 100.0, 108.883), abs=1e-3)
+
+
+def test_lab2lch_and_lch2lab():
+    assert lab2lch((53.2408, 80.0925, 67.2032)) == pytest.approx(
+        (53.2408, 104.5518, 39.999), abs=1e-3
+    )
+    assert lch2lab((53.2408, 104.5518, 39.999)) == pytest.approx(
+        (53.2408, 80.0925, 67.2032), abs=1e-3
+    )
+    ## hue wraps rather than going negative
+    assert lab2lch((50, 10, -10)).hue == pytest.approx(315.0)
+
+
+def test_rgb2lch_reference():
+    assert rgb2lch((255, 0, 0)) == pytest.approx((53.2408, 104.5518, 39.999), abs=1e-3)
+    assert lch2rgb((53.2408, 104.5518, 39.999)) == pytest.approx((255, 0, 0), abs=1e-2)
+
+
+CMYK_CASES = [
+    ((255, 0, 0), (0.0, 100.0, 100.0, 0.0)),
+    ((0, 0, 0), (0.0, 0.0, 0.0, 100.0)),
+    ((255, 255, 255), (0.0, 0.0, 0.0, 0.0)),
+    ((0, 255, 255), (100.0, 0.0, 0.0, 0.0)),
+    ((128, 128, 0), (0.0, 0.0, 100.0, 49.80392156862745)),
+]
+
+
+@pytest.mark.parametrize(("rgb", "cmyk"), CMYK_CASES)
+def test_cmyk(rgb, cmyk):
+    assert rgb2cmyk(rgb) == pytest.approx(cmyk)
+    assert cmyk2rgb(cmyk) == pytest.approx(rgb)
+
+
+def test_yuv_reference_values():
+    assert rgb2yuv((255, 0, 0)) == pytest.approx((0.299, -0.147108, 0.614777), abs=1e-6)
+    assert rgb2yuv((0, 0, 0)) == (0.0, 0.0, 0.0)
+
+
+def test_greys_have_no_chroma_in_yuv():
+    """Working from the B-Y and R-Y differences keeps this exact."""
+    for level in (0, 64, 128, 192, 255):
+        yuv = rgb2yuv((level, level, level))
+        assert yuv.u == 0.0
+        assert yuv.v == 0.0
+        assert yuv.luma == pytest.approx(level / 255)
+
+
+ROUND_TRIPS = [
+    (rgb2xyz, xyz2rgb),
+    (rgb2lab, lab2rgb),
+    (rgb2lch, lch2rgb),
+    (rgb2cmyk, cmyk2rgb),
+    (rgb2yuv, yuv2rgb),
+]
+
+
+@pytest.mark.parametrize(("forward", "backward"), ROUND_TRIPS)
+def test_round_trips(forward, backward):
+    for rgb in [
+        (0, 0, 0),
+        (255, 255, 255),
+        (255, 0, 0),
+        (12, 200, 37),
+        (128, 128, 128),
+        (7, 3, 1),
+        (250, 251, 252),
+    ]:
+        assert backward(forward(rgb)) == pytest.approx(rgb, abs=1e-6)
+
+
+def test_out_of_gamut_is_clamped_not_rejected():
+    """A LAB value outside sRGB has no encoding, so it clamps."""
+    rgb = lab2rgb((100, -128, 127))
+    assert all(0 <= c <= 255 for c in rgb)
+
+
+@pytest.mark.parametrize(
+    ("func", "bad"),
+    [
+        (rgb2xyz, (256, 0, 0)),
+        (xyz2rgb, (200, 0, 0)),
+        (xyz2lab, (0, 0, 200)),
+        (lab2xyz, (101, 0, 0)),
+        (lab2lch, (0, -200, 0)),
+        (lch2lab, (0, 200, 0)),
+        (rgb2cmyk, (256, 0, 0)),
+        (cmyk2rgb, (101, 0, 0, 0)),
+        (rgb2yuv, (256, 0, 0)),
+        (yuv2rgb, (2, 0, 0)),
+        (rgb2lab, (256, 0, 0)),
+        (rgb2lch, (256, 0, 0)),
+    ],
+)
+def test_bad_input_rejected(func, bad):
+    with pytest.raises(InvalidColorError):
+        func(bad)
+
+
+def test_greys_are_neutral_in_xyz():
+    """A grey must be an exact scalar multiple of the white point."""
+    from colourings.definitions import D65_WHITE_POINT
+
+    for level in (0, 64, 128, 192, 255):
+        xyz = rgb2xyz((level, level, level))
+        ratios = [c / w for c, w in zip(xyz, D65_WHITE_POINT, strict=True)]
+        assert ratios[0] == pytest.approx(ratios[1]) == pytest.approx(ratios[2])
+        assert rgb2lab((level, level, level))[1:] == pytest.approx((0.0, 0.0))

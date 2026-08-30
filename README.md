@@ -48,6 +48,11 @@ The library uses explicit numeric ranges (not mixed 0..1 + 0..255 conventions):
 - `hsla`: same as `hsl`, with alpha in `[0, 100]`
 - `hslf` / `hslaf`: channels in `[0, 1]`
 - `hsv`: `(hue, saturation, value)` as `hue in [0, 360]`, `saturation/value in [0, 100]`
+- `xyz`: CIE XYZ under D65, scaled so that white has `y` of 100
+- `lab`: CIE L*a*b*, lightness in `[0, 100]`, a/b in `[-128, 127]`
+- `lch`: cylindrical CIE L*a*b*, chroma in `[0, 182]`, hue in `[0, 360]`
+- `cmyk`: channels in `[0, 100]`
+- `yuv`: BT.601, luma in `[0, 1]`, U in `[-0.436, 0.436]`, V in `[-0.615, 0.615]`
 - `Color.alpha`: always `[0, 1]`
 
 ## Constructing Colors
@@ -67,6 +72,11 @@ Color(rgba=(255, 0, 0, 255))
 Color(rgbf=(1, 0, 0))
 Color(rgbaf=(1, 0, 0, 1))
 Color(hsv=(0, 100, 100))
+Color(lab=(53.2408, 80.0925, 67.2032))
+Color(lch=(53.2408, 104.5518, 40))
+Color(xyz=(41.2456, 21.2673, 1.9334))
+Color(cmyk=(0, 100, 100, 0))
+Color(yuv=(0.299, -0.147108, 0.614777))
 Color(Color("red"))
 ```
 
@@ -228,6 +238,8 @@ Available helpers include conversion paths across:
 - `rgb`, `rgba`, `rgbf`, `rgbaf`
 - `hsl`, `hsla`, `hslf`, `hslaf`
 - `hsv`
+- `xyz`, `lab`, `lch` (CIE, D65)
+- `cmyk`, `yuv`
 - `hex` and `web`
 
 Conversions are memoized with a bounded LRU cache, so repeated lookups of the
@@ -257,6 +269,27 @@ built-in strategies; a custom `equality` that treats colors with different
 `hex_l` as equal breaks that correspondence, and those colors should not be
 used as dict keys. `Color` is mutable, so do not mutate one while it is held
 in a set.
+
+## Perceptual Spaces
+
+`lab` and `lch` are perceptually uniform, so they are the ones to interpolate
+or measure distance in. `lch` is `lab` in polar form, which makes it the
+convenient one for adjusting lightness or chroma without shifting hue.
+
+```python
+from colourings import Color
+
+c = Color("rebeccapurple")
+print(c.lab)  # LAB(lightness=32.9024..., a=42.8830..., b=-47.1486...)
+print(c.lch)  # LCH(lightness=32.9024..., chroma=63.7334..., hue=312.2874...)
+
+lighter = Color(lch=(c.lch.lightness + 20, c.lch.chroma, c.lch.hue))
+```
+
+The CIE conversions use the D65 illuminant, which is the one sRGB is defined
+against. Values are not interchangeable with a library that uses D50.
+Converting into sRGB clamps anything outside its gamut, since an out-of-gamut
+colour has no sRGB encoding.
 
 ## Error Handling
 

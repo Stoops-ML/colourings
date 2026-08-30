@@ -1,19 +1,32 @@
+import math
 import re
 from collections.abc import Callable, Hashable, Sequence
 from functools import lru_cache, wraps
 from typing import ParamSpec, TypeVar
 
 from .definitions import (
+    CMYK,
     COLOR_NAME_TO_RGB,
+    D65_WHITE_POINT,
     FLOAT_ERROR,
     HSL,
     HSLA,
     HSV,
+    LAB,
+    LAB_DELTA,
+    LCH,
     LONG_HEX_COLOR,
     RGB,
     RGB_TO_COLOR_NAMES,
+    RGB_TO_XYZ_MATRIX,
     RGBA,
     SHORT_HEX_COLOR,
+    XYZ,
+    XYZ_TO_RGB_MATRIX,
+    YUV,
+    YUV_LUMA_COEFFICIENTS,
+    YUV_U_SCALE,
+    YUV_V_SCALE,
     HSLAf,
     HSLf,
     RGBAf,
@@ -21,10 +34,13 @@ from .definitions import (
 )
 from .errors import ColorError, InvalidColorError
 from .identify import (
+    is_cmyk,
     is_hsl,
     is_hsla,
     is_hslf,
     is_hsv,
+    is_lab,
+    is_lch,
     is_long_hex,
     is_rgb,
     is_rgba,
@@ -32,9 +48,9 @@ from .identify import (
     is_rgbf,
     is_short_hex,
     is_web,
+    is_xyz,
+    is_yuv,
 )
-
-# add HSV, CMYK, YUV conversion
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -1034,3 +1050,560 @@ def web2hsv(web: str) -> HSV:
     if not is_web(web):
         raise InvalidColorError("Input is not of web type.")
     return hsl2hsv(web2hsl(web))
+
+
+def _matrix_apply(
+    matrix: Sequence[Sequence[float]], vector: Sequence[float]
+) -> tuple[float, float, float]:
+    """Multiply a 3x3 matrix by a 3-component vector.
+
+    Parameters
+    ----------
+    matrix : Sequence[Sequence[float]]
+        Three rows of three coefficients.
+    vector : Sequence[float]
+        Three components.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        The product, as three floats.
+    """
+    return (
+        matrix[0][0] * vector[0] + matrix[0][1] * vector[1] + matrix[0][2] * vector[2],
+        matrix[1][0] * vector[0] + matrix[1][1] * vector[1] + matrix[1][2] * vector[2],
+        matrix[2][0] * vector[0] + matrix[2][1] * vector[1] + matrix[2][2] * vector[2],
+    )
+
+
+def _srgb_to_linear(channel: float) -> float:
+    """Undo the sRGB transfer function for one normalised channel.
+
+    The results are wrapped in ``float`` because ``**`` is typed as possibly
+    returning ``complex``; every base here is non-negative.
+
+    Parameters
+    ----------
+    channel : float
+        Gamma-encoded channel in the ``[0, 1]`` range.
+
+    Returns
+    -------
+    float
+        Linear-light channel in the ``[0, 1]`` range.
+    """
+    if channel <= 0.04045:
+        return channel / 12.92
+    return float(((channel + 0.055) / 1.055) ** 2.4)
+
+
+def _linear_to_srgb(channel: float) -> float:
+    """Apply the sRGB transfer function to one linear channel.
+
+    Out-of-gamut values are clamped, because a colour outside sRGB has no
+    representable encoding.
+
+    Parameters
+    ----------
+    channel : float
+        Linear-light channel.
+
+    Returns
+    -------
+    float
+        Gamma-encoded channel in the ``[0, 1]`` range.
+    """
+    channel = min(max(channel, 0.0), 1.0)
+    if channel <= 0.0031308:
+        return channel * 12.92
+    return float(1.055 * channel ** (1 / 2.4) - 0.055)
+
+
+@_cached
+def rgb2xyz(rgb: Sequence[int | float]) -> XYZ:
+    """Convert RGB representation to CIE XYZ under the D65 illuminant.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    XYZ
+        XYZ tuple scaled so that the reference white has ``y`` of 100.
+    """
+    if not is_rgb(rgb):
+        raise InvalidColorError("Input is not an RGB type.")
+    linear = [_srgb_to_linear(c) for c in rgb2rgbf(rgb)]
+    x, y, z = _matrix_apply(RGB_TO_XYZ_MATRIX, linear)
+    return XYZ(_threshold(x * 100.0), _threshold(y * 100.0), _threshold(z * 100.0))
+
+
+@_cached
+def xyz2rgb(xyz: Sequence[int | float]) -> RGB:
+    """Convert CIE XYZ to RGB, clamping anything outside the sRGB gamut.
+
+    Parameters
+    ----------
+    xyz : Sequence[int | float]
+        XYZ sequence scaled so that the reference white has ``y`` of 100.
+
+    Returns
+    -------
+    RGB
+        RGB tuple in the ``[0, 255]`` range.
+    """
+    if not is_xyz(xyz):
+        raise InvalidColorError("Input is not an XYZ type.")
+    linear = _matrix_apply(XYZ_TO_RGB_MATRIX, [c / 100.0 for c in xyz])
+    return RGB(*(_threshold(_linear_to_srgb(c) * 255.0) for c in linear))
+
+
+@_cached
+def xyz2lab(xyz: Sequence[int | float]) -> LAB:
+    """Convert CIE XYZ to CIE L*a*b*.
+
+    Parameters
+    ----------
+    xyz : Sequence[int | float]
+        XYZ sequence under D65.
+
+    Returns
+    -------
+    LAB
+        L*a*b* tuple with lightness in ``[0, 100]``.
+    """
+    if not is_xyz(xyz):
+        raise InvalidColorError("Input is not an XYZ type.")
+
+    def f(t: float) -> float:
+        if t > LAB_DELTA**3:
+            return float(t ** (1 / 3))
+        return t / (3 * LAB_DELTA**2) + 4.0 / 29.0
+
+    fx, fy, fz = (f(c / w) for c, w in zip(xyz, D65_WHITE_POINT, strict=True))
+    return LAB(
+        _threshold(116.0 * fy - 16.0),
+        _threshold(500.0 * (fx - fy)),
+        _threshold(200.0 * (fy - fz)),
+    )
+
+
+@_cached
+def lab2xyz(lab: Sequence[int | float]) -> XYZ:
+    """Convert CIE L*a*b* to CIE XYZ.
+
+    Parameters
+    ----------
+    lab : Sequence[int | float]
+        L*a*b* sequence.
+
+    Returns
+    -------
+    XYZ
+        XYZ tuple under D65.
+    """
+    if not is_lab(lab):
+        raise InvalidColorError("Input is not a LAB type.")
+
+    def f_inv(t: float) -> float:
+        if t > LAB_DELTA:
+            return t**3
+        return 3 * LAB_DELTA**2 * (t - 4.0 / 29.0)
+
+    fy = (lab[0] + 16.0) / 116.0
+    fx = fy + lab[1] / 500.0
+    fz = fy - lab[2] / 200.0
+    return XYZ(
+        *(
+            _threshold(min(max(f_inv(c) * w, 0.0), 110.0))
+            for c, w in zip((fx, fy, fz), D65_WHITE_POINT, strict=True)
+        )
+    )
+
+
+@_cached
+def lab2lch(lab: Sequence[int | float]) -> LCH:
+    """Convert CIE L*a*b* to its cylindrical LCh form.
+
+    Parameters
+    ----------
+    lab : Sequence[int | float]
+        L*a*b* sequence.
+
+    Returns
+    -------
+    LCH
+        LCh tuple with hue in ``[0, 360]``.
+    """
+    if not is_lab(lab):
+        raise InvalidColorError("Input is not a LAB type.")
+    chroma = math.hypot(lab[1], lab[2])
+    hue = math.degrees(math.atan2(lab[2], lab[1])) % 360.0
+    return LCH(_threshold(lab[0]), _threshold(chroma), _threshold(hue))
+
+
+@_cached
+def lch2lab(lch: Sequence[int | float]) -> LAB:
+    """Convert cylindrical CIE LCh to L*a*b*.
+
+    Parameters
+    ----------
+    lch : Sequence[int | float]
+        LCh sequence.
+
+    Returns
+    -------
+    LAB
+        L*a*b* tuple.
+    """
+    if not is_lch(lch):
+        raise InvalidColorError("Input is not an LCH type.")
+    radians = math.radians(lch[2])
+    return LAB(
+        _threshold(lch[0]),
+        _threshold(lch[1] * math.cos(radians)),
+        _threshold(lch[1] * math.sin(radians)),
+    )
+
+
+@_cached
+def rgb2lab(rgb: Sequence[int | float]) -> LAB:
+    """Convert RGB representation to CIE L*a*b*.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    LAB
+        L*a*b* tuple.
+    """
+    return xyz2lab(rgb2xyz(rgb))
+
+
+@_cached
+def lab2rgb(lab: Sequence[int | float]) -> RGB:
+    """Convert CIE L*a*b* to RGB representation.
+
+    Parameters
+    ----------
+    lab : Sequence[int | float]
+        L*a*b* sequence.
+
+    Returns
+    -------
+    RGB
+        RGB tuple in the ``[0, 255]`` range.
+    """
+    return xyz2rgb(lab2xyz(lab))
+
+
+@_cached
+def rgb2lch(rgb: Sequence[int | float]) -> LCH:
+    """Convert RGB representation to cylindrical CIE LCh.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    LCH
+        LCh tuple.
+    """
+    return lab2lch(rgb2lab(rgb))
+
+
+@_cached
+def lch2rgb(lch: Sequence[int | float]) -> RGB:
+    """Convert cylindrical CIE LCh to RGB representation.
+
+    Parameters
+    ----------
+    lch : Sequence[int | float]
+        LCh sequence.
+
+    Returns
+    -------
+    RGB
+        RGB tuple in the ``[0, 255]`` range.
+    """
+    return lab2rgb(lch2lab(lch))
+
+
+@_cached
+def rgb2cmyk(rgb: Sequence[int | float]) -> CMYK:
+    """Convert RGB representation to CMYK.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    CMYK
+        CMYK tuple with each component in the ``[0, 100]`` range.
+    """
+    if not is_rgb(rgb):
+        raise InvalidColorError("Input is not an RGB type.")
+    r, g, b = rgb2rgbf(rgb)
+    key = 1.0 - max(r, g, b)
+    if key >= 1.0:  ## black has no chromatic component to record
+        return CMYK(0.0, 0.0, 0.0, 100.0)
+    scale = 1.0 - key
+    return CMYK(
+        _threshold((1.0 - r - key) / scale * 100.0),
+        _threshold((1.0 - g - key) / scale * 100.0),
+        _threshold((1.0 - b - key) / scale * 100.0),
+        _threshold(key * 100.0),
+    )
+
+
+@_cached
+def cmyk2rgb(cmyk: Sequence[int | float]) -> RGB:
+    """Convert CMYK to RGB representation.
+
+    Parameters
+    ----------
+    cmyk : Sequence[int | float]
+        CMYK sequence with each component in the ``[0, 100]`` range.
+
+    Returns
+    -------
+    RGB
+        RGB tuple in the ``[0, 255]`` range.
+    """
+    if not is_cmyk(cmyk):
+        raise InvalidColorError("Input is not a CMYK type.")
+    c, m, y, k = (component / 100.0 for component in cmyk)
+    return RGB(
+        _threshold((1.0 - c) * (1.0 - k) * 255.0),
+        _threshold((1.0 - m) * (1.0 - k) * 255.0),
+        _threshold((1.0 - y) * (1.0 - k) * 255.0),
+    )
+
+
+@_cached
+def rgb2yuv(rgb: Sequence[int | float]) -> YUV:
+    """Convert RGB representation to BT.601 YUV.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    YUV
+        YUV tuple with luma in ``[0, 1]``.
+    """
+    if not is_rgb(rgb):
+        raise InvalidColorError("Input is not an RGB type.")
+    r, g, b = rgb2rgbf(rgb)
+    kr, kg, kb = YUV_LUMA_COEFFICIENTS
+    luma = kr * r + kg * g + kb * b
+    return YUV(
+        _threshold(luma),
+        _threshold(YUV_U_SCALE * (b - luma)),
+        _threshold(YUV_V_SCALE * (r - luma)),
+    )
+
+
+@_cached
+def yuv2rgb(yuv: Sequence[int | float]) -> RGB:
+    """Convert BT.601 YUV to RGB representation.
+
+    Parameters
+    ----------
+    yuv : Sequence[int | float]
+        YUV sequence with luma in ``[0, 1]``.
+
+    Returns
+    -------
+    RGB
+        RGB tuple in the ``[0, 255]`` range.
+    """
+    if not is_yuv(yuv):
+        raise InvalidColorError("Input is not a YUV type.")
+    luma, u, v = (float(c) for c in yuv)
+    kr, kg, kb = YUV_LUMA_COEFFICIENTS
+    r = luma + v / YUV_V_SCALE
+    b = luma + u / YUV_U_SCALE
+    g = (luma - kr * r - kb * b) / kg
+    return RGB(*(_threshold(min(max(c, 0.0), 1.0) * 255.0) for c in (r, g, b)))
+
+
+@_cached
+def hsl2xyz(hsl: Sequence[int | float]) -> XYZ:
+    """Convert HSL representation to CIE XYZ.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    XYZ
+        XYZ tuple under D65.
+    """
+    return rgb2xyz(hsl2rgb(hsl))
+
+
+@_cached
+def xyz2hsl(xyz: Sequence[int | float]) -> HSL:
+    """Convert CIE XYZ to HSL representation.
+
+    Parameters
+    ----------
+    xyz : Sequence[int | float]
+        XYZ sequence under D65.
+
+    Returns
+    -------
+    HSL
+        HSL tuple.
+    """
+    return rgb2hsl(xyz2rgb(xyz))
+
+
+@_cached
+def hsl2lab(hsl: Sequence[int | float]) -> LAB:
+    """Convert HSL representation to CIE L*a*b*.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    LAB
+        L*a*b* tuple.
+    """
+    return rgb2lab(hsl2rgb(hsl))
+
+
+@_cached
+def lab2hsl(lab: Sequence[int | float]) -> HSL:
+    """Convert CIE L*a*b* to HSL representation.
+
+    Parameters
+    ----------
+    lab : Sequence[int | float]
+        L*a*b* sequence.
+
+    Returns
+    -------
+    HSL
+        HSL tuple.
+    """
+    return rgb2hsl(lab2rgb(lab))
+
+
+@_cached
+def hsl2lch(hsl: Sequence[int | float]) -> LCH:
+    """Convert HSL representation to cylindrical CIE LCh.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    LCH
+        LCh tuple.
+    """
+    return lab2lch(hsl2lab(hsl))
+
+
+@_cached
+def lch2hsl(lch: Sequence[int | float]) -> HSL:
+    """Convert cylindrical CIE LCh to HSL representation.
+
+    Parameters
+    ----------
+    lch : Sequence[int | float]
+        LCh sequence.
+
+    Returns
+    -------
+    HSL
+        HSL tuple.
+    """
+    return lab2hsl(lch2lab(lch))
+
+
+@_cached
+def hsl2cmyk(hsl: Sequence[int | float]) -> CMYK:
+    """Convert HSL representation to CMYK.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    CMYK
+        CMYK tuple.
+    """
+    return rgb2cmyk(hsl2rgb(hsl))
+
+
+@_cached
+def cmyk2hsl(cmyk: Sequence[int | float]) -> HSL:
+    """Convert CMYK to HSL representation.
+
+    Parameters
+    ----------
+    cmyk : Sequence[int | float]
+        CMYK sequence.
+
+    Returns
+    -------
+    HSL
+        HSL tuple.
+    """
+    return rgb2hsl(cmyk2rgb(cmyk))
+
+
+@_cached
+def hsl2yuv(hsl: Sequence[int | float]) -> YUV:
+    """Convert HSL representation to BT.601 YUV.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    YUV
+        YUV tuple.
+    """
+    return rgb2yuv(hsl2rgb(hsl))
+
+
+@_cached
+def yuv2hsl(yuv: Sequence[int | float]) -> HSL:
+    """Convert BT.601 YUV to HSL representation.
+
+    Parameters
+    ----------
+    yuv : Sequence[int | float]
+        YUV sequence.
+
+    Returns
+    -------
+    HSL
+        HSL tuple.
+    """
+    return rgb2hsl(yuv2rgb(yuv))

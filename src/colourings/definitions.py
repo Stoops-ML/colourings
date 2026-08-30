@@ -61,6 +61,47 @@ class HSV(NamedTuple):
     value: float
 
 
+class XYZ(NamedTuple):
+    """CIE 1931 XYZ tristimulus values, scaled so that Y is in ``[0, 100]``."""
+
+    x: float
+    y: float
+    z: float
+
+
+class LAB(NamedTuple):
+    """CIE L*a*b* with lightness in ``[0, 100]`` and a/b in ``[-128, 127]``."""
+
+    lightness: float
+    a: float
+    b: float
+
+
+class LCH(NamedTuple):
+    """Cylindrical CIE L*a*b*: lightness, chroma, and hue in ``[0, 360]``."""
+
+    lightness: float
+    chroma: float
+    hue: float
+
+
+class CMYK(NamedTuple):
+    """Cyan, magenta, yellow and key, each in ``[0, 100]``."""
+
+    cyan: float
+    magenta: float
+    yellow: float
+    key: float
+
+
+class YUV(NamedTuple):
+    """BT.601 luma in ``[0, 1]`` with chroma differences around zero."""
+
+    luma: float
+    u: float
+    v: float
+
+
 class HSLA(NamedTuple):
     """Hue in ``[0, 360]`` with saturation, lightness and alpha in ``[0, 100]``."""
 
@@ -233,6 +274,74 @@ _NAMED_RGB: dict[tuple[int, int, int], list[str]] = {
     (255, 255, 240): ["Ivory"],
     (255, 255, 255): ["White"],
 }
+
+## Linear sRGB <-> CIE XYZ under D65 (IEC 61966-2-1).
+RGB_TO_XYZ_MATRIX = (
+    (0.4124564, 0.3575761, 0.1804375),
+    (0.2126729, 0.7151522, 0.0721750),
+    (0.0193339, 0.1191920, 0.9503041),
+)
+
+
+def _invert_3x3(
+    matrix: tuple[tuple[float, float, float], ...],
+) -> tuple[tuple[float, float, float], ...]:
+    """Invert a 3x3 matrix by cofactor expansion.
+
+    Parameters
+    ----------
+    matrix : tuple[tuple[float, float, float], ...]
+        Three rows of three coefficients.
+
+    Returns
+    -------
+    tuple[tuple[float, float, float], ...]
+        The inverse, as three rows of three coefficients.
+    """
+    (a, b, c), (d, e, f), (g, h, i) = matrix
+    cofactors = (
+        (e * i - f * h, c * h - b * i, b * f - c * e),
+        (f * g - d * i, a * i - c * g, c * d - a * f),
+        (d * h - e * g, b * g - a * h, a * e - b * d),
+    )
+    determinant = a * cofactors[0][0] + b * cofactors[1][0] + c * cofactors[2][0]
+    return tuple(
+        (row[0] / determinant, row[1] / determinant, row[2] / determinant)
+        for row in cofactors
+    )
+
+
+## Derived rather than quoted, for the same reason as the white point below:
+## the published inverse is rounded to seven digits and is not the exact
+## inverse of the matrix above, which costs about 4e-4 of a channel on an
+## RGB -> XYZ -> RGB round trip. Deriving it brings that down to float noise.
+XYZ_TO_RGB_MATRIX = _invert_3x3(RGB_TO_XYZ_MATRIX)
+
+## Reference white for the CIE conversions. sRGB is defined against D65, so
+## that is the illuminant used throughout; values are not interchangeable with
+## a library that uses D50.
+##
+## Derived from the matrix rather than quoted, because the published
+## coefficients are rounded and their green row sums to 1.0000001. Quoting the
+## nominal (95.047, 100.0, 108.883) would put white at L* 100.0000039, just
+## outside the range L* is defined over. Deriving it makes white land exactly
+## on the white point, so L* of white is exactly 100.
+D65_WHITE_POINT: tuple[float, float, float] = (
+    sum(RGB_TO_XYZ_MATRIX[0]) * 100.0,
+    sum(RGB_TO_XYZ_MATRIX[1]) * 100.0,
+    sum(RGB_TO_XYZ_MATRIX[2]) * 100.0,
+)
+
+## Breakpoint of the L*a*b* transfer function, delta = 6/29.
+LAB_DELTA = 6.0 / 29.0
+
+## BT.601 luma coefficients, with the scale factors that turn the B-Y and R-Y
+## differences into U and V. Working from the differences rather than a rounded
+## 3x3 matrix keeps a grey at exactly U = V = 0; the published matrix leaves
+## white at U = 1e-5.
+YUV_LUMA_COEFFICIENTS = (0.299, 0.587, 0.114)
+YUV_U_SCALE = 0.492
+YUV_V_SCALE = 0.877
 
 RGB_TO_COLOR_NAMES: dict[RGB, list[str]] = {
     RGB(float(r), float(g), float(b)): names for (r, g, b), names in _NAMED_RGB.items()

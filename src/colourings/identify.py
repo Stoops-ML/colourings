@@ -35,6 +35,32 @@ def _in_range(value: object, low: float, high: float) -> bool:
     return low - FLOAT_ERROR <= value <= high + FLOAT_ERROR
 
 
+def _is_color_ranges(color: object, ranges: Sequence[tuple[float, float]]) -> bool:
+    """Check a colour sequence whose components have different ranges.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+    ranges : Sequence[tuple[float, float]]
+        One ``(low, high)`` pair per component, in order.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of the same length as
+        ``ranges`` and each component lies within its own range.
+    """
+    if not isinstance(color, Sequence) or isinstance(color, str):
+        return False
+    if len(color) != len(ranges):
+        return False
+    return all(
+        _in_range(channel, low, high)
+        for channel, (low, high) in zip(color, ranges, strict=True)
+    )
+
+
 def _is_color(color: object, length: int, low: float, high: float) -> bool:
     """Check whether a value is a colour sequence with components in range.
 
@@ -227,13 +253,7 @@ def is_hsl(color: object) -> bool:
         ``[0, 360]`` and saturation/lightness in ``[0, 100]``, each within
         ``FLOAT_ERROR``.
     """
-    if not isinstance(color, Sequence) or isinstance(color, str):
-        return False
-    if len(color) != 3:
-        return False
-    return _in_range(color[0], 0, 360) and all(
-        _in_range(channel, 0, 100) for channel in color[1:]
-    )
+    return _is_color_ranges(color, ((0, 360), (0, 100), (0, 100)))
 
 
 def is_hsv(color: object) -> bool:
@@ -251,13 +271,7 @@ def is_hsv(color: object) -> bool:
         ``[0, 360]`` and saturation/value in ``[0, 100]``, each within
         ``FLOAT_ERROR``.
     """
-    if not isinstance(color, Sequence) or isinstance(color, str):
-        return False
-    if len(color) != 3:
-        return False
-    return _in_range(color[0], 0, 360) and all(
-        _in_range(channel, 0, 100) for channel in color[1:]
-    )
+    return _is_color_ranges(color, ((0, 360), (0, 100), (0, 100)))
 
 
 def is_hsla(color: object) -> bool:
@@ -275,10 +289,89 @@ def is_hsla(color: object) -> bool:
         ``[0, 360]`` and saturation/lightness/alpha in ``[0, 100]``, each
         within ``FLOAT_ERROR``.
     """
-    if not isinstance(color, Sequence) or isinstance(color, str):
-        return False
-    if len(color) != 4:
-        return False
-    return _in_range(color[0], 0, 360) and all(
-        _in_range(channel, 0, 100) for channel in color[1:]
-    )
+    return _is_color_ranges(color, ((0, 360), (0, 100), (0, 100), (0, 100)))
+
+
+def is_xyz(color: object) -> bool:
+    """Validate whether a value is a CIE XYZ sequence.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 whose
+        components lie within the bounds the sRGB gamut occupies under D65.
+    """
+    return _is_color_ranges(color, ((0, 110), (0, 110), (0, 110)))
+
+
+def is_lab(color: object) -> bool:
+    """Validate whether a value is a CIE L*a*b* sequence.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with lightness
+        in ``[0, 100]`` and a/b in ``[-128, 127]``.
+    """
+    return _is_color_ranges(color, ((0, 100), (-128, 127), (-128, 127)))
+
+
+def is_lch(color: object) -> bool:
+    """Validate whether a value is a CIE LCh sequence.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with lightness
+        in ``[0, 100]``, chroma in ``[0, 182]`` and hue in ``[0, 360]``.
+    """
+    return _is_color_ranges(color, ((0, 100), (0, 182), (0, 360)))
+
+
+def is_cmyk(color: object) -> bool:
+    """Validate whether a value is a CMYK sequence.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 4 with each
+        component in the ``[0, 100]`` range.
+    """
+    return _is_color(color, 4, 0, 100)
+
+
+def is_yuv(color: object) -> bool:
+    """Validate whether a value is a BT.601 YUV sequence.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with luma in
+        ``[0, 1]``, U in ``[-0.436, 0.436]`` and V in ``[-0.615, 0.615]``.
+    """
+    return _is_color_ranges(color, ((0, 1), (-0.436, 0.436), (-0.615, 0.615)))
