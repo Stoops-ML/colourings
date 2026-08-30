@@ -433,7 +433,7 @@ def hsla2hsl(hsla: Sequence[int | float]) -> HSL:
     """
     if not is_hsla(hsla):
         raise ValueError("Input is not an HSLA type.")
-    return HSL(hsla[0], hsla[1], hsla[2])
+    return HSL(_threshold(hsla[0]), _threshold(hsla[1]), _threshold(hsla[2]))
 
 
 @_cached
@@ -686,7 +686,8 @@ def hex2web(hex: str) -> str:
         raise ValueError("Input is not of hex type.")
 
     rgb = hex2rgb(hex)
-    dec_rgb = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+    ## Table keys are whole numbers, so truncate before looking the color up.
+    dec_rgb = RGB(float(int(rgb[0])), float(int(rgb[1])), float(int(rgb[2])))
     if dec_rgb in RGB_TO_COLOR_NAMES:
         ## take the first one
         color_name = RGB_TO_COLOR_NAMES[dec_rgb][0]
@@ -729,9 +730,7 @@ def web2hex(web: str, force_long: bool = False) -> str:
 
     if not is_web(web):
         raise ValueError("Input is not of web type.")
-    return rgb2hex(
-        [float(int(v)) for v in COLOR_NAME_TO_RGB[web]], force_long
-    )  # convert dec to hex
+    return rgb2hex(COLOR_NAME_TO_RGB[web], force_long)  # convert dec to hex
 
 
 @_cached

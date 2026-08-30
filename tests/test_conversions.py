@@ -340,3 +340,10 @@ def test_normalized_and_scaled_paths_agree():
         rgbf = tuple(v / 255.0 for v in rgb)
         assert rgbf2hsl(rgbf) == pytest.approx(rgb2hsl(rgb))
         assert rgbaf2hsl((*rgbf, 1.0)) == pytest.approx(rgb2hsl(rgb))
+
+
+def test_hsla2hsl_returns_floats_for_integer_input():
+    """hsla2hsl used to pass its input through without normalizing it."""
+    hsl = hsla2hsl((240, 100, 50, 100))
+    assert hsl == (240.0, 100.0, 50.0)
+    assert [type(v) for v in hsl] == [float, float, float]

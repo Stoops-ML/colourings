@@ -79,7 +79,9 @@ class HSLAf(NamedTuple):
     alpha: float
 
 
-RGB_TO_COLOR_NAMES: dict[tuple[int, int, int], list[str]] = {
+## Source data, written as integers to keep the table readable. The public
+## mappings below expose it with float components.
+_NAMED_RGB: dict[tuple[int, int, int], list[str]] = {
     (0, 0, 0): ["Black"],
     (0, 0, 128): ["Navy", "NavyBlue"],
     (0, 0, 139): ["DarkBlue"],
@@ -224,8 +226,12 @@ RGB_TO_COLOR_NAMES: dict[tuple[int, int, int], list[str]] = {
     (255, 255, 255): ["White"],
 }
 
+RGB_TO_COLOR_NAMES: dict[RGB, list[str]] = {
+    RGB(float(r), float(g), float(b)): names for (r, g, b), names in _NAMED_RGB.items()
+}
+
 ## Building inverse relation
-COLOR_NAME_TO_RGB: dict[str, tuple[int, int, int]] = {
+COLOR_NAME_TO_RGB: dict[str, RGB] = {
     name.lower(): rgb for rgb, names in RGB_TO_COLOR_NAMES.items() for name in names
 }
 

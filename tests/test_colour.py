@@ -717,3 +717,79 @@ def test_color_color_lower():
 
 def test_color_web_lower():
     assert Color(web="orangered") == Color(web="OrangeRed")
+
+
+TUPLE_ATTRIBUTES = ("hsl", "hsla", "hslf", "hslaf", "rgb", "rgba", "rgbf", "rgbaf")
+SCALAR_ATTRIBUTES = (
+    "hue",
+    "saturation",
+    "lightness",
+    "red",
+    "green",
+    "blue",
+    "alpha",
+    "luminance",
+)
+
+
+def assert_all_float(color):
+    for attribute in TUPLE_ATTRIBUTES:
+        for component in getattr(color, attribute):
+            assert type(component) is float, f"{attribute} component is not a float"
+    for attribute in SCALAR_ATTRIBUTES:
+        assert type(getattr(color, attribute)) is float, f"{attribute} is not a float"
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"color": "red"},
+        {"web": "blue"},
+        {"hex": "#00f"},
+        {"hsl": (240, 100, 50)},
+        {"hsla": (240, 100, 50, 100)},
+        {"hslf": (0, 1, 1)},
+        {"hslaf": (0, 1, 1, 1)},
+        {"rgb": (0, 0, 255)},
+        {"rgba": (0, 0, 255, 255)},
+        {"rgbf": (0, 0, 1)},
+        {"rgbaf": (0, 0, 1, 1)},
+        {"color": "red", "alpha": 1},
+    ],
+)
+def test_attributes_are_float_for_integer_input(kwargs):
+    """Integer input must not leak into the attributes as ints."""
+    assert_all_float(Color(**kwargs))
+
+
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("hue", 0),
+        ("saturation", 50),
+        ("lightness", 25),
+        ("red", 12),
+        ("green", 7),
+        ("blue", 3),
+        ("alpha", 1),
+        ("hsl", (240, 100, 50)),
+        ("rgb", (0, 0, 255)),
+    ],
+)
+def test_attributes_are_float_after_integer_assignment(attribute, value):
+    c = Color("red")
+    setattr(c, attribute, value)
+    assert_all_float(c)
+
+
+def test_setting_one_hsl_channel_does_not_mix_types():
+    """Assigning one channel used to leave the tuple as (int, float, float)."""
+    c = Color("red")
+    c.hue = 240
+    assert c.hsl == (240.0, 100.0, 50.0)
+    assert [type(v) for v in c.hsl] == [float, float, float]
+
+
+def test_bool_input_is_normalized_to_float():
+    """bool is an int subclass and must not survive into the attributes."""
+    assert_all_float(Color(hslf=(0, True, True)))

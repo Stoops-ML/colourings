@@ -646,7 +646,9 @@ class Color:
     def set_hsl(self, value: Sequence[float]) -> None:
         if not is_hsl(value):
             raise TypeError("Value is not a valid HSL")
-        self._hsl = HSLTuple(*value)
+        ## Stored as float so that every colour attribute reports floats,
+        ## whatever numeric type the caller supplied.
+        self._hsl = HSLTuple(float(value[0]), float(value[1]), float(value[2]))
 
     def set_rgb(self, value: Sequence[float]) -> None:
         self.hsl = rgb2hsl(value)
@@ -681,7 +683,7 @@ class Color:
     def set_alpha(self, value: float) -> None:
         if not 0 <= value <= 1:
             raise ValueError("Alpha must be between 0 and 1.")
-        self._alpha = value
+        self._alpha = float(value)
 
     def set_hex(self, value: str) -> None:
         self.rgb = hex2rgb(value)
