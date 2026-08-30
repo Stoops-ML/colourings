@@ -157,6 +157,27 @@ share them safely, and repeated calls return the identical object:
 
    clear_caches()  # release cached results; never needed for correctness
 
+Handle errors
+-------------
+
+Every failure caused by a value that is not a usable color derives from
+``ColorError``:
+
+.. code-block:: python
+
+   from colourings import Color, ColorError
+
+   try:
+       Color("nope")
+   except ColorError as e:
+       print(f"not a color: {e}")
+
+``InvalidColorError`` covers a value invalid in the format it was given as,
+``AmbiguousColorError`` a value that reads as more than one format, and
+``UnknownColorError`` a value matching no supported format. ``ColorError``
+derives from both ``ValueError`` and ``TypeError``, so existing ``except``
+clauses keep working.
+
 Equality behavior
 -----------------
 

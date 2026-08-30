@@ -239,12 +239,47 @@ assert rgb2hsl((255, 0, 0)) is rgb2hsl((255, 0, 0))
 clear_caches()  # release cached results; never needed for correctness
 ```
 
+## Error Handling
+
+Every failure caused by a value that is not a usable color derives from
+`ColorError`, so one `except` covers them all:
+
+```python
+from colourings import Color, ColorError
+
+try:
+    Color(user_input)
+except ColorError as e:
+    print(f"not a color: {e}")
+```
+
+The subclasses say what went wrong:
+
+| Exception | Raised when |
+| --- | --- |
+| `InvalidColorError` | A value is not valid in the format it was given as |
+| `AmbiguousColorError` | A value reads as more than one format, e.g. `Color((0, 0, 0))` |
+| `UnknownColorError` | A value matches no supported format, e.g. `Color("nope")` |
+
+`ColorError` derives from both `ValueError` and `TypeError`, so existing
+`except ValueError` and `except TypeError` clauses keep working unchanged.
+
+Errors about how a helper was *called* -- more than one color argument to
+`Color`, a scale with fewer than two colors -- stay plain `ValueError` or
+`TypeError`, since they are not about a color value.
+
 ## API Surface
 
 Top-level exports:
 
 ```python
 from colourings import Color, Colour, color_scale, colour_scale
+from colourings import (
+    ColorError,
+    InvalidColorError,
+    AmbiguousColorError,
+    UnknownColorError,
+)
 ```
 
 Additional APIs are available from submodules:

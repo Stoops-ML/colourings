@@ -18,6 +18,7 @@ from .definitions import (
     RGBAf,
     RGBf,
 )
+from .errors import ColorError, InvalidColorError
 from .identify import (
     is_hsl,
     is_hsla,
@@ -99,6 +100,10 @@ def _cached(func: Callable[P, R]) -> Callable[P, R]:
                 ## Tuples and strings, which is what conversions are normally
                 ## given, key the cache directly and skip the work below.
                 return cached(*args)
+            except ColorError:
+                ## A rejected colour, not an unhashable argument. Re-raise it
+                ## rather than falling through and running the conversion twice.
+                raise
             except TypeError:
                 pass
         try:
@@ -254,7 +259,7 @@ def hsl2hsla(hsl: Sequence[int | float], alpha: int | float) -> HSLA:
         HSLA tuple with alpha scaled to ``[0, 100]``.
     """
     if not is_hsl(hsl):
-        raise ValueError("Input is not an HSL type.")
+        raise InvalidColorError("Input is not an HSL type.")
     return HSLA(
         _threshold(hsl[0]),
         _threshold(hsl[1]),
@@ -280,7 +285,7 @@ def hsl2hslaf(hsl: Sequence[int | float], alpha: int | float) -> HSLAf:
         HSLAf tuple where hue is scaled to ``[0, 1]`` and saturation/lightness to ``[0, 1]``.
     """
     if not is_hsl(hsl):
-        raise ValueError("Input is not an HSL type.")
+        raise InvalidColorError("Input is not an HSL type.")
     return HSLAf(
         _threshold(hsl[0] / 360.0),
         _threshold(hsl[1] / 100.0),
@@ -304,7 +309,7 @@ def hslf2hsl(hslf: Sequence[int | float]) -> HSL:
         HSL tuple with hue in ``[0, 360]`` and saturation/lightness in ``[0, 100]``.
     """
     if not is_hslf(hslf):
-        raise ValueError("Input is not an HSLf type.")
+        raise InvalidColorError("Input is not an HSLf type.")
     return HSL(
         _threshold(hslf[0] * 360.0),
         _threshold(hslf[1] * 100.0),
@@ -327,7 +332,7 @@ def hsl2hslf(hsl: Sequence[int | float]) -> HSLf:
         HSLf tuple normalized to ``[0, 1]``.
     """
     if not is_hsl(hsl):
-        raise ValueError("Input is not an HSLf type.")
+        raise InvalidColorError("Input is not an HSLf type.")
     return HSLf(
         _threshold(hsl[0] / 360.0),
         _threshold(hsl[1] / 100.0),
@@ -350,7 +355,7 @@ def hsl2rgb(hsl: Sequence[int | float]) -> RGB:
         RGB tuple in the ``[0, 255]`` range.
     """
     if not is_hsl(hsl):
-        raise ValueError("Input is not an HSL type.")
+        raise InvalidColorError("Input is not an HSL type.")
     r, g, b = _hsl2rgbf(hsl)
     return RGB(
         _threshold(r * 255.0),
@@ -374,7 +379,7 @@ def hsl2rgbf(hsl: Sequence[int | float]) -> RGBf:
         RGBf tuple in the ``[0, 1]`` range.
     """
     if not is_hsl(hsl):
-        raise ValueError("Input is not an HSL type.")
+        raise InvalidColorError("Input is not an HSL type.")
     r, g, b = _hsl2rgbf(hsl)
     return RGBf(_threshold(r), _threshold(g), _threshold(b))
 
@@ -394,7 +399,7 @@ def rgba2hsl(rgba: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     if not is_rgba(rgba):
-        raise ValueError("Input is not an RGBA type.")
+        raise InvalidColorError("Input is not an RGBA type.")
     return rgb2hsl(rgba[:3])
 
 
@@ -413,7 +418,7 @@ def rgbaf2hsl(rgbaf: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     if not is_rgbaf(rgbaf):
-        raise ValueError("Input is not an RGBAf type.")
+        raise InvalidColorError("Input is not an RGBAf type.")
     return _rgbf2hsl(_threshold(rgbaf[0]), _threshold(rgbaf[1]), _threshold(rgbaf[2]))
 
 
@@ -432,7 +437,7 @@ def hsla2hsl(hsla: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     if not is_hsla(hsla):
-        raise ValueError("Input is not an HSLA type.")
+        raise InvalidColorError("Input is not an HSLA type.")
     return HSL(_threshold(hsla[0]), _threshold(hsla[1]), _threshold(hsla[2]))
 
 
@@ -451,7 +456,7 @@ def rgbf2hsl(rgbf: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     if not is_rgbf(rgbf):
-        raise ValueError("Input is not an RGBf type.")
+        raise InvalidColorError("Input is not an RGBf type.")
     return _rgbf2hsl(_threshold(rgbf[0]), _threshold(rgbf[1]), _threshold(rgbf[2]))
 
 
@@ -470,7 +475,7 @@ def rgb2hsl(rgb: Sequence[int | float]) -> HSL:
         HSL tuple where hue is in ``[0, 360]`` and saturation/lightness are in ``[0, 100]``.
     """
     if not is_rgb(rgb):
-        raise ValueError("Input is not an RGB type.")
+        raise InvalidColorError("Input is not an RGB type.")
     return _rgbf2hsl(*rgb2rgbf(rgb))
 
 
@@ -621,7 +626,7 @@ def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
         Hex color string prefixed with ``#``.
     """
     if not is_rgb(rgb):
-        raise ValueError("Input is not of RGB type.")
+        raise InvalidColorError("Input is not of RGB type.")
 
     hx = "".join([f"{int(c + 0.5 - FLOAT_ERROR):02x}" for c in rgb])
 
@@ -647,7 +652,7 @@ def hex2rgb(hex: str) -> RGB:
     """
 
     if not (is_long_hex(hex) or is_short_hex(hex)):
-        raise ValueError("Input is not of hex type.")
+        raise InvalidColorError("Input is not of hex type.")
 
     try:
         rgb = hex[1:]
@@ -657,9 +662,9 @@ def hex2rgb(hex: str) -> RGB:
         elif len(rgb) == 3:
             r, g, b = rgb[0] * 2, rgb[1] * 2, rgb[2] * 2
         else:
-            raise ValueError("Length of rgb must be either three or six.")
+            raise InvalidColorError("Length of rgb must be either three or six.")
     except Exception as e:
-        raise ValueError(f"Invalid value {hex} provided for rgb color.") from e
+        raise InvalidColorError(f"Invalid value {hex} provided for rgb color.") from e
 
     return RGB(
         _threshold(float(int(r, 16))),
@@ -683,7 +688,7 @@ def hex2web(hex: str) -> str:
         Named CSS color when available, otherwise a hex string (possibly shortened).
     """
     if not (is_long_hex(hex) or is_short_hex(hex)):
-        raise ValueError("Input is not of hex type.")
+        raise InvalidColorError("Input is not of hex type.")
 
     rgb = hex2rgb(hex)
     ## Table keys are whole numbers, so truncate before looking the color up.
@@ -726,10 +731,10 @@ def web2hex(web: str, force_long: bool = False) -> str:
             return web.lower()
         elif SHORT_HEX_COLOR.match(web) and force_long:
             return "#" + "".join([str(t) * 2 for t in web[1:]])
-        raise AttributeError(f"{web} is not in web format. Need 3 or 6 hex digit.")
+        raise InvalidColorError(f"{web} is not in web format. Need 3 or 6 hex digit.")
 
     if not is_web(web):
-        raise ValueError("Input is not of web type.")
+        raise InvalidColorError("Input is not of web type.")
     return rgb2hex(COLOR_NAME_TO_RGB[web], force_long)  # convert dec to hex
 
 
@@ -748,7 +753,7 @@ def hsl2hex(hsl: Sequence[int | float]) -> str:
         Hex color string.
     """
     if not is_hsl(hsl):
-        raise ValueError("Input is not of hsl type.")
+        raise InvalidColorError("Input is not of hsl type.")
     return rgb2hex(hsl2rgb(hsl))
 
 
@@ -767,7 +772,7 @@ def hex2hsl(hex: str) -> HSL:
         HSL tuple.
     """
     if not (is_long_hex(hex) or is_short_hex(hex)):
-        raise ValueError("Input is not of hex type.")
+        raise InvalidColorError("Input is not of hex type.")
     return rgb2hsl(hex2rgb(hex))
 
 
@@ -786,7 +791,7 @@ def rgb2web(rgb: Sequence[int | float]) -> str:
         Named CSS color when available, otherwise hex.
     """
     if not is_rgb(rgb):
-        raise ValueError("Input is not an RGB type.")
+        raise InvalidColorError("Input is not an RGB type.")
     return hex2web(rgb2hex(rgb))
 
 
@@ -805,7 +810,7 @@ def web2rgb(web: str) -> RGB:
         RGB tuple in the ``[0, 255]`` range.
     """
     if not is_web(web):
-        raise ValueError("Input is not of web type.")
+        raise InvalidColorError("Input is not of web type.")
     return hex2rgb(web2hex(web))
 
 
@@ -824,7 +829,7 @@ def web2hsl(web: str) -> HSL:
         HSL tuple.
     """
     if not is_web(web):
-        raise ValueError("Input is not an web type.")
+        raise InvalidColorError("Input is not an web type.")
     return rgb2hsl(web2rgb(web))
 
 
@@ -843,5 +848,5 @@ def hsl2web(hsl: Sequence[int | float]) -> str:
         Named CSS color when available, otherwise hex.
     """
     if not is_hsl(hsl):
-        raise ValueError("Input is not an HSL type.")
+        raise InvalidColorError("Input is not an HSL type.")
     return rgb2web(hsl2rgb(hsl))

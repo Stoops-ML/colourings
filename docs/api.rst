@@ -33,6 +33,14 @@ Input identification helpers
    :undoc-members:
    :show-inheritance:
 
+Errors
+------
+
+.. automodule:: colourings.errors
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Color definitions
 -----------------
 

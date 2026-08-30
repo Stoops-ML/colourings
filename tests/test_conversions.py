@@ -27,6 +27,7 @@ from colourings.conversions import (
     web2hsl,
     web2rgb,
 )
+from colourings.errors import InvalidColorError
 
 
 def test_rgb2web():
@@ -130,9 +131,11 @@ def test_bad_hex2web():
 
 
 def test_bad_web2hex():
-    with pytest.raises(AttributeError):
+    ## A malformed hex used to raise AttributeError here, which is neither
+    ## accurate nor catchable alongside every other bad-colour error.
+    with pytest.raises(InvalidColorError):
         web2hex("#1234")
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidColorError):
         web2hex("123")
 
 

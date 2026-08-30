@@ -4,7 +4,7 @@ import hashlib
 import math
 import warnings
 from collections.abc import Callable, Generator, Sequence
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from .conversions import (
     hex2hsl,
@@ -39,6 +39,11 @@ from .definitions import HSLAf as HSLAfTuple
 from .definitions import HSLf as HSLfTuple
 from .definitions import RGBAf as RGBAfTuple
 from .definitions import RGBf as RGBfTuple
+from .errors import (
+    AmbiguousColorError,
+    InvalidColorError,
+    UnknownColorError,
+)
 from .identify import (
     is_hsl,
     is_hsla,
@@ -299,9 +304,9 @@ def identify_color(
 
     Raises
     ------
-    TypeError
+    AmbiguousColorError
         Raised when the value is ambiguous between RGB/HSL or RGBA/HSLA.
-    TypeError
+    UnknownColorError
         Raised when the format cannot be identified.
     """
     # checks
@@ -311,14 +316,14 @@ def identify_color(
         and is_rgb(color)
         and is_hsl(color)
     ):
-        raise TypeError("Cannot determine whether color is RGB or HSL.")
+        raise AmbiguousColorError("Cannot determine whether color is RGB or HSL.")
     elif (
         isinstance(color, Sequence)
         and len(color) == 4
         and is_rgba(color)
         and is_hsla(color)
     ):
-        raise TypeError("Cannot determine whether color is RGBA or HSLA.")
+        raise AmbiguousColorError("Cannot determine whether color is RGBA or HSLA.")
     else:
         pass
 
@@ -343,7 +348,7 @@ def identify_color(
     # elif isinstance(color, Sequence) and is_hsla(color): NOTE: unreachable
     #     return hsla2hsl
     else:
-        raise TypeError("Cannot identify color.")
+        raise UnknownColorError("Cannot identify color.")
 
 
 class Color:
@@ -396,71 +401,18 @@ class Color:
         Raised when none or more than one primary color input is provided.
     ValueError
         Raised when alpha is provided inconsistently across inputs.
+    UnknownColorError
+        Raised when the input does not match any supported color format.
     """
+
+    ## Only these three are stored; every colour format below is a property
+    ## computed from them. Declaring them as slots keeps a mistyped attribute an
+    ## AttributeError instead of silently becoming a new attribute.
+    __slots__ = ("_alpha", "_hsl", "equality")
 
     _hsl: HSLTuple  # internal representation
     _alpha: float
     equality: ColorEquality
-    hsv: tuple[float, float, float]  # reserved: no HSV conversion implemented yet
-    hex: str
-    hex_l: str
-    hue: float
-    saturation: float
-    lightness: float
-    red: float
-    green: float
-    blue: float
-    alpha: float
-    web: str
-
-    ## The attributes below are served at runtime by ``__getattr__`` and
-    ## ``__setattr__``, which dispatch to the ``get_*`` / ``set_*`` methods. They
-    ## are spelled out as properties for type checkers only: reading one yields a
-    ## named tuple, while assigning one still accepts any sequence of floats, and
-    ## those without a ``set_*`` method are read-only.
-    if TYPE_CHECKING:
-
-        @property
-        def hsl(self) -> HSLTuple: ...
-
-        @hsl.setter
-        def hsl(self, value: Sequence[float]) -> None: ...
-
-        @property
-        def rgb(self) -> RGBTuple: ...
-
-        @rgb.setter
-        def rgb(self, value: Sequence[float]) -> None: ...
-
-        @property
-        def rgbf(self) -> RGBfTuple: ...
-
-        @rgbf.setter
-        def rgbf(self, value: Sequence[float]) -> None: ...
-
-        @property
-        def rgba(self) -> RGBATuple: ...
-
-        @rgba.setter
-        def rgba(self, value: Sequence[float]) -> None: ...
-
-        @property
-        def rgbaf(self) -> RGBAfTuple: ...
-
-        @rgbaf.setter
-        def rgbaf(self, value: Sequence[float]) -> None: ...
-
-        @property
-        def hsla(self) -> HSLATuple: ...
-
-        @property
-        def hslf(self) -> HSLfTuple: ...
-
-        @property
-        def hslaf(self) -> HSLAfTuple: ...
-
-        @property
-        def luminance(self) -> float: ...
 
     def __init__(  # noqa: C901
         self,
@@ -562,28 +514,13 @@ class Color:
         # elif isinstance(color, Color):
         #     self.web = web2hsl(color.web)
         else:
-            raise ValueError("Input not recognised")
+            raise UnknownColorError("Input not recognised")
 
         # set attributes
         self.equality = equality
         self.alpha = alpha if alpha is not None else 1.0
         for k, v in kwargs.items():
             setattr(self, k, v)
-
-    def __getattr__(self, label: str) -> Any:
-        if label.startswith("get_"):
-            raise AttributeError(f"'{label}' not found")
-        try:
-            return getattr(self, "get_" + label)()
-        except AttributeError as e:
-            raise AttributeError(f"'{label}' not found") from e
-
-    def __setattr__(self, label: str, value: Any) -> None:
-        if label not in ["_alpha", "_hsl", "equality"]:
-            fc = getattr(self, "set_" + label)
-            fc(value)
-        else:
-            self.__dict__[label] = value
 
     def get_hsl(self) -> HSLTuple:
         return self._hsl
@@ -645,7 +582,7 @@ class Color:
 
     def set_hsl(self, value: Sequence[float]) -> None:
         if not is_hsl(value):
-            raise TypeError("Value is not a valid HSL")
+            raise InvalidColorError("Value is not a valid HSL")
         ## Stored as float so that every colour attribute reports floats,
         ## whatever numeric type the caller supplied.
         self._hsl = HSLTuple(float(value[0]), float(value[1]), float(value[2]))
@@ -682,7 +619,7 @@ class Color:
 
     def set_alpha(self, value: float) -> None:
         if not 0 <= value <= 1:
-            raise ValueError("Alpha must be between 0 and 1.")
+            raise InvalidColorError("Alpha must be between 0 and 1.")
         self._alpha = float(value)
 
     def set_hex(self, value: str) -> None:
@@ -693,6 +630,30 @@ class Color:
 
     def set_web(self, value: str) -> None:
         self.hex = web2hex(value)
+
+    ## The colour formats are properties over the accessors above, so they are
+    ## visible to type checkers, editors and dir(), and reading one is a plain
+    ## descriptor call. Those without a ``set_*`` accessor are read-only.
+    hsl = property(get_hsl, set_hsl)
+    rgb = property(get_rgb, set_rgb)
+    rgbf = property(get_rgbf, set_rgbf)
+    rgba = property(get_rgba, set_rgba)
+    rgbaf = property(get_rgbaf, set_rgbaf)
+    hex = property(get_hex, set_hex)
+    hex_l = property(get_hex_l, set_hex_l)
+    web = property(get_web, set_web)
+    hue = property(get_hue, set_hue)
+    saturation = property(get_saturation, set_saturation)
+    lightness = property(get_lightness, set_lightness)
+    red = property(get_red, set_red)
+    green = property(get_green, set_green)
+    blue = property(get_blue, set_blue)
+    alpha = property(get_alpha, set_alpha)
+
+    hslf = property(get_hslf)
+    hsla = property(get_hsla)
+    hslaf = property(get_hslaf)
+    luminance = property(get_luminance)
 
     def range_to(
         self,
@@ -762,7 +723,10 @@ class Color:
         raise NotImplementedError("Other object must be of type `Color` or `Colour`")
 
 
-class Colour(Color): ...
+class Colour(Color):
+    """British-spelling alias of :class:`Color`."""
+
+    __slots__ = ()
 
 
 def make_color_factory(**kwargs_defaults: Any) -> Callable[..., Color]:

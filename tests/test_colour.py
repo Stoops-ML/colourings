@@ -16,6 +16,13 @@ from colourings.colour import (
     identify_color,
     make_color_factory,
 )
+from colourings.conversions import hsl2rgb
+from colourings.errors import (
+    AmbiguousColorError,
+    ColorError,
+    InvalidColorError,
+    UnknownColorError,
+)
 
 
 @patch("tkinter.Tk")
@@ -479,11 +486,46 @@ def test_no_eq():
 
 
 def test_no_attribute():
+    """Unknown attributes are now visible to the type checker too."""
     c = Color("red")
     with pytest.raises(AttributeError):
-        c.does_not_exists  # noqa: B018
+        c.does_not_exists  # type: ignore  # noqa: B018
     with pytest.raises(AttributeError):
-        c.get_does_not_exists  # noqa: B018
+        c.get_does_not_exists  # type: ignore  # noqa: B018
+
+
+def test_cannot_set_unknown_attribute():
+    """__slots__ keeps a mistyped attribute an error rather than a silent set."""
+    c = Color("red")
+    with pytest.raises(AttributeError):
+        c.does_not_exists = 1  # type: ignore
+    with pytest.raises(AttributeError):
+        Color("red", does_not_exists=1)
+    with pytest.raises(AttributeError):
+        Colour("red", does_not_exists=1)
+
+
+def test_read_only_attributes_cannot_be_assigned():
+    c = Color("red")
+    for attribute in ("hsla", "hslf", "hslaf", "luminance"):
+        with pytest.raises(AttributeError):
+            setattr(c, attribute, 0)
+
+
+def test_accessors_remain_available():
+    """The get_*/set_* methods stay part of the API."""
+    c = Color("red")
+    assert c.get_hex_l() == "#ff0000"
+    assert c.get_rgb() == c.rgb
+    c.set_hue(240)
+    assert c.web == "blue"
+
+
+def test_attributes_are_discoverable():
+    """Properties are visible on the class, unlike the old dynamic dispatch."""
+    for attribute in ("hsl", "rgb", "rgba", "hsla", "hex", "web", "luminance"):
+        assert isinstance(getattr(Color, attribute), property)
+        assert attribute in dir(Color("red"))
 
 
 def test_web1():
@@ -793,3 +835,63 @@ def test_setting_one_hsl_channel_does_not_mix_types():
 def test_bool_input_is_normalized_to_float():
     """bool is an int subclass and must not survive into the attributes."""
     assert_all_float(Color(hslf=(0, True, True)))
+
+
+def test_color_errors_are_catchable_as_one_kind():
+    """Every bad-colour failure derives from ColorError."""
+    cases = [
+        lambda: Color("nope"),
+        lambda: Color((0, 0, 0)),
+        lambda: Color(hslf=(2, 0, 0)),
+        lambda: Color(hsv=(0, 1, 1)),
+        lambda: setattr(Color("red"), "hsl", (0, 102, 0)),
+        lambda: setattr(Color("red"), "alpha", 2),
+    ]
+    for case in cases:
+        with pytest.raises(ColorError):
+            case()
+
+
+def test_same_failure_raises_the_same_error():
+    """An invalid HSL used to be ValueError here and TypeError there."""
+    with pytest.raises(InvalidColorError):
+        hsl2rgb((0, 102, 0))
+    with pytest.raises(InvalidColorError):
+        Color("red").set_hsl((0, 102, 0))
+
+
+def test_error_kinds_are_distinguishable():
+    with pytest.raises(AmbiguousColorError):
+        Color((0, 0, 0))
+    with pytest.raises(UnknownColorError):
+        Color("nope")
+    with pytest.raises(UnknownColorError):
+        Color(hsv=(0, 1, 1))
+    with pytest.raises(InvalidColorError):
+        Color(hslf=(2, 0, 0))
+
+
+def test_errors_stay_catchable_as_before():
+    """ColorError derives from both ValueError and TypeError for compatibility."""
+    assert issubclass(ColorError, ValueError)
+    assert issubclass(ColorError, TypeError)
+    for error in (InvalidColorError, AmbiguousColorError, UnknownColorError):
+        assert issubclass(error, ColorError)
+    with pytest.raises(ValueError):
+        hsl2rgb((0, 102, 0))
+    with pytest.raises(TypeError):
+        Color((0, 0, 0))
+    with pytest.raises(TypeError):
+        Color("red").set_hsl((0, 102, 0))
+    with pytest.raises(ValueError):
+        Color("nope")
+
+
+def test_usage_errors_are_not_color_errors():
+    """Calling a helper wrongly is not a bad colour, and stays a plain error."""
+    with pytest.raises(ValueError) as excinfo:
+        color_scale((Color("red"),), 5)
+    assert not isinstance(excinfo.value, ColorError)
+    with pytest.raises(TypeError) as excinfo:
+        Color("red").preview(size_x="wide")  # type: ignore
+    assert not isinstance(excinfo.value, ColorError)
