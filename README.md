@@ -227,6 +227,18 @@ Available helpers include conversion paths across:
 - `hsl`, `hsla`, `hslf`, `hslaf`
 - `hex` and `web`
 
+Conversions are memoized with a bounded LRU cache, so repeated lookups of the
+same color are served from the cache. Results are immutable, so callers may
+share them safely, and repeated calls return the identical object:
+
+```python
+from colourings.conversions import clear_caches, rgb2hsl
+
+assert rgb2hsl((255, 0, 0)) is rgb2hsl((255, 0, 0))
+
+clear_caches()  # release cached results; never needed for correctness
+```
+
 ## API Surface
 
 Top-level exports:
@@ -238,5 +250,5 @@ from colourings import Color, Colour, color_scale, colour_scale
 Additional APIs are available from submodules:
 
 - `colourings.colour`: `HSL_equivalence`, `RGB_equivalence`, `RGB_color_picker`, `make_color_factory`, `identify_color`, `HSL`, `RGB`, `HEX`
-- `colourings.conversions`: conversion utilities
+- `colourings.conversions`: conversion utilities and `clear_caches`
 - `colourings.identify`: type/shape predicates like `is_rgb`, `is_hsl`, `is_web`

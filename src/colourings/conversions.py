@@ -1,5 +1,7 @@
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Hashable, Sequence
+from functools import lru_cache, wraps
+from typing import ParamSpec, TypeVar
 
 from .definitions import (
     COLOR_NAME_TO_RGB,
@@ -31,6 +33,101 @@ from .identify import (
 
 # add HSV, CMYK, YUV conversion
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+## Conversions are pure functions of their arguments and return immutable
+## values, so results can be memoised and shared between callers. The cache is
+## bounded because hex and RGB inputs form a very large key space, while the
+## palette an application actually uses is typically tiny.
+CACHE_SIZE = 1024
+
+_caches: list[Callable[[], None]] = []
+
+
+def _hashable(value: object) -> Hashable:
+    """Return a hashable equivalent of a conversion argument.
+
+    Parameters
+    ----------
+    value : object
+        Argument passed to a conversion helper.
+
+    Returns
+    -------
+    Hashable
+        ``value`` as a tuple when it is a non-string sequence, otherwise
+        ``value`` unchanged.
+
+    Raises
+    ------
+    TypeError
+        Raised when ``value`` cannot be used as a cache key.
+    """
+    if isinstance(value, Sequence) and not isinstance(value, str):
+        return tuple(value)
+    if isinstance(value, Hashable):
+        return value
+    raise TypeError(f"Unhashable argument of type {type(value).__name__}.")
+
+
+def _cached(func: Callable[P, R]) -> Callable[P, R]:
+    """Memoize a conversion, normalizing sequence arguments to hashable tuples.
+
+    The conversion helpers accept any ``Sequence``, including lists, which
+    ``lru_cache`` cannot use as a key. Sequence arguments are converted to
+    tuples before reaching the cache, so passing a list behaves exactly as it
+    did before, and a list and the equivalent tuple share a cache entry.
+
+    Parameters
+    ----------
+    func : Callable[P, R]
+        Pure conversion function to memoize.
+
+    Returns
+    -------
+    Callable[P, R]
+        Wrapper with the same signature, backed by a bounded LRU cache.
+    """
+    cached = lru_cache(maxsize=CACHE_SIZE)(func)
+    _caches.append(cached.cache_clear)
+
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        if not kwargs:
+            try:
+                ## Tuples and strings, which is what conversions are normally
+                ## given, key the cache directly and skip the work below.
+                return cached(*args)
+            except TypeError:
+                pass
+        try:
+            key_args = tuple(_hashable(a) for a in args)
+            key_kwargs = {k: _hashable(v) for k, v in kwargs.items()}
+        except TypeError:
+            ## An argument that cannot be a cache key at all is passed straight
+            ## through, so the conversion still raises its own error rather than
+            ## one from the cache.
+            return func(*args, **kwargs)
+        return cached(*key_args, **key_kwargs)
+
+    return wrapper
+
+
+def clear_caches() -> None:
+    """Empty every conversion cache.
+
+    Conversions are pure, so this is never needed for correctness. It is
+    provided to release the memory held by cached results.
+
+    Returns
+    -------
+    None
+        This function clears the caches in place.
+    """
+    for cache_clear in _caches:
+        cache_clear()
+
 
 def _threshold(value: float) -> float:
     """Clamp tiny floating-point noise to zero.
@@ -50,6 +147,7 @@ def _threshold(value: float) -> float:
     return float(value)
 
 
+@_cached
 def rgbf2rgb(rgbf: Sequence[int | float]) -> RGB:
     """Convert normalized RGB components into 0-255 RGB components.
 
@@ -70,6 +168,7 @@ def rgbf2rgb(rgbf: Sequence[int | float]) -> RGB:
     )
 
 
+@_cached
 def rgb2rgba(rgb: Sequence[int | float], alpha: int | float) -> RGBA:
     """Build an RGBA tuple from RGB values and normalized alpha.
 
@@ -93,6 +192,7 @@ def rgb2rgba(rgb: Sequence[int | float], alpha: int | float) -> RGBA:
     )
 
 
+@_cached
 def rgb2rgbf(rgb: Sequence[int | float]) -> RGBf:
     """Convert 0-255 RGB components into normalized RGB components.
 
@@ -113,6 +213,7 @@ def rgb2rgbf(rgb: Sequence[int | float]) -> RGBf:
     )
 
 
+@_cached
 def rgb2rgbaf(rgb: Sequence[int | float], alpha: int | float) -> RGBAf:
     """Build an RGBAf tuple from RGB values and alpha.
 
@@ -136,6 +237,7 @@ def rgb2rgbaf(rgb: Sequence[int | float], alpha: int | float) -> RGBAf:
     )
 
 
+@_cached
 def hsl2hsla(hsl: Sequence[int | float], alpha: int | float) -> HSLA:
     """Build an HSLA tuple from HSL values and normalized alpha.
 
@@ -161,6 +263,7 @@ def hsl2hsla(hsl: Sequence[int | float], alpha: int | float) -> HSLA:
     )
 
 
+@_cached
 def hsl2hslaf(hsl: Sequence[int | float], alpha: int | float) -> HSLAf:
     """Convert HSL values and alpha to normalized HSLAf representation.
 
@@ -186,6 +289,7 @@ def hsl2hslaf(hsl: Sequence[int | float], alpha: int | float) -> HSLAf:
     )
 
 
+@_cached
 def hslf2hsl(hslf: Sequence[int | float]) -> HSL:
     """Convert normalized HSL components to standard HSL representation.
 
@@ -208,6 +312,7 @@ def hslf2hsl(hslf: Sequence[int | float]) -> HSL:
     )
 
 
+@_cached
 def hsl2hslf(hsl: Sequence[int | float]) -> HSLf:
     """Convert standard HSL components to normalized HSLf representation.
 
@@ -230,6 +335,7 @@ def hsl2hslf(hsl: Sequence[int | float]) -> HSLf:
     )
 
 
+@_cached
 def hsl2rgb(hsl: Sequence[int | float]) -> RGB:
     """Convert HSL representation to RGB representation.
 
@@ -269,6 +375,7 @@ def hsl2rgb(hsl: Sequence[int | float]) -> RGB:
     return rgbf2rgb((r, g, b))
 
 
+@_cached
 def hsl2rgbf(hsl: Sequence[int | float]) -> RGBf:
     """Convert HSL representation to normalized RGB representation.
 
@@ -285,6 +392,7 @@ def hsl2rgbf(hsl: Sequence[int | float]) -> RGBf:
     return rgb2rgbf(hsl2rgb(hsl))
 
 
+@_cached
 def rgba2hsl(rgba: Sequence[int | float]) -> HSL:
     """Convert RGBA values to HSL values, ignoring alpha.
 
@@ -303,6 +411,7 @@ def rgba2hsl(rgba: Sequence[int | float]) -> HSL:
     return rgb2hsl(rgba[:3])
 
 
+@_cached
 def rgbaf2hsl(rgbaf: Sequence[int | float]) -> HSL:
     """Convert RGBAf values to HSL values, ignoring alpha.
 
@@ -321,6 +430,7 @@ def rgbaf2hsl(rgbaf: Sequence[int | float]) -> HSL:
     return rgb2hsl(rgbf2rgb(rgbaf[:3]))
 
 
+@_cached
 def hsla2hsl(hsla: Sequence[int | float]) -> HSL:
     """Convert HSLA values to HSL values, ignoring alpha.
 
@@ -339,6 +449,7 @@ def hsla2hsl(hsla: Sequence[int | float]) -> HSL:
     return HSL(hsla[0], hsla[1], hsla[2])
 
 
+@_cached
 def rgbf2hsl(rgbf: Sequence[int | float]) -> HSL:
     """Convert normalized RGB values to HSL values.
 
@@ -357,6 +468,7 @@ def rgbf2hsl(rgbf: Sequence[int | float]) -> HSL:
     return rgb2hsl(rgbf2rgb(rgbf))
 
 
+@_cached
 def rgb2hsl(rgb: Sequence[int | float]) -> HSL:
     """Convert RGB representation to HSL representation.
 
@@ -448,6 +560,7 @@ def _hue2rgb(v1: float, v2: float, vH: float) -> float:
     return v1
 
 
+@_cached
 def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
     """Convert RGB components to a hexadecimal color string.
 
@@ -474,6 +587,7 @@ def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
     return f"#{hx}"
 
 
+@_cached
 def hex2rgb(hex: str) -> RGB:
     """Convert a hexadecimal color string to RGB components.
 
@@ -510,6 +624,7 @@ def hex2rgb(hex: str) -> RGB:
     )
 
 
+@_cached
 def hex2web(hex: str) -> str:
     """Convert a hexadecimal color to a web representation.
 
@@ -544,6 +659,7 @@ def hex2web(hex: str) -> str:
     return hex
 
 
+@_cached
 def web2hex(web: str, force_long: bool = False) -> str:
     """Convert a web color representation to hexadecimal form.
 
@@ -574,6 +690,7 @@ def web2hex(web: str, force_long: bool = False) -> str:
     )  # convert dec to hex
 
 
+@_cached
 def hsl2hex(hsl: Sequence[int | float]) -> str:
     """Convert HSL values to a hexadecimal color string.
 
@@ -592,6 +709,7 @@ def hsl2hex(hsl: Sequence[int | float]) -> str:
     return rgb2hex(hsl2rgb(hsl))
 
 
+@_cached
 def hex2hsl(hex: str) -> HSL:
     """Convert a hexadecimal color string to HSL values.
 
@@ -610,6 +728,7 @@ def hex2hsl(hex: str) -> HSL:
     return rgb2hsl(hex2rgb(hex))
 
 
+@_cached
 def rgb2web(rgb: Sequence[int | float]) -> str:
     """Convert RGB values to a web color representation.
 
@@ -628,6 +747,7 @@ def rgb2web(rgb: Sequence[int | float]) -> str:
     return hex2web(rgb2hex(rgb))
 
 
+@_cached
 def web2rgb(web: str) -> RGB:
     """Convert a web color representation to RGB values.
 
@@ -646,6 +766,7 @@ def web2rgb(web: str) -> RGB:
     return hex2rgb(web2hex(web))
 
 
+@_cached
 def web2hsl(web: str) -> HSL:
     """Convert a web color representation to HSL values.
 
@@ -664,6 +785,7 @@ def web2hsl(web: str) -> HSL:
     return rgb2hsl(web2rgb(web))
 
 
+@_cached
 def hsl2web(hsl: Sequence[int | float]) -> str:
     """Convert HSL values to a web color representation.
 

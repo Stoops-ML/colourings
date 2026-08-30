@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from colourings.conversions import (
+    clear_caches,
     hex2hsl,
     hex2rgb,
     hex2web,
@@ -257,3 +258,50 @@ def test_bad_hslf2hsl():
 def test_bad_hsl2hslf():
     with pytest.raises(ValueError):
         hsl2hslf((-1, 0, 0))
+
+
+def test_cache_accepts_unhashable_sequences():
+    """Lists are accepted even though ``lru_cache`` cannot key on them."""
+    assert rgb2hsl([255, 0, 0]) == rgb2hsl((255, 0, 0))
+    assert hsl2rgb([0, 100, 50]) == hsl2rgb((0, 100, 50))
+    assert rgb2hex([255, 0, 0]) == rgb2hex((255, 0, 0))
+
+
+def test_cache_shares_entry_between_list_and_tuple():
+    """A list and the equivalent tuple hit the same cache entry."""
+    first = rgb2hsl([255, 0, 0])
+    assert rgb2hsl((255, 0, 0)) is first
+
+
+def test_cache_returns_memoized_result():
+    """Repeated calls return the identical object, so the result was cached."""
+    assert rgb2hsl((255, 0, 0)) is rgb2hsl((255, 0, 0))
+    assert web2hsl("rebeccapurple") is web2hsl("rebeccapurple")
+    assert web2rgb("rebeccapurple") is web2rgb("rebeccapurple")
+
+
+def test_cache_distinguishes_arguments():
+    assert rgb2hex((255, 0, 0), force_long=True) != rgb2hex((255, 0, 0))
+    assert rgb2hsl((255, 0, 0)) != rgb2hsl((0, 255, 0))
+
+
+def test_clear_caches_forces_recomputation():
+    first = rgb2hsl((255, 0, 0))
+    assert rgb2hsl((255, 0, 0)) is first
+    clear_caches()
+    assert rgb2hsl((255, 0, 0)) == first
+    assert rgb2hsl((255, 0, 0)) is not first
+
+
+def test_cache_does_not_mask_validation_errors():
+    """Invalid input raises the conversion's own error, not a cache error."""
+    with pytest.raises(ValueError):
+        rgb2hsl((300, 0, 0))
+    with pytest.raises(ValueError):
+        rgb2hsl((300, 0, 0))
+
+
+def test_unhashable_non_sequence_raises_conversion_error():
+    """A set is unhashable and not a sequence: the conversion still rejects it."""
+    with pytest.raises(ValueError):
+        rgb2hsl({255, 0, 1})  # type: ignore

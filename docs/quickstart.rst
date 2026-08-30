@@ -142,6 +142,21 @@ Use conversion helpers directly
    print(web2rgb("rebeccapurple"))  # RGB(red=102.0, green=51.0, blue=153.0)
    print(hsl2web((0, 0, 50.2)))     # gray
 
+Cached conversions
+------------------
+
+Conversions are memoized with a bounded LRU cache, so repeated lookups of the
+same color are served from the cache. Results are immutable, so callers may
+share them safely, and repeated calls return the identical object:
+
+.. code-block:: python
+
+   from colourings.conversions import clear_caches, rgb2hsl
+
+   assert rgb2hsl((255, 0, 0)) is rgb2hsl((255, 0, 0))
+
+   clear_caches()  # release cached results; never needed for correctness
+
 Equality behavior
 -----------------
 
