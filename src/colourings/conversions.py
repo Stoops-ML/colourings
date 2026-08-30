@@ -400,7 +400,7 @@ def rgb2hsl(rgb: Sequence[int | float]) -> tuple[float, float, float]:
         h = db - dg
     elif g == vmax:
         h = (1.0 / 3) + dr - db
-    elif b == vmax:
+    else:  ## b == vmax
         h = (2.0 / 3) + dg - dr
 
     if h < 0:

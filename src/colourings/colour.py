@@ -175,7 +175,7 @@ def hash_or_str(obj: Any) -> str | int:
     except TypeError:
         ## Adds the type name to make sure two object of different type but
         ## identical string representation get distinguished.
-        return type(obj).__name__ + str(obj)
+        return f"{type(obj).__name__}{obj}"
 
 
 def RGB_color_picker(obj: Any) -> Color:
