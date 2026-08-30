@@ -29,8 +29,8 @@ blue = Color("blue")
 print(blue)  # blue
 print(blue.hex)  # #00f
 print(blue.hex_l)  # #0000ff
-print(blue.rgb)  # (0.0, 0.0, 255.0)
-print(blue.hsl)  # (240.0, 100.0, 50.0)
+print(blue.rgb)  # RGB(red=0.0, green=0.0, blue=255.0)
+print(blue.hsl)  # HSL(hue=240.0, saturation=100.0, lightness=50.0)
 
 blue.red = 255
 print(blue.web)  # magenta
@@ -88,8 +88,8 @@ c.saturation = 50
 c.lightness = 75
 c.alpha = 0.5
 
-print(c.hsla)  # (0.0, 50.0, 75.0, 50.0)
-print(c.rgbaf)  # (0.875, 0.625, 0.625, 0.5)
+print(c.hsla)  # HSLA(hue=0.0, saturation=50.0, lightness=75.0, alpha=50.0)
+print(c.rgbaf)  # RGBAf(red=0.875, green=0.625, blue=0.625, alpha=0.5)
 ```
 
 ## Gradients and Color Scales
@@ -167,14 +167,47 @@ You can override the picking strategy with:
 ```python
 from colourings.colour import HEX, HSL, RGB, Colour
 
-print(HSL.BLUE)  # (240.0, 100.0, 50.0)
-print(RGB.BLUE)  # (0.0, 0.0, 255.0)
+print(HSL.BLUE)  # HSL(hue=240.0, saturation=100.0, lightness=50.0)
+print(RGB.BLUE)  # RGB(red=0.0, green=0.0, blue=255.0)
 print(HEX.BLUE)  # #00f
 
 assert Colour("red") == Colour("#f00")
 ```
 
 `Colour` is an alias subclass of `Color` for British spelling preference.
+
+## Named Components
+
+Conversions and the `Color` tuple attributes return named tuples, so components
+can be read by name:
+
+```python
+from colourings import Color
+from colourings.definitions import RGB
+
+c = Color("red")
+
+print(c.rgb.red)  # 255.0
+print(c.hsl.hue)  # 0.0
+print(c.rgbaf.alpha)  # 1.0
+```
+
+They are still ordinary tuples, so comparing, unpacking, indexing and hashing
+against plain tuples behave exactly as before, and assignment still accepts any
+sequence:
+
+```python
+r, g, b = c.rgb
+assert c.hsl == (0.0, 100.0, 50.0)
+assert isinstance(c.rgb, RGB)
+
+c.rgb = (0.0, 0.0, 255.0)
+```
+
+The types are `RGB`, `RGBA`, `HSL`, `HSLA` and their normalised `RGBf`, `RGBAf`,
+`HSLf` and `HSLAf` counterparts, all importable from `colourings.definitions`.
+Note these are distinct from the same-named `colourings.colour.HSL` and
+`colourings.colour.RGB` accessor objects that look up colors by name.
 
 ## Function-Based Conversions
 
@@ -184,8 +217,8 @@ Use direct conversion helpers when you do not need the class API:
 from colourings.conversions import rgb2hex, rgb2hsl, web2rgb, hsl2web
 
 print(rgb2hex((255, 0, 0)))  # #f00
-print(rgb2hsl((255, 0, 0)))  # (0.0, 100.0, 50.0)
-print(web2rgb("rebeccapurple"))  # (102.0, 51.0, 153.0)
+print(rgb2hsl((255, 0, 0)))  # HSL(hue=0.0, saturation=100.0, lightness=50.0)
+print(web2rgb("rebeccapurple"))  # RGB(red=102.0, green=51.0, blue=153.0)
 print(hsl2web((0, 0, 50.2)))  # gray
 ```
 

@@ -12,8 +12,8 @@ Basic usage
    print(blue)          # blue
    print(blue.hex)      # #00f
    print(blue.hex_l)    # #0000ff
-   print(blue.rgb)      # (0.0, 0.0, 255.0)
-   print(blue.hsl)      # (240.0, 100.0, 50.0)
+   print(blue.rgb)      # RGB(red=0.0, green=0.0, blue=255.0)
+   print(blue.hsl)      # HSL(hue=240.0, saturation=100.0, lightness=50.0)
 
 Create colors from different inputs
 -----------------------------------
@@ -48,7 +48,7 @@ Read and update channels
    print(c.hue, c.saturation, c.lightness)
    print(c.red, c.green, c.blue)
    print(c.alpha)
-   print(c.hsla)  # (240.0, 100.0, 50.0, 100.0)
+   print(c.hsla)  # HSLA(hue=240.0, saturation=100.0, lightness=50.0, alpha=100.0)
 
    # Update
    c.hue = 0
@@ -56,8 +56,8 @@ Read and update channels
    c.lightness = 75
    c.alpha = 0.5
 
-   print(c.hsla)   # (0.0, 50.0, 75.0, 50.0)
-   print(c.rgbaf)  # (0.875, 0.625, 0.625, 0.5)
+   print(c.hsla)   # HSLA(hue=0.0, saturation=50.0, lightness=75.0, alpha=50.0)
+   print(c.rgbaf)  # RGBAf(red=0.875, green=0.625, blue=0.625, alpha=0.5)
 
 Interpolate between colors
 --------------------------
@@ -95,6 +95,41 @@ Build a multi-stop color scale
        print(color)
    # black #39221c #8e4d1c orange #ff003c #e100ff blue #bd71e3 #e3c6d9 white
 
+Named components
+----------------
+
+Conversions and the ``Color`` tuple attributes return named tuples, so
+components can be read by name:
+
+.. code-block:: python
+
+   from colourings import Color
+   from colourings.definitions import RGB
+
+   c = Color("red")
+
+   print(c.rgb.red)      # 255.0
+   print(c.hsl.hue)      # 0.0
+   print(c.rgbaf.alpha)  # 1.0
+
+They are still ordinary tuples, so comparing, unpacking, indexing and hashing
+against plain tuples behave exactly as before, and assignment still accepts any
+sequence:
+
+.. code-block:: python
+
+   r, g, b = c.rgb
+   assert c.hsl == (0.0, 100.0, 50.0)
+   assert isinstance(c.rgb, RGB)
+
+   c.rgb = (0.0, 0.0, 255.0)
+
+The types are ``RGB``, ``RGBA``, ``HSL``, ``HSLA`` and their normalised
+``RGBf``, ``RGBAf``, ``HSLf`` and ``HSLAf`` counterparts, all importable from
+``colourings.definitions``. Note these are distinct from the same-named
+``colourings.colour.HSL`` and ``colourings.colour.RGB`` accessor objects that
+look up colors by name.
+
 Use conversion helpers directly
 ------------------------------
 
@@ -103,8 +138,8 @@ Use conversion helpers directly
    from colourings.conversions import hsl2web, rgb2hex, rgb2hsl, web2rgb
 
    print(rgb2hex((255, 0, 0)))      # #f00
-   print(rgb2hsl((255, 0, 0)))      # (0.0, 100.0, 50.0)
-   print(web2rgb("rebeccapurple"))  # (102.0, 51.0, 153.0)
+   print(rgb2hsl((255, 0, 0)))      # HSL(hue=0.0, saturation=100.0, lightness=50.0)
+   print(web2rgb("rebeccapurple"))  # RGB(red=102.0, green=51.0, blue=153.0)
    print(hsl2web((0, 0, 50.2)))     # gray
 
 Equality behavior
@@ -153,8 +188,8 @@ Convenience objects and aliases
 
    from colourings.colour import HEX, HSL, RGB, Colour
 
-   print(HSL.BLUE)   # (240.0, 100.0, 50.0)
-   print(RGB.BLUE)   # (0.0, 0.0, 255.0)
+   print(HSL.BLUE)   # HSL(hue=240.0, saturation=100.0, lightness=50.0)
+   print(RGB.BLUE)   # RGB(red=0.0, green=0.0, blue=255.0)
    print(HEX.BLUE)   # #00f
 
    assert Colour("red") == Colour("#f00")

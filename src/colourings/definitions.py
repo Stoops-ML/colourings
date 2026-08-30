@@ -1,10 +1,85 @@
 import re
+from typing import NamedTuple
 
 ## Soften inequalities and some rounding issue based on float
 FLOAT_ERROR = 0.0000005
 
 
-RGB_TO_COLOR_NAMES = {
+## Colour representations. Each is a tuple subclass, so it stays interchangeable
+## with the plain tuples previously returned by the conversion functions while
+## naming its components and distinguishing the 0-255/0-360 scales from the
+## normalised ``f`` variants.
+
+
+class RGB(NamedTuple):
+    """Red, green and blue components in the ``[0, 255]`` range."""
+
+    red: float
+    green: float
+    blue: float
+
+
+class RGBA(NamedTuple):
+    """Red, green, blue and alpha components in the ``[0, 255]`` range."""
+
+    red: float
+    green: float
+    blue: float
+    alpha: float
+
+
+class RGBf(NamedTuple):
+    """Red, green and blue components normalised to the ``[0, 1]`` range."""
+
+    red: float
+    green: float
+    blue: float
+
+
+class RGBAf(NamedTuple):
+    """Red, green, blue and alpha components normalised to the ``[0, 1]`` range."""
+
+    red: float
+    green: float
+    blue: float
+    alpha: float
+
+
+class HSL(NamedTuple):
+    """Hue in ``[0, 360]`` with saturation and lightness in ``[0, 100]``."""
+
+    hue: float
+    saturation: float
+    lightness: float
+
+
+class HSLA(NamedTuple):
+    """Hue in ``[0, 360]`` with saturation, lightness and alpha in ``[0, 100]``."""
+
+    hue: float
+    saturation: float
+    lightness: float
+    alpha: float
+
+
+class HSLf(NamedTuple):
+    """Hue, saturation and lightness normalised to the ``[0, 1]`` range."""
+
+    hue: float
+    saturation: float
+    lightness: float
+
+
+class HSLAf(NamedTuple):
+    """Hue, saturation, lightness and alpha normalised to the ``[0, 1]`` range."""
+
+    hue: float
+    saturation: float
+    lightness: float
+    alpha: float
+
+
+RGB_TO_COLOR_NAMES: dict[tuple[int, int, int], list[str]] = {
     (0, 0, 0): ["Black"],
     (0, 0, 128): ["Navy", "NavyBlue"],
     (0, 0, 139): ["DarkBlue"],
@@ -150,7 +225,7 @@ RGB_TO_COLOR_NAMES = {
 }
 
 ## Building inverse relation
-COLOR_NAME_TO_RGB = {
+COLOR_NAME_TO_RGB: dict[str, tuple[int, int, int]] = {
     name.lower(): rgb for rgb, names in RGB_TO_COLOR_NAMES.items() for name in names
 }
 

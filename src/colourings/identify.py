@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from typing import Any
 
 from .definitions import COLOR_NAME_TO_RGB, LONG_HEX_COLOR, SHORT_HEX_COLOR
 
@@ -36,12 +35,12 @@ def is_short_hex(color: str) -> bool:
     return bool(SHORT_HEX_COLOR.fullmatch(color))
 
 
-def is_rgb(color: Any) -> bool:
+def is_rgb(color: object) -> bool:
     """Validate whether a value is an RGB sequence.
 
     Parameters
     ----------
-    color : Any
+    color : object
         Candidate value.
 
     Returns
@@ -60,12 +59,12 @@ def is_rgb(color: Any) -> bool:
     return True
 
 
-def is_rgbf(color: Any) -> bool:
+def is_rgbf(color: object) -> bool:
     """Validate whether a value is a normalized RGB sequence.
 
     Parameters
     ----------
-    color : Any
+    color : object
         Candidate value.
 
     Returns
@@ -84,12 +83,12 @@ def is_rgbf(color: Any) -> bool:
     return True
 
 
-def is_hslf(color: Any) -> bool:
+def is_hslf(color: object) -> bool:
     """Validate whether a value is a normalized HSL sequence.
 
     Parameters
     ----------
-    color : Any
+    color : object
         Candidate value.
 
     Returns
@@ -108,12 +107,12 @@ def is_hslf(color: Any) -> bool:
     return True
 
 
-def is_rgba(color: Any) -> bool:
+def is_rgba(color: object) -> bool:
     """Validate whether a value is an RGBA sequence.
 
     Parameters
     ----------
-    color : Any
+    color : object
         Candidate value.
 
     Returns
@@ -132,12 +131,12 @@ def is_rgba(color: Any) -> bool:
     return True
 
 
-def is_rgbaf(color: Any) -> bool:
+def is_rgbaf(color: object) -> bool:
     """Validate whether a value is a normalized RGBA sequence.
 
     Parameters
     ----------
-    color : Any
+    color : object
         Candidate value.
 
     Returns
@@ -156,12 +155,12 @@ def is_rgbaf(color: Any) -> bool:
     return True
 
 
-def is_hslaf(color: Any) -> bool:
+def is_hslaf(color: object) -> bool:
     """Validate whether a value is a normalized HSLA sequence.
 
     Parameters
     ----------
-    color : Any
+    color : object
         Candidate value.
 
     Returns
@@ -196,12 +195,12 @@ def is_web(color: str) -> bool:
     return color in COLOR_NAME_TO_RGB or is_long_hex(color) or is_short_hex(color)
 
 
-def is_hsl(color: Any) -> bool:
+def is_hsl(color: object) -> bool:
     """Validate whether a value is an HSL sequence.
 
     Parameters
     ----------
-    color : Any
+    color : object
         Candidate value.
 
     Returns
@@ -222,12 +221,12 @@ def is_hsl(color: Any) -> bool:
     return True
 
 
-def is_hsla(color: Any) -> bool:
+def is_hsla(color: object) -> bool:
     """Validate whether a value is an HSLA sequence.
 
     Parameters
     ----------
-    color : Any
+    color : object
         Candidate value.
 
     Returns

@@ -4,7 +4,7 @@ import hashlib
 import math
 import warnings
 from collections.abc import Callable, Generator, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from .conversions import (
     hex2hsl,
@@ -27,7 +27,18 @@ from .conversions import (
     web2hex,
     web2hsl,
 )
+
+## The colour tuple types are aliased because this module already exposes
+## ``HSL`` and ``RGB`` as the named-colour accessor singletons defined below.
 from .definitions import COLOR_NAME_TO_RGB, linspace
+from .definitions import HSL as HSLTuple
+from .definitions import HSLA as HSLATuple
+from .definitions import RGB as RGBTuple
+from .definitions import RGBA as RGBATuple
+from .definitions import HSLAf as HSLAfTuple
+from .definitions import HSLf as HSLfTuple
+from .definitions import RGBAf as RGBAfTuple
+from .definitions import RGBf as RGBfTuple
 from .identify import (
     is_hsl,
     is_hsla,
@@ -157,12 +168,30 @@ def color_scale(
 colour_scale = color_scale
 
 
-def hash_or_str(obj: Any) -> str | int:
+class PickKey(Protocol):
+    """Callable reducing an arbitrary object to a stable, hashable pick key."""
+
+    def __call__(self, obj: Any, /) -> str | int: ...
+
+
+class ColorPicker(Protocol):
+    """Callable turning a pick key into a deterministic color."""
+
+    def __call__(self, key: Any, /) -> Color: ...
+
+
+class ColorEquality(Protocol):
+    """Callable deciding whether two colors are considered equal."""
+
+    def __call__(self, c1: Color, c2: Color, /) -> bool: ...
+
+
+def hash_or_str(obj: object) -> str | int:
     """Return a stable hash key for an object, with a string fallback.
 
     Parameters
     ----------
-    obj : Any
+    obj : object
         Object to key.
 
     Returns
@@ -178,7 +207,7 @@ def hash_or_str(obj: Any) -> str | int:
         return f"{type(obj).__name__}{obj}"
 
 
-def RGB_color_picker(obj: Any) -> Color:
+def RGB_color_picker(obj: object) -> Color:
     """Build a color representation from the string representation of an object.
 
     This allows to quickly get a color from some data, with the
@@ -187,7 +216,7 @@ def RGB_color_picker(obj: Any) -> Color:
 
     Parameters
     ----------
-    obj : Any
+    obj : object
         Object used to derive a deterministic color.
 
     Returns
@@ -255,7 +284,7 @@ def HSL_equivalence(c1: Color, c2: Color) -> bool:
 
 def identify_color(
     color: str | Sequence[int | float] | Color | Colour,
-) -> Callable[[Any], Any]:
+) -> Callable[[Any], HSLTuple]:
     """Identify a color input format and return its HSL conversion callable.
 
     Parameters
@@ -265,7 +294,7 @@ def identify_color(
 
     Returns
     -------
-    Callable[[Any], Any]
+    Callable[[Any], HSLTuple]
         Converter function that maps the provided representation to HSL.
 
     Raises
@@ -295,7 +324,7 @@ def identify_color(
 
     # identify colour
     if isinstance(color, Color | Colour):
-        return lambda x: x.hsl
+        return lambda x: HSLTuple(*x.hsl)
     elif (
         isinstance(color, str)
         and is_long_hex(color)
@@ -308,7 +337,7 @@ def identify_color(
     elif isinstance(color, Sequence) and is_rgb(color):
         return rgb2hsl
     elif isinstance(color, Sequence) and is_hsl(color):
-        return lambda x: x
+        return lambda x: HSLTuple(*x)
     # elif isinstance(color, Sequence) and is_rgba(color): NOTE: unreachable
     #     return rgba2hsl
     # elif isinstance(color, Sequence) and is_hsla(color): NOTE: unreachable
@@ -350,13 +379,13 @@ class Color:
         Normalized RGBA components in ``[0, 1]``.
     alpha : float | None, optional
         Explicit alpha value in ``[0, 1]``.
-    pick_for : Any, optional
+    pick_for : object, optional
         Arbitrary value used to deterministically pick a color.
-    picker : Callable[[Any], Color], default=RGB_color_picker
+    picker : ColorPicker, default=RGB_color_picker
         Picker function used with ``pick_for``.
-    pick_key : Callable[[Any], str | int], default=hash_or_str
+    pick_key : PickKey, default=hash_or_str
         Key function used before passing values to ``picker``.
-    equality : Callable[[Color, Color], bool], default=RGB_equivalence
+    equality : ColorEquality, default=RGB_equivalence
         Equality strategy used by ``__eq__``.
     **kwargs : Any
         Additional attributes attached to the instance.
@@ -369,27 +398,69 @@ class Color:
         Raised when alpha is provided inconsistently across inputs.
     """
 
-    _hsl: tuple[float, float, float]  # internal representation
-    hsl: tuple[float, float, float]
-    hsla: tuple[float, float, float, float]
-    hslf: tuple[float, float, float]
-    hslaf: tuple[float, float, float, float]
-    hsv: tuple[float, float, float]
+    _hsl: HSLTuple  # internal representation
+    _alpha: float
+    equality: ColorEquality
+    hsv: tuple[float, float, float]  # reserved: no HSV conversion implemented yet
     hex: str
     hex_l: str
-    rgb: tuple[float, float, float]
-    rgba: tuple[float, float, float, float]
-    rgbf: tuple[float, float, float]
-    rgbaf: tuple[float, float, float, float]
     hue: float
     saturation: float
     lightness: float
-    luminance: float
     red: float
     green: float
     blue: float
     alpha: float
     web: str
+
+    ## The attributes below are served at runtime by ``__getattr__`` and
+    ## ``__setattr__``, which dispatch to the ``get_*`` / ``set_*`` methods. They
+    ## are spelled out as properties for type checkers only: reading one yields a
+    ## named tuple, while assigning one still accepts any sequence of floats, and
+    ## those without a ``set_*`` method are read-only.
+    if TYPE_CHECKING:
+
+        @property
+        def hsl(self) -> HSLTuple: ...
+
+        @hsl.setter
+        def hsl(self, value: Sequence[float]) -> None: ...
+
+        @property
+        def rgb(self) -> RGBTuple: ...
+
+        @rgb.setter
+        def rgb(self, value: Sequence[float]) -> None: ...
+
+        @property
+        def rgbf(self) -> RGBfTuple: ...
+
+        @rgbf.setter
+        def rgbf(self, value: Sequence[float]) -> None: ...
+
+        @property
+        def rgba(self) -> RGBATuple: ...
+
+        @rgba.setter
+        def rgba(self, value: Sequence[float]) -> None: ...
+
+        @property
+        def rgbaf(self) -> RGBAfTuple: ...
+
+        @rgbaf.setter
+        def rgbaf(self, value: Sequence[float]) -> None: ...
+
+        @property
+        def hsla(self) -> HSLATuple: ...
+
+        @property
+        def hslf(self) -> HSLfTuple: ...
+
+        @property
+        def hslaf(self) -> HSLAfTuple: ...
+
+        @property
+        def luminance(self) -> float: ...
 
     def __init__(  # noqa: C901
         self,
@@ -408,10 +479,10 @@ class Color:
         rgbf: Sequence[int | float] | None = None,
         rgbaf: Sequence[int | float] | None = None,
         alpha: float | None = None,
-        pick_for: Any = None,
-        picker: Callable[[Any], Color] = RGB_color_picker,
-        pick_key: Callable[[Any], str | int] = hash_or_str,
-        equality: Callable[[Color, Color], bool] = RGB_equivalence,
+        pick_for: object = None,
+        picker: ColorPicker = RGB_color_picker,
+        pick_key: PickKey = hash_or_str,
+        equality: ColorEquality = RGB_equivalence,
         **kwargs: Any,
     ):
         # checks
@@ -451,7 +522,7 @@ class Color:
             web = web.lower()
             self.hsl = web2hsl(web)
         elif hsl is not None:
-            self.hsl = hsl  # type: ignore
+            self.hsl = hsl
         elif hsla is not None:
             if alpha is not None and alpha != hsla[3]:
                 raise ValueError(
@@ -507,17 +578,17 @@ class Color:
         except AttributeError as e:
             raise AttributeError(f"'{label}' not found") from e
 
-    def __setattr__(self, label, value):
+    def __setattr__(self, label: str, value: Any) -> None:
         if label not in ["_alpha", "_hsl", "equality"]:
             fc = getattr(self, "set_" + label)
             fc(value)
         else:
             self.__dict__[label] = value
 
-    def get_hsl(self) -> tuple[float, float, float]:
+    def get_hsl(self) -> HSLTuple:
         return self._hsl
 
-    def get_hslf(self) -> tuple[float, float, float]:
+    def get_hslf(self) -> HSLfTuple:
         return hsl2hslf(self._hsl)
 
     def get_hex(self) -> str:
@@ -526,45 +597,45 @@ class Color:
     def get_hex_l(self) -> str:
         return rgb2hex(self.rgb, force_long=True)
 
-    def get_rgb(self) -> tuple[float, float, float]:
+    def get_rgb(self) -> RGBTuple:
         return hsl2rgb(self.hsl)
 
-    def get_rgbf(self) -> tuple[float, float, float]:
+    def get_rgbf(self) -> RGBfTuple:
         return hsl2rgbf(self.hsl)
 
-    def get_rgba(self) -> tuple[float, float, float, float]:
+    def get_rgba(self) -> RGBATuple:
         return rgb2rgba(hsl2rgb(self.hsl), self._alpha)
 
-    def get_rgbaf(self) -> tuple[float, float, float, float]:
+    def get_rgbaf(self) -> RGBAfTuple:
         return rgb2rgbaf(hsl2rgb(self.hsl), self._alpha)
 
-    def get_hsla(self) -> tuple[float, float, float, float]:
+    def get_hsla(self) -> HSLATuple:
         return hsl2hsla(self.hsl, self._alpha)
 
-    def get_hslaf(self) -> tuple[float, float, float, float]:
+    def get_hslaf(self) -> HSLAfTuple:
         return hsl2hslaf(self.hsl, self._alpha)
 
     def get_hue(self) -> float:
-        return self.hsl[0]
+        return self.hsl.hue
 
     def get_saturation(self) -> float:
-        return self.hsl[1]
+        return self.hsl.saturation
 
     def get_lightness(self) -> float:
-        return self.hsl[2]
+        return self.hsl.lightness
 
     def get_luminance(self) -> float:
         r, g, b = self.get_rgbf()
         return math.sqrt(0.299 * r**2 + 0.587 * g**2 + 0.114 * b**2)
 
     def get_red(self) -> float:
-        return self.rgb[0]
+        return self.rgb.red
 
     def get_green(self) -> float:
-        return self.rgb[1]
+        return self.rgb.green
 
     def get_blue(self) -> float:
-        return self.rgb[2]
+        return self.rgb.blue
 
     def get_alpha(self) -> float:
         return self._alpha
@@ -575,7 +646,7 @@ class Color:
     def set_hsl(self, value: Sequence[float]) -> None:
         if not is_hsl(value):
             raise TypeError("Value is not a valid HSL")
-        self._hsl = tuple(value)  # type: ignore
+        self._hsl = HSLTuple(*value)
 
     def set_rgb(self, value: Sequence[float]) -> None:
         self.hsl = rgb2hsl(value)
@@ -590,22 +661,22 @@ class Color:
         self.hsl = rgbaf2hsl(value)
 
     def set_hue(self, value: float) -> None:
-        self.hsl = (value, self.hsl[1], self.hsl[2])
+        self.hsl = HSLTuple(value, self.hsl.saturation, self.hsl.lightness)
 
     def set_saturation(self, value: float) -> None:
-        self.hsl = (self.hsl[0], value, self.hsl[2])
+        self.hsl = HSLTuple(self.hsl.hue, value, self.hsl.lightness)
 
     def set_lightness(self, value: float) -> None:
-        self.hsl = (self.hsl[0], self.hsl[1], value)
+        self.hsl = HSLTuple(self.hsl.hue, self.hsl.saturation, value)
 
     def set_red(self, value: float) -> None:
-        self.rgb = (value, self.rgb[1], self.rgb[2])
+        self.rgb = RGBTuple(value, self.rgb.green, self.rgb.blue)
 
     def set_green(self, value: float) -> None:
-        self.rgb = (self.rgb[0], value, self.rgb[2])
+        self.rgb = RGBTuple(self.rgb.red, value, self.rgb.blue)
 
     def set_blue(self, value: float) -> None:
-        self.rgb = (self.rgb[0], self.rgb[1], value)
+        self.rgb = RGBTuple(self.rgb.red, self.rgb.green, value)
 
     def set_alpha(self, value: float) -> None:
         if not 0 <= value <= 1:
@@ -683,7 +754,7 @@ class Color:
     def __repr__(self) -> str:
         return f"<Color {self.web}>"
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Color):
             return self.equality(self, other)
         raise NotImplementedError("Other object must be of type `Color` or `Colour`")
@@ -706,7 +777,7 @@ def make_color_factory(**kwargs_defaults: Any) -> Callable[..., Color]:
         Callable that creates ``Color`` instances with merged defaults.
     """
 
-    def ColorFactory(*args, **kwargs):
+    def ColorFactory(*args: Any, **kwargs: Any) -> Color:
         new_kwargs = kwargs_defaults.copy()
         new_kwargs.update(kwargs)
         return Color(*args, **new_kwargs)
