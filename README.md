@@ -26,14 +26,14 @@ pip install colourings
 from colourings import Color
 
 blue = Color("blue")
-print(blue)          # blue
-print(blue.hex)      # #00f
-print(blue.hex_l)    # #0000ff
-print(blue.rgb)      # (0.0, 0.0, 255.0)
-print(blue.hsl)      # (240.0, 100.0, 50.0)
+print(blue)  # blue
+print(blue.hex)  # #00f
+print(blue.hex_l)  # #0000ff
+print(blue.rgb)  # (0.0, 0.0, 255.0)
+print(blue.hsl)  # (240.0, 100.0, 50.0)
 
 blue.red = 255
-print(blue.web)      # magenta
+print(blue.web)  # magenta
 ```
 
 ## Value Ranges
@@ -88,7 +88,7 @@ c.saturation = 50
 c.lightness = 75
 c.alpha = 0.5
 
-print(c.hsla)   # (0.0, 50.0, 75.0, 50.0)
+print(c.hsla)  # (0.0, 50.0, 75.0, 50.0)
 print(c.rgbaf)  # (0.875, 0.625, 0.625, 0.5)
 ```
 
@@ -119,7 +119,7 @@ stops = (Color("black"), Color("orange"), Color("blue"), Color("white"))
 palette = color_scale(stops, 10)
 
 for color in palette:
-	print(color)
+    print(color)
 # black #39221c #8e4d1c orange #ff003c #e100ff blue #bd71e3 #e3c6d9
 white
 ```
@@ -167,9 +167,9 @@ You can override the picking strategy with:
 ```python
 from colourings.colour import HEX, HSL, RGB, Colour
 
-print(HSL.BLUE)   # (240.0, 100.0, 50.0)
-print(RGB.BLUE)   # (0.0, 0.0, 255.0)
-print(HEX.BLUE)   # #00f
+print(HSL.BLUE)  # (240.0, 100.0, 50.0)
+print(RGB.BLUE)  # (0.0, 0.0, 255.0)
+print(HEX.BLUE)  # #00f
 
 assert Colour("red") == Colour("#f00")
 ```
@@ -183,10 +183,10 @@ Use direct conversion helpers when you do not need the class API:
 ```python
 from colourings.conversions import rgb2hex, rgb2hsl, web2rgb, hsl2web
 
-print(rgb2hex((255, 0, 0)))       # #f00
-print(rgb2hsl((255, 0, 0)))       # (0.0, 100.0, 50.0)
-print(web2rgb("rebeccapurple"))   # (102.0, 51.0, 153.0)
-print(hsl2web((0, 0, 50.2)))      # gray
+print(rgb2hex((255, 0, 0)))  # #f00
+print(rgb2hsl((255, 0, 0)))  # (0.0, 100.0, 50.0)
+print(web2rgb("rebeccapurple"))  # (102.0, 51.0, 153.0)
+print(hsl2web((0, 0, 50.2)))  # gray
 ```
 
 Available helpers include conversion paths across:
