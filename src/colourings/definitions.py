@@ -85,6 +85,22 @@ class LCH(NamedTuple):
     hue: float
 
 
+class OKLAB(NamedTuple):
+    """Oklab with lightness in ``[0, 1]`` and a/b within ``[-0.4, 0.4]``."""
+
+    lightness: float
+    a: float
+    b: float
+
+
+class OKLCH(NamedTuple):
+    """Cylindrical Oklab: lightness, chroma in ``[0, 0.4]``, hue in ``[0, 360]``."""
+
+    lightness: float
+    chroma: float
+    hue: float
+
+
 class CMYK(NamedTuple):
     """Cyan, magenta, yellow and key, each in ``[0, 100]``."""
 
@@ -342,6 +358,39 @@ LAB_DELTA = 6.0 / 29.0
 YUV_LUMA_COEFFICIENTS = (0.299, 0.587, 0.114)
 YUV_U_SCALE = 0.492
 YUV_V_SCALE = 0.877
+
+## Oklab (Ottosson, 2020). Linear sRGB to the cone-response space, then
+## the cube-rooted cone responses to Oklab.
+##
+## Both are quoted rather than derived, which is the opposite of the choice
+## made for XYZ above, because here the published coefficients are the
+## self-consistent ones: the rows of the first matrix sum to 1 to within 1e-10,
+## so white reaches (1, 1, 1). Building it instead from the published
+## XYZ-to-cone matrix and the seven-digit RGB_TO_XYZ_MATRIX would put white at
+## (0.99993, 1.00002, 1.00034), a 3.4e-4 error that gives every grey a faint
+## cast. Oklab therefore hangs off sRGB directly and does not pass through XYZ.
+RGB_TO_LMS_MATRIX = (
+    (0.4122214708, 0.5363325363, 0.0514459929),
+    (0.2119034982, 0.6806995451, 0.1073969566),
+    (0.0883024619, 0.2817188376, 0.6299787005),
+)
+
+## The first row sums to 0.9999999935, so white lands 6.5e-9 short of L = 1;
+## the other two rows put a and b of a neutral within FLOAT_ERROR of zero,
+## where _threshold takes them to exactly zero.
+LMS_TO_OKLAB_MATRIX = (
+    (0.2104542553, 0.7936177850, -0.0040720468),
+    (1.9779984951, -2.4285922050, 0.4505937099),
+    (0.0259040371, 0.7827717662, -0.8086757660),
+)
+
+## Derived for the same reason as XYZ_TO_RGB_MATRIX: the published inverses are
+## rounded to ten digits and are not the exact inverses of the matrices they
+## undo. Composing each published pair leaves the identity out by 1.6e-10 and
+## 3.7e-8 respectively; inverting brings both to 5.6e-16. The derived values
+## agree with the published ones to eight decimal places.
+LMS_TO_RGB_MATRIX = _invert_3x3(RGB_TO_LMS_MATRIX)
+OKLAB_TO_LMS_MATRIX = _invert_3x3(LMS_TO_OKLAB_MATRIX)
 
 RGB_TO_COLOR_NAMES: dict[RGB, list[str]] = {
     RGB(float(r), float(g), float(b)): names for (r, g, b), names in _NAMED_RGB.items()

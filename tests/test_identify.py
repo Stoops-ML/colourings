@@ -11,6 +11,8 @@ from colourings.identify import (
     is_hsv,
     is_lab,
     is_lch,
+    is_oklab,
+    is_oklch,
     is_rgb,
     is_rgba,
     is_rgbaf,
@@ -186,6 +188,33 @@ def test_is_lch():
     assert not is_lch((0, 0, 361))
     assert not is_lch((0, 183, 0))
     assert not is_lch((0, 0))
+
+
+def test_is_oklab():
+    assert is_oklab((0, 0, 0))
+    assert is_oklab((1, -0.4, 0.4))
+    assert is_oklab(Color("red").oklab)
+    assert not is_oklab((1.1, 0, 0))
+    assert not is_oklab((0, -0.41, 0))
+    assert not is_oklab((0, 0, 0.41))
+    assert not is_oklab((0, 0))
+
+
+def test_is_oklch():
+    assert is_oklch((0, 0, 0))
+    assert is_oklch(Color("red").oklch)
+    assert not is_oklch((0, -0.01, 0))
+    assert not is_oklch((0, 0, 361))
+    assert not is_oklch((0, 0.41, 0))
+    assert not is_oklch((0, 0))
+
+
+def test_every_named_colour_is_in_oklab_range():
+    """The declared bounds must hold over the whole sRGB gamut, not just red."""
+    for name in COLOR_NAME_TO_RGB:
+        color = Color(name)
+        assert is_oklab(color.oklab)
+        assert is_oklch(color.oklch)
 
 
 def test_is_cmyk():

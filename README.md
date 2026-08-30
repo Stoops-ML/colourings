@@ -51,6 +51,8 @@ The library uses explicit numeric ranges (not mixed 0..1 + 0..255 conventions):
 - `xyz`: CIE XYZ under D65, scaled so that white has `y` of 100
 - `lab`: CIE L*a*b*, lightness in `[0, 100]`, a/b in `[-128, 127]`
 - `lch`: cylindrical CIE L*a*b*, chroma in `[0, 182]`, hue in `[0, 360]`
+- `oklab`: Oklab, lightness in `[0, 1]`, a/b in `[-0.4, 0.4]`
+- `oklch`: cylindrical Oklab, chroma in `[0, 0.4]`, hue in `[0, 360]`
 - `cmyk`: channels in `[0, 100]`
 - `yuv`: BT.601, luma in `[0, 1]`, U in `[-0.436, 0.436]`, V in `[-0.615, 0.615]`
 - `Color.alpha`: always `[0, 1]`
@@ -74,6 +76,8 @@ Color(rgbaf=(1, 0, 0, 1))
 Color(hsv=(0, 100, 100))
 Color(lab=(53.2408, 80.0925, 67.2032))
 Color(lch=(53.2408, 104.5518, 40))
+Color(oklab=(0.62796, 0.22486, 0.12585))
+Color(oklch=(0.62796, 0.25768, 29.2339))
 Color(xyz=(41.2456, 21.2673, 1.9334))
 Color(cmyk=(0, 100, 100, 0))
 Color(yuv=(0.299, -0.147108, 0.614777))
@@ -137,6 +141,39 @@ white
 ```
 
 `color_scale` requires at least two colors, and `num_steps >= len(colors)`.
+
+### Interpolation Space
+
+Both `color_scale` and `range_to` take a `space`, one of `hsl`, `lab`, `lch`,
+`oklab` or `oklch`. It defaults to `hsl`, which is what these functions have
+always used, but `hsl` is the weakest of the five for a gradient: it is polar,
+so it swings through hues that are in neither endpoint, and its lightness is
+not a perceptual quantity, so the steps come out unevenly spaced.
+
+```python
+from colourings import Color
+
+red = Color("red")
+
+print(list(red.range_to("cyan", 5)))
+# HSL invents a magenta and a violet that are in neither endpoint.
+# [<Color red>, <Color #ff00bf>, <Color #7f00ff>, <Color #0040ff>, <Color cyan>]
+
+print(list(red.range_to("cyan", 5, space="oklab")))
+# Oklab blends the two, in evenly sized perceptual steps.
+# [<Color red>, <Color #ee745b>, <Color #d2a993>, <Color #a3d6c9>, <Color cyan>]
+```
+
+Reach for `oklab`. It is perceptually uniform, so its steps are evenly spaced,
+and rectangular, so there is no hue arc to sweep. Use `oklch` when that sweep
+is the point, and `lab` or `lch` for the CIE equivalents.
+
+`longer` chooses the arc around the hue circle, so it applies only to a space
+that has a hue: passing it with `oklab` or `lab` raises `ValueError`.
+
+A straight line between two saturated colors can leave the sRGB gamut. Those
+points are clamped, as everywhere else in the library, so a scale through one
+of them is a shade off the exact interpolant.
 
 ## Equality Behavior
 
@@ -239,6 +276,7 @@ Available helpers include conversion paths across:
 - `hsl`, `hsla`, `hslf`, `hslaf`
 - `hsv`
 - `xyz`, `lab`, `lch` (CIE, D65)
+- `oklab`, `oklch`
 - `cmyk`, `yuv`
 - `hex` and `web`
 
@@ -272,9 +310,10 @@ in a set.
 
 ## Perceptual Spaces
 
-`lab` and `lch` are perceptually uniform, so they are the ones to interpolate
-or measure distance in. `lch` is `lab` in polar form, which makes it the
-convenient one for adjusting lightness or chroma without shifting hue.
+`lab`, `lch`, `oklab` and `oklch` are perceptually uniform, so they are the
+ones to interpolate or measure distance in. `lch` and `oklch` are the polar
+forms, which makes them the convenient ones for adjusting lightness or chroma
+without shifting hue.
 
 ```python
 from colourings import Color
@@ -282,14 +321,23 @@ from colourings import Color
 c = Color("rebeccapurple")
 print(c.lab)  # LAB(lightness=32.9024..., a=42.8830..., b=-47.1486...)
 print(c.lch)  # LCH(lightness=32.9024..., chroma=63.7334..., hue=312.2874...)
+print(c.oklab)  # OKLAB(lightness=0.4402..., a=0.0881..., b=-0.1338...)
+print(c.oklch)  # OKLCH(lightness=0.4402..., chroma=0.1602..., hue=303.3729...)
 
 lighter = Color(lch=(c.lch.lightness + 20, c.lch.chroma, c.lch.hue))
 ```
 
+`oklab` is the more uniform of the two pairs, most visibly around blue, where
+CIE L*a*b* is known to bend. It is also on a different scale: lightness runs
+`[0, 1]` rather than `[0, 100]`, and its chroma axes `[-0.4, 0.4]` rather than
+`[-128, 127]`, matching the CSS `oklab()` and `oklch()` functions.
+
 The CIE conversions use the D65 illuminant, which is the one sRGB is defined
-against. Values are not interchangeable with a library that uses D50.
-Converting into sRGB clamps anything outside its gamut, since an out-of-gamut
-colour has no sRGB encoding.
+against. Values are not interchangeable with a library that uses D50. Oklab is
+defined against D65 too, but is derived from sRGB directly rather than through
+this library's XYZ, whose seven-digit matrix is not precise enough to leave a
+grey neutral in Oklab. Converting into sRGB clamps anything outside its gamut,
+since an out-of-gamut colour has no sRGB encoding.
 
 ## Error Handling
 

@@ -28,12 +28,18 @@ from colourings.conversions import (
     lab2xyz,
     lch2lab,
     lch2rgb,
+    oklab2oklch,
+    oklab2rgb,
+    oklch2oklab,
+    oklch2rgb,
     rgb2cmyk,
     rgb2hex,
     rgb2hsl,
     rgb2hsv,
     rgb2lab,
     rgb2lch,
+    rgb2oklab,
+    rgb2oklch,
     rgb2web,
     rgb2xyz,
     rgb2yuv,
@@ -49,6 +55,7 @@ from colourings.conversions import (
     xyz2rgb,
     yuv2rgb,
 )
+from colourings.definitions import RGB_TO_COLOR_NAMES
 from colourings.errors import InvalidColorError
 
 
@@ -537,6 +544,7 @@ ROUND_TRIPS = [
     (rgb2xyz, xyz2rgb),
     (rgb2lab, lab2rgb),
     (rgb2lch, lch2rgb),
+    (rgb2oklab, oklab2rgb),
     (rgb2cmyk, cmyk2rgb),
     (rgb2yuv, yuv2rgb),
 ]
@@ -577,6 +585,12 @@ def test_out_of_gamut_is_clamped_not_rejected():
         (yuv2rgb, (2, 0, 0)),
         (rgb2lab, (256, 0, 0)),
         (rgb2lch, (256, 0, 0)),
+        (rgb2oklab, (256, 0, 0)),
+        (oklab2rgb, (2, 0, 0)),
+        (oklab2oklch, (0, 0.5, 0)),
+        (oklch2oklab, (0, 0.5, 0)),
+        (rgb2oklch, (256, 0, 0)),
+        (oklch2rgb, (0, 0, 400)),
     ],
 )
 def test_bad_input_rejected(func, bad):
@@ -593,3 +607,85 @@ def test_greys_are_neutral_in_xyz():
         ratios = [c / w for c, w in zip(xyz, D65_WHITE_POINT, strict=True)]
         assert ratios[0] == pytest.approx(ratios[1]) == pytest.approx(ratios[2])
         assert rgb2lab((level, level, level))[1:] == pytest.approx((0.0, 0.0))
+
+
+## Reference values published with Oklab (Ottosson, 2020) for the sRGB
+## primaries, rounded to five decimal places.
+OKLAB_REFERENCE = [
+    ((255, 255, 255), (1.0, 0.0, 0.0)),
+    ((0, 0, 0), (0.0, 0.0, 0.0)),
+    ((255, 0, 0), (0.62796, 0.22486, 0.12585)),
+    ((0, 255, 0), (0.86644, -0.23389, 0.17950)),
+    ((0, 0, 255), (0.45201, -0.03246, -0.31153)),
+]
+
+
+@pytest.mark.parametrize(("rgb", "oklab"), OKLAB_REFERENCE)
+def test_rgb2oklab_reference(rgb, oklab):
+    assert rgb2oklab(rgb) == pytest.approx(oklab, abs=1e-5)
+    ## The five decimal places the reference is quoted to are worth about
+    ## 0.02 of a channel on the way back, so the return leg is looser.
+    assert oklab2rgb(oklab) == pytest.approx(rgb, abs=5e-2)
+
+
+def test_white_is_l1_in_oklab():
+    """Off by 6.5e-9, the amount the published matrix's first row is short."""
+    lightness, a, b = rgb2oklab((255, 255, 255))
+    assert lightness == pytest.approx(1.0, abs=1e-8)
+    assert (a, b) == pytest.approx((0.0, 0.0), abs=1e-7)
+
+
+def test_greys_have_no_hue_in_oklch():
+    """A grey keeps its 2e-8 of residual chroma in Oklab, but not in Oklch.
+
+    Clamping it in Oklab would cost 2.6e-5 of a channel on the way back, so it
+    is left alone there and resolved where a stray hue would be visible.
+    """
+    for level in (0, 64, 128, 192, 255):
+        assert rgb2oklab((level, level, level))[1:] == pytest.approx(
+            (0.0, 0.0), abs=1e-7
+        )
+        oklch = rgb2oklch((level, level, level))
+        assert oklch.chroma == 0.0
+        assert oklch.hue == 0.0
+
+
+def test_oklab2oklch_and_oklch2oklab():
+    ## Taken from the full-precision red rather than the rounded reference
+    ## above, whose fifth decimal place moves the hue by 1e-3.
+    oklab = rgb2oklab((255, 0, 0))
+    assert oklab2oklch(oklab) == pytest.approx((0.62796, 0.25768, 29.2339), abs=1e-4)
+    assert oklch2oklab(oklab2oklch(oklab)) == pytest.approx(oklab, abs=1e-15)
+    ## hue wraps rather than going negative
+    assert oklab2oklch((0.5, 0.1, -0.1)).hue == pytest.approx(315.0)
+
+
+def test_oklab_lightness_is_perceptual():
+    """Oklab L of mid grey sits near 0.6, where HSL and CIE L* put it at 0.5."""
+    assert rgb2oklab((128, 128, 128)).lightness == pytest.approx(0.5999, abs=1e-4)
+
+
+def test_every_named_colour_round_trips_through_oklab():
+    worst = 0.0
+    for rgb in RGB_TO_COLOR_NAMES:
+        back = oklab2rgb(rgb2oklab(rgb))
+        worst = max(worst, max(abs(a - b) for a, b in zip(rgb, back, strict=True)))
+    assert worst < 1e-11
+
+
+def test_oklch_round_trip_pays_for_neutral_greys():
+    """Oklch is exact except on a grey, whose hue it discards on the way out.
+
+    That is the deliberate trade made in oklab2oklch: 2.6e-5 of a channel,
+    which no output format can represent, buys a grey with no phantom hue.
+    """
+    worst_grey, worst_colour = 0.0, 0.0
+    for rgb in RGB_TO_COLOR_NAMES:
+        back = oklch2rgb(rgb2oklch(rgb))
+        error = max(abs(a - b) for a, b in zip(rgb, back, strict=True))
+        if len(set(rgb)) == 1:
+            worst_grey = max(worst_grey, error)
+        else:
+            worst_colour = max(worst_colour, error)
+    assert worst_colour < 1e-11
+    assert worst_grey < 1e-4

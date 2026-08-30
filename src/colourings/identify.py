@@ -343,6 +343,40 @@ def is_lch(color: object) -> bool:
     return _is_color_ranges(color, ((0, 100), (0, 182), (0, 360)))
 
 
+def is_oklab(color: object) -> bool:
+    """Validate whether a value is an Oklab sequence.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with lightness
+        in ``[0, 1]`` and a/b in ``[-0.4, 0.4]``.
+    """
+    return _is_color_ranges(color, ((0, 1), (-0.4, 0.4), (-0.4, 0.4)))
+
+
+def is_oklch(color: object) -> bool:
+    """Validate whether a value is an Oklch sequence.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when ``color`` is a non-string sequence of length 3 with lightness
+        in ``[0, 1]``, chroma in ``[0, 0.4]`` and hue in ``[0, 360]``.
+    """
+    return _is_color_ranges(color, ((0, 1), (0, 0.4), (0, 360)))
+
+
 def is_cmyk(color: object) -> bool:
     """Validate whether a value is a CMYK sequence.
 

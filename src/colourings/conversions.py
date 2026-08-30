@@ -15,9 +15,15 @@ from .definitions import (
     LAB,
     LAB_DELTA,
     LCH,
+    LMS_TO_OKLAB_MATRIX,
+    LMS_TO_RGB_MATRIX,
     LONG_HEX_COLOR,
+    OKLAB,
+    OKLAB_TO_LMS_MATRIX,
+    OKLCH,
     RGB,
     RGB_TO_COLOR_NAMES,
+    RGB_TO_LMS_MATRIX,
     RGB_TO_XYZ_MATRIX,
     RGBA,
     SHORT_HEX_COLOR,
@@ -42,6 +48,8 @@ from .identify import (
     is_lab,
     is_lch,
     is_long_hex,
+    is_oklab,
+    is_oklch,
     is_rgb,
     is_rgba,
     is_rgbaf,
@@ -1337,6 +1345,149 @@ def lch2rgb(lch: Sequence[int | float]) -> RGB:
 
 
 @_cached
+def rgb2oklab(rgb: Sequence[int | float]) -> OKLAB:
+    """Convert RGB representation to Oklab.
+
+    Oklab hangs off sRGB directly rather than composing through
+    :func:`rgb2xyz`, because its cone-response matrix is normalised against a
+    more precise sRGB primary set than the seven-digit ``RGB_TO_XYZ_MATRIX``.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    OKLAB
+        Oklab tuple with lightness in ``[0, 1]``.
+    """
+    if not is_rgb(rgb):
+        raise InvalidColorError("Input is not an RGB type.")
+    linear = [_srgb_to_linear(c) for c in rgb2rgbf(rgb)]
+    ## Every coefficient of the matrix is positive and every linear channel is
+    ## non-negative, so the cube roots below never see a negative base. They
+    ## are wrapped in ``float`` because ``**`` is typed as possibly returning
+    ## ``complex``.
+    roots = [float(c ** (1 / 3)) for c in _matrix_apply(RGB_TO_LMS_MATRIX, linear)]
+    lightness, a, b = _matrix_apply(LMS_TO_OKLAB_MATRIX, roots)
+    ## a and b deliberately skip _threshold. Oklab's chroma axes are two orders
+    ## of magnitude shorter than L*a*b*'s, so FLOAT_ERROR sits above the
+    ## residual a grey leaves behind rather than below it, and clamping that to
+    ## zero costs 2.6e-5 of a channel on the way back -- eight orders of
+    ## magnitude more than the arithmetic itself loses. oklab2oklch zeroes the
+    ## hue of an achromatic colour instead, which is where a hue read off
+    ## floating-point noise would actually be visible.
+    return OKLAB(_threshold(lightness), float(a), float(b))
+
+
+@_cached
+def oklab2rgb(oklab: Sequence[int | float]) -> RGB:
+    """Convert Oklab to RGB, clamping anything outside the sRGB gamut.
+
+    Parameters
+    ----------
+    oklab : Sequence[int | float]
+        Oklab sequence with lightness in ``[0, 1]``.
+
+    Returns
+    -------
+    RGB
+        RGB tuple in the ``[0, 255]`` range.
+    """
+    if not is_oklab(oklab):
+        raise InvalidColorError("Input is not an OKLAB type.")
+    roots = _matrix_apply(OKLAB_TO_LMS_MATRIX, oklab)
+    linear = _matrix_apply(LMS_TO_RGB_MATRIX, [c**3 for c in roots])
+    return RGB(*(_threshold(_linear_to_srgb(c) * 255.0) for c in linear))
+
+
+@_cached
+def oklab2oklch(oklab: Sequence[int | float]) -> OKLCH:
+    """Convert Oklab to its cylindrical Oklch form.
+
+    Parameters
+    ----------
+    oklab : Sequence[int | float]
+        Oklab sequence.
+
+    Returns
+    -------
+    OKLCH
+        Oklch tuple with hue in ``[0, 360]``.
+    """
+    if not is_oklab(oklab):
+        raise InvalidColorError("Input is not an OKLAB type.")
+    chroma = math.hypot(oklab[1], oklab[2])
+    if chroma < FLOAT_ERROR:
+        ## An achromatic colour has no hue, and below FLOAT_ERROR the angle is
+        ## just the direction of the noise left in a and b. Report zero rather
+        ## than an arbitrary hue that a caller might interpolate through.
+        return OKLCH(_threshold(oklab[0]), 0.0, 0.0)
+    hue = math.degrees(math.atan2(oklab[2], oklab[1])) % 360.0
+    return OKLCH(_threshold(oklab[0]), _threshold(chroma), _threshold(hue))
+
+
+@_cached
+def oklch2oklab(oklch: Sequence[int | float]) -> OKLAB:
+    """Convert cylindrical Oklch to Oklab.
+
+    Parameters
+    ----------
+    oklch : Sequence[int | float]
+        Oklch sequence.
+
+    Returns
+    -------
+    OKLAB
+        Oklab tuple.
+    """
+    if not is_oklch(oklch):
+        raise InvalidColorError("Input is not an OKLCH type.")
+    radians = math.radians(oklch[2])
+    ## a and b skip _threshold for the reason given in rgb2oklab.
+    return OKLAB(
+        _threshold(oklch[0]),
+        float(oklch[1] * math.cos(radians)),
+        float(oklch[1] * math.sin(radians)),
+    )
+
+
+@_cached
+def rgb2oklch(rgb: Sequence[int | float]) -> OKLCH:
+    """Convert RGB representation to cylindrical Oklch.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    OKLCH
+        Oklch tuple.
+    """
+    return oklab2oklch(rgb2oklab(rgb))
+
+
+@_cached
+def oklch2rgb(oklch: Sequence[int | float]) -> RGB:
+    """Convert cylindrical Oklch to RGB representation.
+
+    Parameters
+    ----------
+    oklch : Sequence[int | float]
+        Oklch sequence.
+
+    Returns
+    -------
+    RGB
+        RGB tuple in the ``[0, 255]`` range.
+    """
+    return oklab2rgb(oklch2oklab(oklch))
+
+
+@_cached
 def rgb2cmyk(rgb: Sequence[int | float]) -> CMYK:
     """Convert RGB representation to CMYK.
 
@@ -1539,6 +1690,74 @@ def lch2hsl(lch: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     return lab2hsl(lch2lab(lch))
+
+
+@_cached
+def hsl2oklab(hsl: Sequence[int | float]) -> OKLAB:
+    """Convert HSL representation to Oklab.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    OKLAB
+        Oklab tuple.
+    """
+    return rgb2oklab(hsl2rgb(hsl))
+
+
+@_cached
+def oklab2hsl(oklab: Sequence[int | float]) -> HSL:
+    """Convert Oklab to HSL representation.
+
+    Parameters
+    ----------
+    oklab : Sequence[int | float]
+        Oklab sequence.
+
+    Returns
+    -------
+    HSL
+        HSL tuple.
+    """
+    return rgb2hsl(oklab2rgb(oklab))
+
+
+@_cached
+def hsl2oklch(hsl: Sequence[int | float]) -> OKLCH:
+    """Convert HSL representation to cylindrical Oklch.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)``.
+
+    Returns
+    -------
+    OKLCH
+        Oklch tuple.
+    """
+    return oklab2oklch(hsl2oklab(hsl))
+
+
+@_cached
+def oklch2hsl(oklch: Sequence[int | float]) -> HSL:
+    """Convert cylindrical Oklch to HSL representation.
+
+    Parameters
+    ----------
+    oklch : Sequence[int | float]
+        Oklch sequence.
+
+    Returns
+    -------
+    HSL
+        HSL tuple.
+    """
+    return oklab2hsl(oklch2oklab(oklch))
 
 
 @_cached

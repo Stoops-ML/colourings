@@ -1,3 +1,4 @@
+import math
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -1014,7 +1015,7 @@ def test_bad_hsv_via_color():
         Color("red").set_hsv((0, 101, 0))
 
 
-SPACES = ("xyz", "lab", "lch", "cmyk", "yuv", "hsv")
+SPACES = ("xyz", "lab", "lch", "oklab", "oklch", "cmyk", "yuv", "hsv")
 
 
 @pytest.mark.parametrize("space", SPACES)
@@ -1034,6 +1035,8 @@ def test_space_reference_values_via_color():
     assert red.xyz == pytest.approx((41.2456, 21.2673, 1.9334), abs=1e-3)
     assert red.lab == pytest.approx((53.2408, 80.0925, 67.2032), abs=1e-3)
     assert red.lch == pytest.approx((53.2408, 104.5518, 39.999), abs=1e-3)
+    assert red.oklab == pytest.approx((0.62796, 0.22486, 0.12585), abs=1e-5)
+    assert red.oklch == pytest.approx((0.62796, 0.25768, 29.2339), abs=1e-4)
     assert red.cmyk == (0.0, 100.0, 100.0, 0.0)
     assert red.yuv == pytest.approx((0.299, -0.147108, 0.614777), abs=1e-6)
 
@@ -1046,12 +1049,18 @@ def test_spaces_are_settable():
     assert c.hex_l == "#00ffff"
     c.yuv = Color("lime").yuv
     assert c.web == "lime"
+    c.oklab = Color("red").oklab
+    assert c.web == "red"
+    c.oklch = Color("blue").oklch
+    assert c.web == "blue"
 
 
 def test_space_named_fields():
     red = Color("red")
     assert red.lab.lightness == pytest.approx(53.2408, abs=1e-3)
     assert red.lch.chroma == pytest.approx(104.5518, abs=1e-3)
+    assert red.oklab.lightness == pytest.approx(0.62796, abs=1e-5)
+    assert red.oklch.chroma == pytest.approx(0.25768, abs=1e-5)
     assert red.cmyk.key == 0.0
     assert red.yuv.luma == pytest.approx(0.299)
     assert red.xyz.y == pytest.approx(21.2673, abs=1e-3)
@@ -1070,6 +1079,8 @@ def test_spaces_conflict_with_other_inputs():
         ("xyz", (-1, 0, 0)),
         ("lab", (101, 0, 0)),
         ("lch", (0, 0, 361)),
+        ("oklab", (1.1, 0, 0)),
+        ("oklch", (0, 0.41, 0)),
         ("cmyk", (101, 0, 0, 0)),
         ("yuv", (1.1, 0, 0)),
     ],
@@ -1079,3 +1090,142 @@ def test_bad_space_input_via_color(space, bad):
         Color(**{space: bad})
     with pytest.raises(InvalidColorError):
         setattr(Color("red"), space, bad)
+
+
+SCALE_SPACES = ("hsl", "lab", "lch", "oklab", "oklch")
+
+
+def test_color_scale_default_space_is_unchanged():
+    """HSL stays the default, so this output is a backward-compatibility guard."""
+    assert [c.hex_l for c in color_scale((Color("blue"), Color("yellow")), 5)] == [
+        "#0000ff",
+        "#bf00ff",
+        "#ff007f",
+        "#ff4000",
+        "#ffff00",
+    ]
+    assert color_scale((Color("blue"), Color("yellow")), 5) == color_scale(
+        (Color("blue"), Color("yellow")), 5, space="hsl"
+    )
+
+
+@pytest.mark.parametrize("space", SCALE_SPACES)
+def test_color_scale_keeps_endpoints_in_every_space(space):
+    stops = (Color("blue"), Color("black"), Color("orange"), Color("white"))
+    scale = color_scale(stops, 10, space=space)
+    assert len(scale) == 10
+    assert scale[0] == stops[0]
+    assert scale[-1] == stops[-1]
+    ## every control colour survives as one of the steps
+    for stop in stops:
+        assert stop in scale
+
+
+@pytest.mark.parametrize("space", SCALE_SPACES)
+def test_color_scale_exact_inputs_in_every_space(space):
+    stops = (Color("blue"), Color("black"), Color("blue"), Color("orange"))
+    assert color_scale(stops, 4, space=space) == list(stops)
+
+
+def test_color_scale_rejects_unknown_space():
+    with pytest.raises(ValueError, match="Unknown interpolation space 'srgb'"):
+        color_scale((Color("red"), Color("blue")), 5, space="srgb")
+
+
+@pytest.mark.parametrize("space", ("lab", "oklab"))
+def test_color_scale_rejects_longer_without_a_hue(space):
+    with pytest.raises(ValueError, match="no hue channel"):
+        color_scale((Color("red"), Color("blue")), 5, longer=True, space=space)
+
+
+def test_color_scale_longer_takes_the_other_arc_in_oklch():
+    short = color_scale((Color("red"), Color("blue")), 5, space="oklch")
+    long = color_scale((Color("red"), Color("blue")), 5, longer=True, space="oklch")
+    assert short != long
+    assert short[0] == long[0] == Color("red")
+    assert short[-1] == long[-1] == Color("blue")
+
+    ## Red is at hue 29 and blue at 264. The short arc runs backwards through
+    ## magenta; only the long one crosses the greens between them.
+    greens = range(100, 200)
+    assert not any(int(c.oklch.hue) in greens for c in short)
+    assert any(int(c.oklch.hue) in greens for c in long)
+
+
+def _oklab_distance(c1, c2):
+    return math.dist(c1.oklab, c2.oklab)
+
+
+def _step_evenness(scale):
+    """Ratio of the largest to the smallest perceived step. 1.0 is perfect."""
+    steps = [_oklab_distance(a, b) for a, b in zip(scale[:-1], scale[1:], strict=True)]
+    return max(steps) / min(steps)
+
+
+SCALE_PAIRS = [
+    ("blue", "yellow"),
+    ("red", "cyan"),
+    ("magenta", "green"),
+    ("red", "blue"),
+    ("black", "white"),
+]
+
+
+@pytest.mark.parametrize(("start", "end"), SCALE_PAIRS)
+def test_oklab_steps_are_more_even_than_hsl(start, end):
+    """The point of the exercise: Oklab is within 5% of a perfect ramp."""
+    stops = (Color(start), Color(end))
+    assert _step_evenness(color_scale(stops, 9, space="oklab")) < 1.05
+    assert _step_evenness(color_scale(stops, 9, space="hsl")) > 2.5
+
+
+def test_hsl_brightness_is_not_monotonic_where_oklab_is():
+    """An HSL ramp between complementary colours rises, dips, then rises."""
+    stops = (Color("blue"), Color("yellow"))
+    hsl = [c.oklab.lightness for c in color_scale(stops, 9)]
+    oklab = [c.oklab.lightness for c in color_scale(stops, 9, space="oklab")]
+
+    assert not all(a <= b for a, b in zip(hsl[:-1], hsl[1:], strict=True))
+    assert hsl[3] > hsl[4]  # the dip
+    assert all(a < b for a, b in zip(oklab[:-1], oklab[1:], strict=True))
+
+
+@pytest.mark.parametrize(("start", "end"), [("red", "cyan"), ("black", "white")])
+def test_oklab_steps_are_exactly_equal_inside_the_gamut(start, end):
+    scale = color_scale((Color(start), Color(end)), 9, space="oklab")
+    lightness = [c.oklab.lightness for c in scale]
+    deltas = [b - a for a, b in zip(lightness[:-1], lightness[1:], strict=True)]
+    assert max(deltas) == pytest.approx(min(deltas), abs=1e-12)
+
+
+def test_oklab_interpolation_clamps_where_it_leaves_the_gamut():
+    """A straight line in Oklab can pass outside sRGB, which has no encoding.
+
+    Blue to yellow does, one step in: the eighth point wants a red channel of
+    -0.006, so it is clamped and reads back a shade lighter than asked for.
+    """
+    scale = color_scale((Color("blue"), Color("yellow")), 9, space="oklab")
+    assert scale[1].rgb.red == 0.0
+    wanted = [
+        a + (b - a) * (1 / 8)
+        for a, b in zip(Color("blue").oklab, Color("yellow").oklab, strict=True)
+    ]
+    assert scale[1].oklab.lightness > wanted[0]
+    assert scale[1].oklab == pytest.approx(wanted, abs=5e-3)
+
+
+def test_hsl_passes_through_hues_in_neither_endpoint():
+    """Being polar, HSL swings blue to yellow through magenta and red."""
+    scale = color_scale((Color("blue"), Color("yellow")), 9)
+    assert any(c.hex_l == "#ff007f" for c in scale)  # a pink, from nowhere
+    oklab = color_scale((Color("blue"), Color("yellow")), 9, space="oklab")
+    assert all(c.oklab.lightness > 0 for c in oklab)
+    ## Oklab stays between the endpoints on both chroma axes
+    lo, hi = sorted((Color("blue").oklab.b, Color("yellow").oklab.b))
+    assert all(lo - 1e-12 <= c.oklab.b <= hi + 1e-12 for c in oklab)
+
+
+def test_range_to_accepts_a_space():
+    direct = color_scale((Color("red"), Color("blue")), 5, space="oklab")
+    assert list(Color("red").range_to("blue", 5, space="oklab")) == direct
+    assert list(Color("red").range_to("blue", 5)) != direct

@@ -18,6 +18,8 @@ from .conversions import (
     hsl2hsv,
     hsl2lab,
     hsl2lch,
+    hsl2oklab,
+    hsl2oklch,
     hsl2rgb,
     hsl2rgbf,
     hsl2xyz,
@@ -27,6 +29,8 @@ from .conversions import (
     hsv2hsl,
     lab2hsl,
     lch2hsl,
+    oklab2hsl,
+    oklch2hsl,
     rgb2hex,
     rgb2hsl,
     rgb2rgba,
@@ -49,6 +53,8 @@ from .definitions import HSLA as HSLATuple
 from .definitions import HSV as HSVTuple
 from .definitions import LAB as LABTuple
 from .definitions import LCH as LCHTuple
+from .definitions import OKLAB as OKLABTuple
+from .definitions import OKLCH as OKLCHTuple
 from .definitions import RGB as RGBTuple
 from .definitions import RGBA as RGBATuple
 from .definitions import XYZ as XYZTuple
@@ -114,12 +120,74 @@ RGB = C_RGB()
 HEX = C_HEX()
 
 
-def color_scale(
-    colors: Sequence[Color | Colour], num_steps: int, longer: bool = False
-) -> list[Color]:
-    """Create a color scale by linearly interpolating in HSL space.
+## Interpolation spaces for ``color_scale``. The key is the ``Color`` property
+## that reads the space, and the value pairs the conversion that takes an
+## interpolated triple back to HSL with the index of the space's hue channel,
+## or ``None`` when the space is rectangular and has no hue to take an arc
+## around.
+_SCALE_SPACES: dict[str, tuple[Callable[[Sequence[float]], HSLTuple], int | None]] = {
+    "hsl": (lambda values: HSLTuple(*values), 0),
+    "lab": (lab2hsl, None),
+    "lch": (lch2hsl, 2),
+    "oklab": (oklab2hsl, None),
+    "oklch": (oklch2hsl, 2),
+}
 
-    TODO: implement better interpolation technique: https://www.alanzucconi.com/2016/01/06/colour-interpolation/
+
+def _unwrap_hue(start: list[float], end: list[float], index: int, longer: bool) -> None:
+    """Shift one endpoint's hue in place so interpolation takes the wanted arc.
+
+    The hue is rewritten as a fraction of a turn rather than left in degrees,
+    so that the arithmetic here -- and so the scale it produces -- is unchanged
+    from when ``color_scale`` only handled HSL.
+
+    Parameters
+    ----------
+    start : list[float]
+        Components of the colour the section starts on.
+    end : list[float]
+        Components of the colour the section ends on.
+    index : int
+        Position of the hue channel within those components.
+    longer : bool
+        Whether to take the longer arc around the hue circle.
+
+    Returns
+    -------
+    None
+        Both lists are modified in place.
+    """
+    h1 = start[index] / 360.0
+    h2 = end[index] / 360.0
+    if longer == (abs(h1 - h2) < 0.5):
+        if h1 < h2:
+            h1 += 1
+        else:
+            h2 += 1
+    start[index], end[index] = h1, h2
+
+
+def color_scale(
+    colors: Sequence[Color | Colour],
+    num_steps: int,
+    longer: bool = False,
+    space: str = "hsl",
+) -> list[Color]:
+    """Create a color scale by linearly interpolating in a chosen space.
+
+    HSL stays the default, because changing it would change the output of
+    every existing caller, but it is the weakest of the five for a gradient.
+    Its lightness is a geometric construction rather than a perceptual one, so
+    an HSL ramp is unevenly spaced to the eye and its brightness need not even
+    be monotonic: blue to yellow in nine steps rises, dips, and rises again.
+    Being polar, it also swings through hues that are in neither endpoint --
+    that same ramp runs through magenta and red.
+
+    ``oklab`` is the one to reach for. It is perceptually uniform, so steps are
+    evenly spaced, and rectangular, so there is no hue arc to sweep or to
+    choose. Use ``oklch`` when that sweep is the point. ``lab`` and ``lch`` are
+    the CIE equivalents, and are less uniform than the Ok pair, most visibly
+    around blue.
 
     Parameters
     ----------
@@ -128,7 +196,11 @@ def color_scale(
     num_steps : int
         Total number of colors to generate, including endpoints.
     longer : bool, default=False
-        Whether to take the longer hue arc instead of the shortest arc.
+        Whether to take the longer hue arc instead of the shortest arc. Only
+        meaningful in a space that has a hue channel.
+    space : str, default="hsl"
+        Space to interpolate in: ``"hsl"``, ``"lab"``, ``"lch"``, ``"oklab"``
+        or ``"oklch"``.
 
     Returns
     -------
@@ -141,6 +213,10 @@ def color_scale(
         Raised when fewer than two colors are provided.
     ValueError
         Raised when ``num_steps`` is less than the number of control colors.
+    ValueError
+        Raised when ``space`` is not one of the supported spaces.
+    ValueError
+        Raised when ``longer`` is requested in a space without a hue channel.
     """
     # checks
     if len(colors) < 2:
@@ -148,6 +224,16 @@ def color_scale(
     if len(colors) > num_steps:
         raise ValueError(
             "Number of steps must be greater than or equal to the number of colors."
+        )
+    if space not in _SCALE_SPACES:
+        raise ValueError(
+            f"Unknown interpolation space {space!r}. Choose one of: "
+            f"{', '.join(sorted(_SCALE_SPACES))}."
+        )
+    to_hsl, hue_index = _SCALE_SPACES[space]
+    if longer and hue_index is None:
+        raise ValueError(
+            f"The longer hue arc is not defined in {space!r}, which has no hue channel."
         )
 
     # linearly interpolate between colours
@@ -158,15 +244,10 @@ def color_scale(
     added = 0
     for i in range(num_sections):
         # colour definitions
-        h1, s1, l1 = colors[i].hsl
-        h2, s2, l2 = colors[i + 1].hsl
-        h1 /= 360.0
-        h2 /= 360.0
-        if longer == (abs(h1 - h2) < 0.5):
-            if h1 < h2:
-                h1 += 1
-            else:
-                h2 += 1
+        start = list(getattr(colors[i], space))
+        end = list(getattr(colors[i + 1], space))
+        if hue_index is not None:
+            _unwrap_hue(start, end, hue_index, longer)
 
         # number of colours
         num_colors = num_steps_per_iter + 2  # add 2 for start and end colours
@@ -175,10 +256,10 @@ def color_scale(
             added += 1
 
         # interpolate
-        hs = [(v * 360) % 360 for v in linspace(h1, h2, num_colors)]
-        ss = linspace(s1, s2, num_colors)
-        ls = linspace(l1, l2, num_colors)
-        add = [Color(hsl=(_h, _s, _l)) for _h, _s, _l in zip(hs, ss, ls, strict=False)]
+        channels = [linspace(a, b, num_colors) for a, b in zip(start, end, strict=True)]
+        if hue_index is not None:
+            channels[hue_index] = [(v * 360) % 360 for v in channels[hue_index]]
+        add = [Color(hsl=to_hsl(values)) for values in zip(*channels, strict=True)]
 
         # add to output
         if i == 0:
@@ -395,6 +476,12 @@ class Color:
         CIE L*a*b* components with lightness in ``[0, 100]``.
     lch : Sequence[int | float] | None, optional
         Cylindrical CIE LCh components with hue in ``[0, 360]``.
+    oklab : Sequence[int | float] | None, optional
+        Oklab components with lightness in ``[0, 1]`` and a/b in
+        ``[-0.4, 0.4]``.
+    oklch : Sequence[int | float] | None, optional
+        Cylindrical Oklab components with chroma in ``[0, 0.4]`` and hue in
+        ``[0, 360]``.
     cmyk : Sequence[int | float] | None, optional
         CMYK components, each in ``[0, 100]``.
     yuv : Sequence[int | float] | None, optional
@@ -456,6 +543,8 @@ class Color:
         xyz: Sequence[int | float] | None = None,
         lab: Sequence[int | float] | None = None,
         lch: Sequence[int | float] | None = None,
+        oklab: Sequence[int | float] | None = None,
+        oklch: Sequence[int | float] | None = None,
         cmyk: Sequence[int | float] | None = None,
         yuv: Sequence[int | float] | None = None,
         hex: str | None = None,
@@ -486,6 +575,8 @@ class Color:
                     xyz,
                     lab,
                     lch,
+                    oklab,
+                    oklch,
                     cmyk,
                     yuv,
                     hex,
@@ -500,7 +591,7 @@ class Color:
             != 1
         ):
             raise ValueError(
-                "Only one of 'color', 'web', 'hsl', 'hsla', 'hslf', 'hslaf', 'hsv', 'xyz', 'lab', 'lch', 'cmyk', 'yuv', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
+                "Only one of 'color', 'web', 'hsl', 'hsla', 'hslf', 'hslaf', 'hsv', 'xyz', 'lab', 'lch', 'oklab', 'oklch', 'cmyk', 'yuv', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
             )
 
         # convert to hsl
@@ -528,6 +619,10 @@ class Color:
             self.hsl = lab2hsl(lab)
         elif lch is not None:
             self.hsl = lch2hsl(lch)
+        elif oklab is not None:
+            self.hsl = oklab2hsl(oklab)
+        elif oklch is not None:
+            self.hsl = oklch2hsl(oklch)
         elif cmyk is not None:
             self.hsl = cmyk2hsl(cmyk)
         elif yuv is not None:
@@ -590,6 +685,12 @@ class Color:
 
     def get_lch(self) -> LCHTuple:
         return hsl2lch(self._hsl)
+
+    def get_oklab(self) -> OKLABTuple:
+        return hsl2oklab(self._hsl)
+
+    def get_oklch(self) -> OKLCHTuple:
+        return hsl2oklch(self._hsl)
 
     def get_cmyk(self) -> CMYKTuple:
         return hsl2cmyk(self._hsl)
@@ -671,6 +772,12 @@ class Color:
     def set_lch(self, value: Sequence[float]) -> None:
         self.hsl = lch2hsl(value)
 
+    def set_oklab(self, value: Sequence[float]) -> None:
+        self.hsl = oklab2hsl(value)
+
+    def set_oklch(self, value: Sequence[float]) -> None:
+        self.hsl = oklch2hsl(value)
+
     def set_cmyk(self, value: Sequence[float]) -> None:
         self.hsl = cmyk2hsl(value)
 
@@ -729,6 +836,8 @@ class Color:
     xyz = property(get_xyz, set_xyz)
     lab = property(get_lab, set_lab)
     lch = property(get_lch, set_lch)
+    oklab = property(get_oklab, set_oklab)
+    oklch = property(get_oklch, set_oklch)
     cmyk = property(get_cmyk, set_cmyk)
     yuv = property(get_yuv, set_yuv)
     rgb = property(get_rgb, set_rgb)
@@ -756,6 +865,7 @@ class Color:
         value: str | Sequence[int | float] | Color,
         steps: int,
         longer: bool = False,
+        space: str = "hsl",
     ) -> Generator[Color, None, None]:
         """Generate a color range from this color to another color.
 
@@ -767,13 +877,15 @@ class Color:
             Number of colors to generate including both endpoints.
         longer : bool, default=False
             Whether to interpolate along the longer hue path.
+        space : str, default="hsl"
+            Space to interpolate in, as described on :func:`color_scale`.
 
         Returns
         -------
         Generator[Color, None, None]
             Generator yielding interpolated colors.
         """
-        yield from color_scale((self, Color(value)), steps, longer=longer)
+        yield from color_scale((self, Color(value)), steps, longer=longer, space=space)
 
     def preview(self, size_x: int | float = 200, size_y: int | float = 200) -> None:
         """Display a Tkinter preview window filled with the current color.
