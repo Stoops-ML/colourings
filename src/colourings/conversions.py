@@ -351,28 +351,12 @@ def hsl2rgb(hsl: Sequence[int | float]) -> RGB:
     """
     if not is_hsl(hsl):
         raise ValueError("Input is not an HSL type.")
-
-    _h, _s, _l = [float(v) for v in hsl]
-    _h /= 360.0
-    _s /= 100.0
-    _l /= 100.0
-
-    if _s == 0:
-        return RGB(
-            _threshold(_l * 255.0),
-            _threshold(_l * 255.0),
-            _threshold(_l * 255.0),
-        )
-
-    v2 = _l * (1.0 + _s) if _l < 0.5 else (_l + _s) - (_s * _l)
-
-    v1 = 2.0 * _l - v2
-
-    r = _hue2rgb(v1, v2, _h + (1.0 / 3))
-    g = _hue2rgb(v1, v2, _h)
-    b = _hue2rgb(v1, v2, _h - (1.0 / 3))
-
-    return rgbf2rgb((r, g, b))
+    r, g, b = _hsl2rgbf(hsl)
+    return RGB(
+        _threshold(r * 255.0),
+        _threshold(g * 255.0),
+        _threshold(b * 255.0),
+    )
 
 
 @_cached
@@ -389,7 +373,10 @@ def hsl2rgbf(hsl: Sequence[int | float]) -> RGBf:
     RGBf
         RGBf tuple in the ``[0, 1]`` range.
     """
-    return rgb2rgbf(hsl2rgb(hsl))
+    if not is_hsl(hsl):
+        raise ValueError("Input is not an HSL type.")
+    r, g, b = _hsl2rgbf(hsl)
+    return RGBf(_threshold(r), _threshold(g), _threshold(b))
 
 
 @_cached
@@ -427,7 +414,7 @@ def rgbaf2hsl(rgbaf: Sequence[int | float]) -> HSL:
     """
     if not is_rgbaf(rgbaf):
         raise ValueError("Input is not an RGBAf type.")
-    return rgb2hsl(rgbf2rgb(rgbaf[:3]))
+    return _rgbf2hsl(_threshold(rgbaf[0]), _threshold(rgbaf[1]), _threshold(rgbaf[2]))
 
 
 @_cached
@@ -465,7 +452,7 @@ def rgbf2hsl(rgbf: Sequence[int | float]) -> HSL:
     """
     if not is_rgbf(rgbf):
         raise ValueError("Input is not an RGBf type.")
-    return rgb2hsl(rgbf2rgb(rgbf))
+    return _rgbf2hsl(_threshold(rgbf[0]), _threshold(rgbf[1]), _threshold(rgbf[2]))
 
 
 @_cached
@@ -484,8 +471,30 @@ def rgb2hsl(rgb: Sequence[int | float]) -> HSL:
     """
     if not is_rgb(rgb):
         raise ValueError("Input is not an RGB type.")
-    r, g, b = rgb2rgbf(rgb)
+    return _rgbf2hsl(*rgb2rgbf(rgb))
 
+
+def _rgbf2hsl(r: float, g: float, b: float) -> HSL:
+    """Convert already normalized RGB components to HSL.
+
+    Shared by every RGB-to-HSL entry point so that components which are
+    already in the ``[0, 1]`` range are not scaled up to ``[0, 255]`` and
+    immediately back down.
+
+    Parameters
+    ----------
+    r : float
+        Red component in the ``[0, 1]`` range.
+    g : float
+        Green component in the ``[0, 1]`` range.
+    b : float
+        Blue component in the ``[0, 1]`` range.
+
+    Returns
+    -------
+    HSL
+        HSL tuple where hue is in ``[0, 360]`` and saturation/lightness are in ``[0, 100]``.
+    """
     vmin = min(r, g, b)  ## Min. value of RGB
     vmax = max(r, g, b)  ## Max. value of RGB
     diff = vmax - vmin  ## Delta RGB value
@@ -524,6 +533,41 @@ def rgb2hsl(rgb: Sequence[int | float]) -> HSL:
         _threshold(h * 360.0),
         _threshold(s * 100.0),
         _threshold(_l * 100.0),
+    )
+
+
+def _hsl2rgbf(hsl: Sequence[int | float]) -> tuple[float, float, float]:
+    """Convert HSL to normalized RGB components.
+
+    Shared by ``hsl2rgb`` and ``hsl2rgbf`` so that the normalized components
+    this produces are not scaled up to ``[0, 255]`` and immediately back down.
+
+    Parameters
+    ----------
+    hsl : Sequence[int | float]
+        HSL sequence as ``(h, s, l)`` with hue in degrees and saturation/lightness in percent.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        RGB components in the ``[0, 1]`` range.
+    """
+    _h, _s, _l = (float(v) for v in hsl)
+    _h /= 360.0
+    _s /= 100.0
+    _l /= 100.0
+
+    if _s == 0:  ## This is a gray, no chroma...
+        return (_l, _l, _l)
+
+    v2 = _l * (1.0 + _s) if _l < 0.5 else (_l + _s) - (_s * _l)
+
+    v1 = 2.0 * _l - v2
+
+    return (
+        _hue2rgb(v1, v2, _h + (1.0 / 3)),
+        _hue2rgb(v1, v2, _h),
+        _hue2rgb(v1, v2, _h - (1.0 / 3)),
     )
 
 

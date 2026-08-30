@@ -12,6 +12,7 @@ from colourings.conversions import (
     hsl2hslaf,
     hsl2hslf,
     hsl2rgb,
+    hsl2rgbf,
     hsl2web,
     hsla2hsl,
     hslf2hsl,
@@ -21,6 +22,7 @@ from colourings.conversions import (
     rgba2hsl,
     rgbaf2hsl,
     rgbf2hsl,
+    rgbf2rgb,
     web2hex,
     web2hsl,
     web2rgb,
@@ -305,3 +307,36 @@ def test_unhashable_non_sequence_raises_conversion_error():
     """A set is unhashable and not a sequence: the conversion still rejects it."""
     with pytest.raises(ValueError):
         rgb2hsl({255, 0, 1})  # type: ignore
+
+
+def test_rgbf2rgb():
+    assert rgbf2rgb((1.0, 0.5, 0.0)) == (255.0, 127.5, 0.0)
+    assert rgbf2rgb((0.0, 0.0, 0.0)) == (0.0, 0.0, 0.0)
+
+
+def test_bad_hsl2rgbf():
+    with pytest.raises(ValueError):
+        hsl2rgbf((361, 0, 0))
+    with pytest.raises(ValueError):
+        hsl2rgbf((0, 110, 0))
+    with pytest.raises(ValueError):
+        hsl2rgbf("a")  # type: ignore
+
+
+def test_hsl2rgbf_does_not_round_trip_through_0_255():
+    """Normalized output keeps full precision.
+
+    Scaling to ``[0, 255]`` and back down would return 0.8993999999999999.
+    """
+    assert hsl2rgbf((28, 9, 90)) == (0.909, 0.8994, 0.891)
+
+
+def test_normalized_and_scaled_paths_agree():
+    """The 0-1 and 0-255 conversions stay consistent with each other."""
+    for hsl in [(0, 100, 50), (28, 9, 90), (240, 100, 50), (180, 0, 25)]:
+        assert hsl2rgbf(hsl) == pytest.approx([v / 255.0 for v in hsl2rgb(hsl)])
+
+    for rgb in [(255, 0, 0), (12, 200, 37), (0, 0, 0), (255, 255, 255)]:
+        rgbf = tuple(v / 255.0 for v in rgb)
+        assert rgbf2hsl(rgbf) == pytest.approx(rgb2hsl(rgb))
+        assert rgbaf2hsl((*rgbf, 1.0)) == pytest.approx(rgb2hsl(rgb))
