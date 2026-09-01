@@ -137,7 +137,7 @@ The types are ``RGB``, ``RGBA``, ``HSL``, ``HSLA`` and their normalised
 look up colors by name.
 
 Use conversion helpers directly
-------------------------------
+-------------------------------
 
 .. code-block:: python
 
