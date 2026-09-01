@@ -947,6 +947,50 @@ def test_color_subclassing():
     assert Tint("red").hsl == (0.0, 100.0, 50)
 
 
+def test_keyword_arguments_set_writable_properties():
+    assert Color("red", lightness=0).hsl == (0.0, 100.0, 0.0)
+    assert Color("red", lightness=0, saturation=25).hsl == (0.0, 25.0, 0.0)
+
+
+def test_keyword_arguments_are_validated_by_the_property_they_set():
+    with pytest.raises(InvalidColorError, match="Value is not a valid HSL"):
+        Color("red", lightness=200)
+
+
+def test_keyword_arguments_are_not_arbitrary_attributes():
+    """``__slots__`` is what makes a mistyped name an error rather than a
+    silent new attribute, and that applies to the constructor too."""
+    with pytest.raises(AttributeError, match="no attribute 'foo'"):
+        Color("red", foo=1)
+    with pytest.raises(AttributeError, match="has no setter"):
+        Color("red", luminance=0.5)
+
+
+def test_keyword_arguments_do_not_reach_the_stored_attributes():
+    """Assigning a slot directly would skip the property that validates it.
+
+    ``_hsl`` accepts any three objects and ``_alpha`` any number, so without
+    this the constructor could build a colour that only fails later, at some
+    unrelated call."""
+    with pytest.raises(ValueError, match="is stored state"):
+        Color("red", _hsl=("not", "a", "colour"))
+    with pytest.raises(ValueError, match="is stored state"):
+        Color("red", _alpha=99)
+
+
+def test_a_subclass_without_slots_does_take_arbitrary_attributes():
+    """The one place the old docstring was right, kept working on purpose."""
+
+    class Tint(Color):
+        pass
+
+    assert Tint("red", foo=1).foo == 1  # type: ignore
+    ## The guard is on the name, not on where it would have been stored, so a
+    ## subclass cannot reach the slots either.
+    with pytest.raises(ValueError, match="is stored state"):
+        Tint("red", _hsl=(1, 2, 3))
+
+
 def test_color_factory():
     get_color = make_color_factory(
         equality=HSL_equivalence, picker=RGB_color_picker, pick_key=str

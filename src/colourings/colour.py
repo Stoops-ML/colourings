@@ -578,7 +578,13 @@ class Color:
         ``RGB_equivalence``, including when ``color`` is a ``Color`` carrying
         another strategy; see ``color`` above.
     **kwargs : Any
-        Additional attributes attached to the instance.
+        Writable color properties to set once the color is built, such as
+        ``lightness=0``. Each is assigned through its own setter, so it is
+        validated like any other assignment and can raise. This is not a way
+        to attach arbitrary attributes: ``Color`` defines ``__slots__``, so a
+        name that is not one of its properties raises ``AttributeError``
+        rather than becoming a new attribute. A subclass that does not
+        redeclare ``__slots__`` has a ``__dict__``, and does accept any name.
 
     Raises
     ------
@@ -586,8 +592,14 @@ class Color:
         Raised when none or more than one primary color input is provided.
     ValueError
         Raised when alpha is provided inconsistently across inputs.
+    ValueError
+        Raised when a keyword names one of the stored attributes, which would
+        set it without the validation its property does.
     UnknownColorError
         Raised when the input does not match any supported color format.
+    AttributeError
+        Raised when a keyword is neither a writable property nor, on a
+        subclass with a ``__dict__``, a name that can be attached.
     """
 
     ## Only these three are stored; every colour format below is a property
@@ -748,6 +760,17 @@ class Color:
         self.equality = equality
         self.alpha = alpha if alpha is not None else 1.0
         for k, v in kwargs.items():
+            ## The stored attributes are reachable by name, and assigning one
+            ## here would skip the property that guards it: `_hsl` would take
+            ## any three objects and `_alpha` any number, leaving a colour that
+            ## fails later, somewhere else. `__slots__` exists to turn a
+            ## mistyped attribute into an AttributeError; letting keywords
+            ## write the slots would undo that for the two names it protects.
+            if k in Color.__slots__:
+                raise ValueError(
+                    f"{k!r} is stored state rather than a color property. "
+                    f"Set {k.lstrip('_')!r} instead."
+                )
             setattr(self, k, v)
 
     def get_hsl(self) -> HSLTuple:

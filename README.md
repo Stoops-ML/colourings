@@ -142,6 +142,19 @@ That only works where the ranges tell the formats apart. `(0, 0, 0)` is
 equally valid RGB and HSL, so it raises `AmbiguousColorError`; name the format
 to settle it.
 
+Any remaining keyword sets a writable property once the color is built, which
+is how you say "this color, but darker" in one call:
+
+```python
+Color("red", lightness=0)  # HSL(hue=0.0, saturation=100.0, lightness=0.0)
+```
+
+Each goes through its own setter, so it is validated the same way an
+assignment would be — `Color("red", lightness=200)` raises. This is not a way
+to attach arbitrary attributes: `Color` defines `__slots__`, so an unknown name
+raises `AttributeError` instead of quietly becoming one. A subclass that does
+not redeclare `__slots__` has a `__dict__`, and does accept any name.
+
 ## Reading and Updating Channels
 
 ```python
