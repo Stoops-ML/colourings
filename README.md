@@ -339,6 +339,32 @@ this library's XYZ, whose seven-digit matrix is not precise enough to leave a
 grey neutral in Oklab. Converting into sRGB clamps anything outside its gamut,
 since an out-of-gamut colour has no sRGB encoding.
 
+## Previewing a Color
+
+`Color.preview()` opens a window filled with the color, sized in pixels.
+
+```python
+from colourings import Color
+
+Color("rebeccapurple").preview()  # 200x200 by default
+Color("rebeccapurple").preview(400, 100)
+```
+
+An alpha other than `1` is not rendered, and warns.
+
+This is the only part of the library that needs a GUI toolkit. `tkinter` is
+imported inside the method rather than at module scope, so `import colourings`
+neither pays for it -- tkinter costs roughly three times what the rest of this
+package does to import, since it loads a C extension and links Tcl/Tk -- nor
+fails on a machine that does not have it.
+
+Being in the standard library does not mean it is installed. CPython ships
+`tkinter` on Windows and macOS, but most Linux distributions package it
+separately, and a minimal install or a slim container image will not have it.
+Calling `preview()` there raises `ImportError` naming what to install:
+`python3-tkinter` on the Red Hat family, `python3-tk` on Debian and Ubuntu.
+Every other part of the library works without it.
+
 ## Error Handling
 
 Every failure caused by a value that is not a usable color derives from
