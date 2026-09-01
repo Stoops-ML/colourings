@@ -499,6 +499,21 @@ def identify_color(
 class Color:
     """Abstraction over a color with multi-format conversion properties.
 
+    A color is held as HSL, which is bounded by sRGB, so the ``lab``, ``lch``,
+    ``oklab``, ``oklch``, ``xyz`` and ``yuv`` inputs -- each of which can name
+    a color sRGB cannot show -- are **clipped** to what sRGB can. That is
+    silent, and it is not rare: 88% of the ``lab`` triples the range check
+    accepts do not survive it. A clipped color is also indistinguishable
+    afterwards from one that was always in gamut, since what is stored is the
+    clipped value, so ask :func:`~colourings.conversions.in_srgb_gamut`
+    beforehand rather than comparing afterwards.
+
+    >>> Color(lab=(100, 120, -120)).lab
+    LAB(lightness=95.85895978712477, a=8.621537162382786, b=-6.079793114528798)
+
+    Every other input format is bounded by its own component ranges, so it is
+    representable by construction and converts exactly.
+
     Parameters
     ----------
     color : str | Sequence[int | float] | Color | None, optional

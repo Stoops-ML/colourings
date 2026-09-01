@@ -1152,6 +1152,8 @@ def rgb2xyz(rgb: Sequence[int | float]) -> XYZ:
 def xyz2rgb(xyz: Sequence[int | float]) -> RGB:
     """Convert CIE XYZ to RGB, clamping anything outside the sRGB gamut.
 
+    :func:`in_srgb_gamut` says whether a given value will survive.
+
     Parameters
     ----------
     xyz : Sequence[int | float]
@@ -1297,6 +1299,10 @@ def rgb2lab(rgb: Sequence[int | float]) -> LAB:
 def lab2rgb(lab: Sequence[int | float]) -> RGB:
     """Convert CIE L*a*b* to RGB representation.
 
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
+
     Parameters
     ----------
     lab : Sequence[int | float]
@@ -1330,6 +1336,10 @@ def rgb2lch(rgb: Sequence[int | float]) -> LCH:
 @_cached
 def lch2rgb(lch: Sequence[int | float]) -> RGB:
     """Convert cylindrical CIE LCh to RGB representation.
+
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
 
     Parameters
     ----------
@@ -1384,6 +1394,8 @@ def rgb2oklab(rgb: Sequence[int | float]) -> OKLAB:
 @_cached
 def oklab2rgb(oklab: Sequence[int | float]) -> RGB:
     """Convert Oklab to RGB, clamping anything outside the sRGB gamut.
+
+    :func:`in_srgb_gamut` says whether a given value will survive.
 
     Parameters
     ----------
@@ -1473,6 +1485,10 @@ def rgb2oklch(rgb: Sequence[int | float]) -> OKLCH:
 @_cached
 def oklch2rgb(oklch: Sequence[int | float]) -> RGB:
     """Convert cylindrical Oklch to RGB representation.
+
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
 
     Parameters
     ----------
@@ -1570,6 +1586,10 @@ def rgb2yuv(rgb: Sequence[int | float]) -> YUV:
 def yuv2rgb(yuv: Sequence[int | float]) -> RGB:
     """Convert BT.601 YUV to RGB representation.
 
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
+
     Parameters
     ----------
     yuv : Sequence[int | float]
@@ -1611,6 +1631,10 @@ def hsl2xyz(hsl: Sequence[int | float]) -> XYZ:
 def xyz2hsl(xyz: Sequence[int | float]) -> HSL:
     """Convert CIE XYZ to HSL representation.
 
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
+
     Parameters
     ----------
     xyz : Sequence[int | float]
@@ -1644,6 +1668,10 @@ def hsl2lab(hsl: Sequence[int | float]) -> LAB:
 @_cached
 def lab2hsl(lab: Sequence[int | float]) -> HSL:
     """Convert CIE L*a*b* to HSL representation.
+
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
 
     Parameters
     ----------
@@ -1679,6 +1707,10 @@ def hsl2lch(hsl: Sequence[int | float]) -> LCH:
 def lch2hsl(lch: Sequence[int | float]) -> HSL:
     """Convert cylindrical CIE LCh to HSL representation.
 
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
+
     Parameters
     ----------
     lch : Sequence[int | float]
@@ -1713,6 +1745,10 @@ def hsl2oklab(hsl: Sequence[int | float]) -> OKLAB:
 def oklab2hsl(oklab: Sequence[int | float]) -> HSL:
     """Convert Oklab to HSL representation.
 
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
+
     Parameters
     ----------
     oklab : Sequence[int | float]
@@ -1746,6 +1782,10 @@ def hsl2oklch(hsl: Sequence[int | float]) -> OKLCH:
 @_cached
 def oklch2hsl(oklch: Sequence[int | float]) -> HSL:
     """Convert cylindrical Oklch to HSL representation.
+
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
 
     Parameters
     ----------
@@ -1815,6 +1855,10 @@ def hsl2yuv(hsl: Sequence[int | float]) -> YUV:
 def yuv2hsl(yuv: Sequence[int | float]) -> HSL:
     """Convert BT.601 YUV to HSL representation.
 
+    Anything outside the sRGB gamut is clipped, so the colour that comes
+    back need not be the one that went in. :func:`in_srgb_gamut` says
+    whether a given value will survive.
+
     Parameters
     ----------
     yuv : Sequence[int | float]
@@ -1826,3 +1870,140 @@ def yuv2hsl(yuv: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     return rgb2hsl(yuv2rgb(yuv))
+
+
+def _encode_unclamped(channel: float) -> float:
+    """Apply the sRGB transfer function without clamping, preserving sign.
+
+    :func:`_linear_to_srgb` clamps first, which is right when the result has to
+    be a representable colour and wrong when the question is how far outside
+    the gamut a colour falls. The function is odd-extended below zero so that a
+    negative channel stays negative rather than folding back into range.
+
+    Parameters
+    ----------
+    channel : float
+        Linear-light channel, which may lie outside ``[0, 1]``.
+
+    Returns
+    -------
+    float
+        Gamma-encoded channel, outside ``[0, 1]`` exactly when the input was.
+    """
+    sign = -1.0 if channel < 0 else 1.0
+    magnitude = abs(channel)
+    if magnitude <= 0.0031308:
+        return sign * magnitude * 12.92
+    return sign * float(1.055 * magnitude ** (1 / 2.4) - 0.055)
+
+
+def _unclamped_rgbf_from_xyz(xyz: Sequence[int | float]) -> tuple[float, ...]:
+    """Gamma-encoded sRGB channels for an XYZ colour, clamping nothing."""
+    if not is_xyz(xyz):
+        raise InvalidColorError("Input is not an XYZ type.")
+    linear = _matrix_apply(XYZ_TO_RGB_MATRIX, [c / 100.0 for c in xyz])
+    return tuple(_encode_unclamped(c) for c in linear)
+
+
+def _unclamped_rgbf_from_oklab(oklab: Sequence[int | float]) -> tuple[float, ...]:
+    """Gamma-encoded sRGB channels for an Oklab colour, clamping nothing."""
+    if not is_oklab(oklab):
+        raise InvalidColorError("Input is not an OKLAB type.")
+    roots = _matrix_apply(OKLAB_TO_LMS_MATRIX, oklab)
+    linear = _matrix_apply(LMS_TO_RGB_MATRIX, [c**3 for c in roots])
+    return tuple(_encode_unclamped(c) for c in linear)
+
+
+def _unclamped_rgbf_from_yuv(yuv: Sequence[int | float]) -> tuple[float, ...]:
+    """Gamma-encoded sRGB channels for a YUV colour, clamping nothing.
+
+    BT.601 is defined on gamma-encoded R'G'B', so unlike the paths above there
+    is no transfer function to undo here.
+    """
+    if not is_yuv(yuv):
+        raise InvalidColorError("Input is not a YUV type.")
+    luma, u, v = (float(c) for c in yuv)
+    kr, kg, kb = YUV_LUMA_COEFFICIENTS
+    r = luma + v / YUV_V_SCALE
+    b = luma + u / YUV_U_SCALE
+    g = (luma - kr * r - kb * b) / kg
+    return (r, g, b)
+
+
+## The spaces that can address a colour sRGB cannot show. Every other input
+## format -- rgb, hsl, hsv, cmyk, hex, web and their variants -- is bounded by
+## its own component ranges, so it is representable by construction and has
+## nothing to ask about.
+_UNCLAMPED_RGBF_FROM: dict[
+    str, Callable[[Sequence[int | float]], tuple[float, ...]]
+] = {
+    "xyz": _unclamped_rgbf_from_xyz,
+    "lab": lambda lab: _unclamped_rgbf_from_xyz(lab2xyz(lab)),
+    "lch": lambda lch: _unclamped_rgbf_from_xyz(lab2xyz(lch2lab(lch))),
+    "oklab": _unclamped_rgbf_from_oklab,
+    "oklch": lambda oklch: _unclamped_rgbf_from_oklab(oklch2oklab(oklch)),
+    "yuv": _unclamped_rgbf_from_yuv,
+}
+
+
+def in_srgb_gamut(
+    color: Sequence[int | float], space: str, tolerance: float = 0.5
+) -> bool:
+    """Check whether a color is one sRGB can show, and so survives conversion.
+
+    ``lab``, ``lch``, ``oklab``, ``oklch``, ``xyz`` and ``yuv`` all address
+    colors outside sRGB. Such a value is accepted by ``Color`` and by the
+    conversions, and then **clipped** -- the color that comes back is not the
+    one that went in, and nothing says so. Ask this first to find out. The
+    check has to happen here rather than on a finished ``Color``, which cannot
+    answer it: by then the value has been clipped and the original is gone.
+
+    The gamut boundary is sharp, and every fully saturated color sits exactly
+    on it, so the ``tolerance`` matters. It is measured in 8-bit levels -- the
+    units the library renders in -- and defaults to half a level, meaning "the
+    clipping would not change the color as rendered". Even so, a primary
+    written to two decimal places really does fall outside sRGB by more than
+    that, and is reported outside, because clipping really will move it.
+
+    Parameters
+    ----------
+    color : Sequence[int | float]
+        Components of the color, in the space named by ``space``.
+    space : str
+        Space the components are in: ``"lab"``, ``"lch"``, ``"oklab"``,
+        ``"oklch"``, ``"xyz"`` or ``"yuv"``.
+    tolerance : float, default=0.5
+        How far outside the representable range a channel may fall, in 8-bit
+        levels. Pass ``0`` to test the gamut exactly.
+
+    Returns
+    -------
+    bool
+        ``True`` when every channel lands inside ``[0, 255]``, to within
+        ``tolerance``, so the color converts to sRGB without being clipped.
+
+    Raises
+    ------
+    ValueError
+        Raised when ``space`` is not one of the six that can leave the gamut.
+    InvalidColorError
+        Raised when ``color`` is not a valid value in ``space``.
+
+    Examples
+    --------
+    >>> in_srgb_gamut((53.2408, 80.0925, 67.2032), "lab")
+    True
+    >>> in_srgb_gamut((100, 120, -120), "lab")
+    False
+    """
+    if space not in _UNCLAMPED_RGBF_FROM:
+        raise ValueError(
+            f"Cannot ask about the gamut of {space!r}. Choose one of: "
+            f"{', '.join(sorted(_UNCLAMPED_RGBF_FROM))}. Every other format is "
+            "bounded by its own ranges, so it is always representable."
+        )
+    slack = tolerance / 255.0
+    return all(
+        -slack <= channel <= 1.0 + slack
+        for channel in _UNCLAMPED_RGBF_FROM[space](color)
+    )

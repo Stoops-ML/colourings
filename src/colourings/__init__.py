@@ -1,4 +1,5 @@
 from .colour import Color, Colour, color_scale, colour_scale
+from .conversions import in_srgb_gamut
 from .errors import (
     AmbiguousColorError,
     ColorError,
@@ -15,6 +16,7 @@ __all__ = [
     "UnknownColorError",
     "color_scale",
     "colour_scale",
+    "in_srgb_gamut",
 ]
 
 

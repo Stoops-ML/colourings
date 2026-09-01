@@ -57,6 +57,41 @@ The library uses explicit numeric ranges (not mixed 0..1 + 0..255 conventions):
 - `yuv`: BT.601, luma in `[0, 1]`, U in `[-0.436, 0.436]`, V in `[-0.615, 0.615]`
 - `Color.alpha`: always `[0, 1]`
 
+### Ranges Are Not the Gamut
+
+Those ranges say what a format accepts, not what sRGB can show. `lab`, `lch`,
+`oklab`, `oklch`, `xyz` and `yuv` can each name a color outside sRGB, and a
+`Color` holds sRGB, so such a value is **clipped** on the way in — quietly, and
+often: 88% of the `lab` triples in the range above do not survive.
+
+```python
+from colourings import Color
+
+Color(lab=(100, 120, -120)).lab
+# LAB(lightness=95.85895978712477, a=8.621537162382786, b=-6.079793114528798)
+# -- not the color that went in
+```
+
+A clipped color is indistinguishable afterwards from one that was always in
+gamut, because what it stores is the clipped value. So ask before building it:
+
+```python
+from colourings import Color, in_srgb_gamut
+
+in_srgb_gamut((53.2408, 80.0925, 67.2032), "lab")  # True, this is red
+in_srgb_gamut((100, 120, -120), "lab")  # False, this would be clipped
+```
+
+`tolerance` is measured in 8-bit levels and defaults to half a level, so the
+default answers "would clipping change the color as rendered". Pass
+`tolerance=0` to test the gamut exactly. The boundary is sharp, and every fully
+saturated color sits exactly on it, so a primary written to few enough decimal
+places really does fall outside and is reported as such.
+
+Every other format — `rgb`, `hsl`, `hsv`, `cmyk`, `hex`, `web` and their
+variants — is bounded by its own ranges, so it is representable by construction
+and converts exactly. `in_srgb_gamut` raises `ValueError` if asked about one.
+
 ## Constructing Colors
 
 All of these produce equivalent red colors:
@@ -403,7 +438,8 @@ against. Values are not interchangeable with a library that uses D50. Oklab is
 defined against D65 too, but is derived from sRGB directly rather than through
 this library's XYZ, whose seven-digit matrix is not precise enough to leave a
 grey neutral in Oklab. Converting into sRGB clamps anything outside its gamut,
-since an out-of-gamut colour has no sRGB encoding.
+since an out-of-gamut colour has no sRGB encoding; see
+[Ranges Are Not the Gamut](#ranges-are-not-the-gamut) for how to check first.
 
 ## Previewing a Color
 

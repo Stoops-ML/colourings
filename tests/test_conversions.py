@@ -23,6 +23,7 @@ from colourings.conversions import (
     hsv2hsl,
     hsv2rgb,
     hsv2web,
+    in_srgb_gamut,
     lab2lch,
     lab2rgb,
     lab2xyz,
@@ -689,3 +690,95 @@ def test_oklch_round_trip_pays_for_neutral_greys():
             worst_colour = max(worst_colour, error)
     assert worst_colour < 1e-11
     assert worst_grey < 1e-4
+
+
+@pytest.mark.parametrize(
+    ("space", "to_space"),
+    [
+        ("lab", rgb2lab),
+        ("lch", rgb2lch),
+        ("oklab", rgb2oklab),
+        ("oklch", rgb2oklch),
+        ("xyz", rgb2xyz),
+        ("yuv", rgb2yuv),
+    ],
+)
+def test_in_srgb_gamut_accepts_every_colour_srgb_can_show(space, to_space):
+    """Anything reached from an sRGB colour is by definition inside the gamut.
+
+    This is the assertion that matters, because the failure that would make the
+    predicate useless is a false negative on an ordinary colour."""
+    for red in range(0, 256, 15):
+        for green in range(0, 256, 15):
+            for blue in range(0, 256, 15):
+                value = to_space((red, green, blue))
+                assert in_srgb_gamut(value, space), (space, value)
+
+
+@pytest.mark.parametrize(
+    ("space", "value"),
+    [
+        ("lab", (100, 120, -120)),
+        ("lab", (50, 100, 0)),
+        ("lch", (50, 120, 0)),
+        ("oklab", (0.9, 0.3, -0.3)),
+        ("oklch", (0.9, 0.35, 200)),
+        ("xyz", (0, 0, 110)),
+        ("yuv", (1.0, 0.436, 0.615)),
+    ],
+)
+def test_in_srgb_gamut_rejects_colours_srgb_cannot_show(space, value):
+    assert not in_srgb_gamut(value, space)
+
+
+def test_in_srgb_gamut_agrees_with_what_the_conversion_does():
+    """The predicate has to answer the question it is asked: was this clipped."""
+    for lightness in range(0, 101, 10):
+        for a in range(-128, 128, 16):
+            for b in range(-128, 128, 16):
+                value = (lightness, a, b)
+                clipped = lab2rgb(value)
+                ## A clipped colour is one that hit a channel limit. Only to
+                ## within float error: `1.055 * 1.0 - 0.055` is
+                ## 0.9999999999999999, so a channel pinned to the top comes
+                ## back as 254.99999999999997 rather than 255.0.
+                pinned = any(c < 1e-9 or c > 255.0 - 1e-9 for c in clipped)
+                if not in_srgb_gamut(value, space="lab", tolerance=2.0):
+                    assert pinned, value
+
+
+def test_in_srgb_gamut_tolerance_is_in_eight_bit_levels():
+    """A primary written to three decimal places falls outside sRGB.
+
+    Not a flaw in the test: the gamut boundary passes exactly through every
+    saturated colour, so rounding one at all moves it off the surface, and
+    outwards half the time. The default tolerance covers the rounding that
+    cannot be seen once rendered, and no more."""
+    exact = rgb2oklab((255, 0, 0))
+    assert in_srgb_gamut(exact, "oklab", tolerance=0)
+    rounded = tuple(round(v, 3) for v in exact)
+    assert not in_srgb_gamut(rounded, "oklab")
+    assert in_srgb_gamut(rounded, "oklab", tolerance=10)
+
+
+def test_in_srgb_gamut_rejects_a_space_that_cannot_leave_the_gamut():
+    for space in ("rgb", "hsl", "hsv", "cmyk", "hex", "web", "nonsense"):
+        with pytest.raises(ValueError, match="Cannot ask about the gamut"):
+            in_srgb_gamut((0, 0, 0), space)
+
+
+@pytest.mark.parametrize(
+    ("space", "value"),
+    [
+        ("lab", (200, 0, 0)),
+        ("oklab", (2, 0, 0)),
+        ("xyz", (0, 0, 200)),
+        ("yuv", (2, 0, 0)),
+        ("lch", (200, 0, 0)),
+        ("oklch", (2, 0, 0)),
+    ],
+)
+def test_in_srgb_gamut_rejects_a_malformed_value(space, value):
+    """Out of the format's own range is a different error from out of gamut."""
+    with pytest.raises(InvalidColorError):
+        in_srgb_gamut(value, space)
