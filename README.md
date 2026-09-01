@@ -217,6 +217,23 @@ c2 = Color("blue", lightness=0, equality=HSL_equivalence)
 print(c1 == c2)  # False
 ```
 
+The strategy is a comparison policy rather than part of the color, so
+`Color(other)` does not inherit it — it copies the value and starts from the
+default. `copy.copy` duplicates both:
+
+```python
+import copy
+
+from colourings.colour import Color, HSL_equivalence, RGB_equivalence
+
+c = Color("red", equality=HSL_equivalence)
+print(Color(c).equality is RGB_equivalence)  # True, the default
+print(copy.copy(c).equality is HSL_equivalence)  # True
+```
+
+Note also that `==` consults both operands and accepts either verdict, so a
+stricter strategy only holds where both colors carry it.
+
 ## Deterministic Color Picking for Objects
 
 Use `pick_for` to map Python objects to colors:

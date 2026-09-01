@@ -489,8 +489,11 @@ class Color:
     Parameters
     ----------
     color : str | Sequence[int | float] | Color | None, optional
-        Generic color input in any supported format. Another ``Color`` is
-        copied, alpha included, unless ``alpha`` names one to use instead.
+        Generic color input in any supported format. Another ``Color`` has
+        its value copied -- its components and its alpha, unless ``alpha``
+        names one to use instead -- but not its ``equality`` strategy, which
+        is a comparison policy rather than part of the color. Use
+        ``copy.copy`` for a duplicate that keeps both.
     web : str | None, optional
         Web color name or hex string.
     hsl : Sequence[int | float] | None, optional
@@ -543,7 +546,9 @@ class Color:
     pick_key : PickKey, default=hash_or_str
         Key function used before passing values to ``picker``.
     equality : ColorEquality, default=RGB_equivalence
-        Equality strategy used by ``__eq__``.
+        Equality strategy used by ``__eq__``. It always defaults to
+        ``RGB_equivalence``, including when ``color`` is a ``Color`` carrying
+        another strategy; see ``color`` above.
     **kwargs : Any
         Additional attributes attached to the instance.
 

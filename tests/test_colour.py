@@ -1,3 +1,4 @@
+import copy
 import math
 import sys
 from unittest.mock import MagicMock, patch
@@ -12,6 +13,7 @@ from colourings.colour import (
     Colour,
     HSL_equivalence,
     RGB_color_picker,
+    RGB_equivalence,
     color_scale,
     colour_scale,
     hash_or_str,
@@ -305,6 +307,21 @@ def test_copying_a_color_keeps_its_alpha(cls):
 
 def test_copying_an_opaque_color_stays_opaque():
     assert Color(Color("red")).alpha == 1
+
+
+def test_copying_a_color_does_not_copy_its_equality_strategy():
+    """The constructor copies the colour's value, not how it is compared.
+
+    ``equality`` is a comparison policy rather than part of the colour, and no
+    other input format can carry one, so it is not something ``Color(other)``
+    inherits. ``copy.copy`` is the way to duplicate both. This is deliberate:
+    ``__hash__`` is keyed on ``hex_l`` whatever ``equality`` says, so a copy
+    that inherited a custom strategy would spread that inconsistency rather
+    than contain it."""
+    original = Color("red", equality=HSL_equivalence)
+    assert Color(original).equality is RGB_equivalence
+    assert copy.copy(original).equality is HSL_equivalence
+    assert original.equality is HSL_equivalence
 
 
 def test_copying_a_color_takes_the_alpha_keyword_over_the_original():
