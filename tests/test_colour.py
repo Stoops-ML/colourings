@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from colourings.colour import (
+    _BLEND_MODES,
     _KEYWORD_ALPHA_SCALES,
     _KEYWORD_INPUTS,
     HEX,
@@ -1854,3 +1855,108 @@ def test_the_one_input_rule_names_every_input():
     message = str(excinfo.value)
     for name in ("color", "pick_for", *_KEYWORD_INPUTS):
         assert f"'{name}'" in message
+
+
+def test_over_matches_the_porter_duff_formula():
+    """Checked against the source-over definition written out separately,
+    rather than against values this implementation produced."""
+    for source_alpha in (0.0, 0.25, 0.5, 1.0):
+        for backdrop_alpha in (0.0, 0.25, 0.5, 1.0):
+            source = Color(rgbf=(1.0, 0.2, 0.0), alpha=source_alpha)
+            backdrop = Color(rgbf=(0.0, 0.4, 1.0), alpha=backdrop_alpha)
+            result = source.over(backdrop)
+            alpha = source_alpha + backdrop_alpha * (1.0 - source_alpha)
+            assert result.alpha == pytest.approx(alpha)
+            if alpha == 0.0:
+                continue
+            for got, s, b in zip(result.rgbf, source.rgbf, backdrop.rgbf, strict=True):
+                want = (
+                    s * source_alpha + b * backdrop_alpha * (1.0 - source_alpha)
+                ) / alpha
+                assert got == pytest.approx(want, abs=1e-12)
+
+
+def test_compositing_identities():
+    red, blue, white = Color("red"), Color("blue"), Color("white")
+    assert red.over(blue) == red  # an opaque source hides everything
+    assert Color("red", alpha=0.0).over(blue) == blue  # and a clear one hides nothing
+    assert Color("red", alpha=0.0).over(blue).alpha == 1.0
+    assert Color("red", alpha=0.0).over(Color("blue", alpha=0.0)).alpha == 0.0
+    assert red.over(white).alpha == 1.0
+
+
+@pytest.mark.parametrize(
+    ("mode", "expected"),
+    [
+        ("multiply", "#000000"),
+        ("screen", "#ffffff"),
+        ("darken", "#000000"),
+        ("lighten", "#ffffff"),
+        ("difference", "#ffffff"),
+        ("exclusion", "#ffffff"),
+    ],
+)
+def test_blend_modes_on_red_over_cyan(mode, expected):
+    assert Color("red").blend(Color("cyan"), mode).hex_l == expected
+
+
+@pytest.mark.parametrize("name", ["red", "#3d7ab8", "yellow", "black", "white"])
+def test_the_blend_modes_with_an_identity_have_it(name):
+    """multiply by white and screen with black both change nothing, which
+    catches a formula with its operands the wrong way round."""
+    color = Color(name)
+    assert color.blend("white", "multiply") == color
+    assert color.blend("black", "screen") == color
+    assert color.blend("black", "lighten") == color
+    assert color.blend("white", "darken") == color
+
+
+def test_overlay_is_hard_light_with_the_operands_swapped():
+    """That is how CSS defines it, and it is a property no coincidence
+    satisfies: it has to hold for every pair."""
+    for first in ("#3d7ab8", "red", "#202020", "#e0e0e0"):
+        for second in ("#c08040", "cyan", "#101010", "#f0f0f0"):
+            a, b = Color(first), Color(second)
+            assert a.blend(b, "overlay") == b.blend(a, "hard-light")
+
+
+def test_a_blend_mode_may_be_spelled_with_an_underscore():
+    a, b = Color("#3d7ab8"), Color("#c08040")
+    assert a.blend(b, "hard_light") == a.blend(b, "hard-light")
+    assert a.blend(b, "HARD-LIGHT") == a.blend(b, "hard-light")
+
+
+def test_normal_is_what_over_does():
+    source, backdrop = Color("red", alpha=0.4), Color("blue", alpha=0.6)
+    assert source.blend(backdrop, "normal") == source.over(backdrop)
+    assert source.blend(backdrop).alpha == source.over(backdrop).alpha
+
+
+def test_linear_compositing_is_a_different_answer_on_purpose():
+    """Sixty channel steps apart, which is why it is a flag and not a
+    detail: encoded is what a browser shows, linear is the physical one."""
+    encoded = Color("red", alpha=0.5).over("white")
+    linear = Color("red", alpha=0.5).over("white", linear=True)
+    assert encoded.green == pytest.approx(127.5)
+    assert linear.green == pytest.approx(187.516, abs=0.001)
+    assert encoded.alpha == linear.alpha == 1.0
+
+
+def test_blend_rejects_a_mode_it_does_not_have():
+    """The non-separable modes are absent, and say so rather than silently
+    doing something else."""
+    for mode in ("soft-light", "color-dodge", "hue", "luminosity", "nonsense"):
+        with pytest.raises(ValueError, match="Unknown blend mode"):
+            Color("red").blend("blue", mode)
+
+
+@pytest.mark.parametrize("mode", sorted(_BLEND_MODES))
+def test_every_blend_stays_in_range_and_leaves_its_operands_alone(mode):
+    source = Color("#3d7ab8", alpha=0.4)
+    backdrop = Color("#c08040", alpha=0.7)
+    before = (source.hsl, source.alpha, backdrop.hsl, backdrop.alpha)
+    result = source.blend(backdrop, mode)
+    assert all(0.0 <= channel <= 1.0 for channel in result.rgbf)
+    assert 0.0 <= result.alpha <= 1.0
+    assert (source.hsl, source.alpha, backdrop.hsl, backdrop.alpha) == before
+    assert result is not source and result is not backdrop

@@ -620,6 +620,49 @@ grey neutral in Oklab. Converting into sRGB clamps anything outside its gamut,
 since an out-of-gamut colour has no sRGB encoding; see
 [Ranges Are Not the Gamut](#ranges-are-not-the-gamut) for how to check first.
 
+## Compositing
+
+`over` draws this color on another, which is what its alpha means:
+
+```python
+from colourings import Color
+
+Color("red", alpha=0.5).over("white").rgb
+# RGB(red=255.0, green=127.5, blue=127.5)
+```
+
+`blend` does the same through one of the separable CSS blend modes —
+`normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `hard-light`,
+`difference`, `exclusion`:
+
+```python
+Color("red").blend("cyan", "multiply")  # <Color black>
+Color("red").blend("cyan", "screen")  # <Color white>
+```
+
+This color is the source and the argument is the backdrop, the same way round
+as CSS, so the result is what a browser shows for an element of this color over
+that background. The result's alpha is `a + b * (1 - a)`, so an opaque backdrop
+gives an opaque result.
+
+### Encoded or linear
+
+Compositing happens on the channels **as encoded**, which is what CSS, canvas
+and every renderer do — and is not the physically correct answer, because light
+adds linearly and sRGB is not linear in light. The gap is not subtle:
+
+```python
+Color("red", alpha=0.5).over("white").green  # 127.5, what a browser shows
+Color("red", alpha=0.5).over("white", linear=True).green  # 187.516...
+```
+
+Sixty channel steps. Encoded is the default because it is what you are
+comparing against; pass `linear=True` when you want the physical answer, and
+expect no browser to agree with it.
+
+The non-separable modes — `hue`, `saturation`, `color`, `luminosity` — are not
+implemented, and `blend` raises rather than quietly doing something else.
+
 ## Harmonies
 
 Hue relationships, as new colors carrying this one's alpha:

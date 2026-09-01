@@ -7,6 +7,8 @@ from collections.abc import Callable, Generator, Sequence
 from typing import Any, Protocol
 
 from .conversions import (
+    _linear_to_srgb,
+    _srgb_to_linear,
     cmyk2hsl,
     contrast_ratio as _contrast_ratio,
     hex2hsl,
@@ -672,6 +674,30 @@ def _carried_alpha(
     if func is hsla2hsl:
         return "hsla", value[3] / 100.0
     return None
+
+
+def _hard_light(backdrop: float, source: float) -> float:
+    """The hard-light separable blend, on one channel in ``[0, 1]``."""
+    if source <= 0.5:
+        return backdrop * 2.0 * source
+    doubled = 2.0 * source - 1.0
+    return backdrop + doubled - backdrop * doubled
+
+
+## The separable blend modes CSS defines, each taking the backdrop channel and
+## the source channel. The non-separable ones -- hue, saturation, color,
+## luminosity -- work on all three channels at once and are not here.
+_BLEND_MODES: dict[str, Callable[[float, float], float]] = {
+    "normal": lambda backdrop, source: source,
+    "multiply": lambda backdrop, source: backdrop * source,
+    "screen": lambda backdrop, source: backdrop + source - backdrop * source,
+    "overlay": lambda backdrop, source: _hard_light(source, backdrop),
+    "darken": min,
+    "lighten": max,
+    "hard-light": _hard_light,
+    "difference": lambda backdrop, source: abs(backdrop - source),
+    "exclusion": lambda backdrop, source: backdrop + source - 2.0 * backdrop * source,
+}
 
 
 ## The keyword colour inputs, each with the conversion that takes it to HSL.
@@ -1665,6 +1691,117 @@ class Color:
             f'{background}"></div>'
             f"<span>{label}</span></div>"
         )
+
+    def blend(
+        self,
+        backdrop: str | Sequence[int | float] | Color,
+        mode: str = "normal",
+        linear: bool = False,
+    ) -> Color:
+        """Composite this color over another, optionally through a blend mode.
+
+        This color is the source and ``backdrop`` is what it is drawn on, the
+        same way round as CSS: the result is what a browser shows for an
+        element of this color over that background.
+
+        Compositing happens on the channels as encoded, which is what CSS,
+        canvas and every renderer do, and is **not** the physically correct
+        answer -- light adds linearly and sRGB is not linear in light. The two
+        are far apart: 50% red over white puts green at 127.5 encoded and at
+        187.5 in linear light, sixty channel steps away. Pass ``linear=True``
+        for the latter, which is what image processing wants and what no
+        browser will agree with.
+
+        Parameters
+        ----------
+        backdrop : str | Sequence[int | float] | Color
+            The color underneath, in any supported input format.
+        mode : str, default="normal"
+            One of the separable CSS blend modes: ``"normal"``,
+            ``"multiply"``, ``"screen"``, ``"overlay"``, ``"darken"``,
+            ``"lighten"``, ``"hard-light"``, ``"difference"`` or
+            ``"exclusion"``. An underscore reads the same as a hyphen.
+        linear : bool, default=False
+            Whether to composite in linear light rather than on the channels
+            as encoded.
+
+        Returns
+        -------
+        Color
+            A new color; neither operand is changed. Its alpha is
+            ``a + b * (1 - a)``, so an opaque backdrop gives an opaque result.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``mode`` is not a separable blend mode.
+
+        Examples
+        --------
+        >>> Color("red", alpha=0.5).blend("white").rgb
+        RGB(red=255.0, green=127.5, blue=127.5)
+        >>> Color("red").blend("cyan", "multiply").hex_l
+        '#000000'
+        """
+        blend = _BLEND_MODES.get(mode.replace("_", "-").lower())
+        if blend is None:
+            raise ValueError(
+                f"Unknown blend mode {mode!r}. Choose one of: "
+                f"{', '.join(sorted(_BLEND_MODES))}."
+            )
+        backdrop = Color(backdrop)
+        source_alpha, backdrop_alpha = self._alpha, backdrop._alpha
+        alpha = source_alpha + backdrop_alpha * (1.0 - source_alpha)
+        if alpha == 0.0:
+            ## Nothing is visible, so no colour is more right than another.
+            ## The source's is kept so that the result still says where it
+            ## came from.
+            return Color(hsl=self._hsl, alpha=0.0)
+
+        encode = _linear_to_srgb if linear else lambda channel: channel
+        decode = _srgb_to_linear if linear else lambda channel: channel
+        channels = []
+        for source, back in zip(self.rgbf, backdrop.rgbf, strict=True):
+            source, back = decode(source), decode(back)
+            ## The backdrop shows through the blend in proportion to how
+            ## opaque it is: with nothing behind, there is nothing to blend
+            ## with and the source passes through unchanged.
+            blended = (1.0 - backdrop_alpha) * source + backdrop_alpha * blend(
+                back, source
+            )
+            mixed = blended * source_alpha + back * backdrop_alpha * (
+                1.0 - source_alpha
+            )
+            channels.append(min(max(encode(mixed / alpha), 0.0), 1.0))
+        return Color(rgbf=channels, alpha=alpha)
+
+    def over(
+        self, backdrop: str | Sequence[int | float] | Color, linear: bool = False
+    ) -> Color:
+        """Composite this color over another, with no blend mode.
+
+        The ``normal`` case of :meth:`blend`, and the one worth naming: it is
+        what an alpha means.
+
+        Parameters
+        ----------
+        backdrop : str | Sequence[int | float] | Color
+            The color underneath, in any supported input format.
+        linear : bool, default=False
+            Whether to composite in linear light, as described on
+            :meth:`blend`.
+
+        Returns
+        -------
+        Color
+            A new color; neither operand is changed.
+
+        Examples
+        --------
+        >>> Color("red", alpha=0.5).over("white").rgb
+        RGB(red=255.0, green=127.5, blue=127.5)
+        """
+        return self.blend(backdrop, "normal", linear)
 
     def range_to(
         self,
