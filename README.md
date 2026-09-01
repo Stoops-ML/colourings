@@ -721,18 +721,30 @@ Errors about how a helper was *called* -- more than one color argument to
 Top-level exports:
 
 ```python
-from colourings import Color, Colour, color_scale, colour_scale, in_srgb_gamut
 from colourings import (
-    ColorError,
-    InvalidColorError,
     AmbiguousColorError,
+    Color,
+    ColorError,
+    Colour,
+    HSL_equivalence,
+    InvalidColorError,
+    RGB_color_picker,
+    RGB_equivalence,
     UnknownColorError,
+    clear_caches,
+    color_scale,
+    colour_scale,
+    identify_color,
+    in_srgb_gamut,
+    make_color_factory,
 )
 ```
 
-Additional APIs are available from submodules:
+The conversion functions, the shape predicates and the CSS parser stay in their
+own modules: they are a much larger surface than most callers want, and
+importing the package should not put eighty names within reach of a typo.
 
-- `colourings.colour`: `HSL_equivalence`, `RGB_equivalence`, `RGB_color_picker`, `make_color_factory`, `identify_color`, `HSL`, `RGB`, `HEX`
+- `colourings.colour`: the named-color accessors `HSL`, `RGB`, `HEX`
 - `colourings.conversions`: conversion utilities, plus `rgb2relative_luminance`, `contrast_ratio`, `in_srgb_gamut` and `clear_caches`
 - `colourings.css`: `css2hsl`, `css2hsla`, `hsla2css`, `is_css`
 - `colourings.identify`: type/shape predicates like `is_rgb`, `is_hsl`, `is_web`

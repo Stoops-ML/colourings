@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,7 +12,8 @@ description = "Colouring in Python"
 readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["color", "colour"]
-license = {file = "LICENSE.txt"}
+license = "BSD-3-Clause"
+license-files = ["LICENSE.txt"]
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
@@ -23,6 +24,10 @@ classifiers = [
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
     "Operating System :: OS Independent",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Multimedia :: Graphics",
+    "Typing :: Typed",
 ]
 dependencies = []
 
@@ -38,6 +43,11 @@ dev = [
 [project.urls]
 Repository = "https://github.com/Stoops-ML/colourings"
 Documentation = "https://colourings.readthedocs.io/en/latest/"
+Issues = "https://github.com/Stoops-ML/colourings/issues"
+Changelog = "https://github.com/Stoops-ML/colourings/releases"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.package-data]
 "colourings" = ["py.typed"]

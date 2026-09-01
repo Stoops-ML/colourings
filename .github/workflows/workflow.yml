@@ -127,7 +127,18 @@ jobs:
           description = meta.get_payload() or meta["Description"] or ""
           assert len(description) > 1000, f"long description is {len(description)} characters"
 
-          print("wheel imports, is typed, and carries the README")
+          ## The metadata the source declares, as the build actually emitted it.
+          ## The tests check pyproject.toml against the tree; only here is there
+          ## a fresh build to check that setuptools understood it.
+          licence = meta["License-Expression"]
+          assert licence == "BSD-3-Clause", f"licence expression is {licence!r}"
+          classifiers = meta.get_all("Classifier") or []
+          assert "Typing :: Typed" in classifiers, classifiers
+          assert not [c for c in classifiers if c.startswith("License ::")], (
+              "PEP 639 forbids a License classifier beside the expression"
+          )
+
+          print("wheel imports, is typed, and carries the README and its licence")
           PY
 
   ## Read the Docs builds after merge, so a malformed docstring or a broken

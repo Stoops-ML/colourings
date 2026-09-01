@@ -1,5 +1,15 @@
-from .colour import Color, Colour, color_scale, colour_scale
-from .conversions import in_srgb_gamut
+from .colour import (
+    Color,
+    Colour,
+    HSL_equivalence,
+    RGB_color_picker,
+    RGB_equivalence,
+    color_scale,
+    colour_scale,
+    identify_color,
+    make_color_factory,
+)
+from .conversions import clear_caches, in_srgb_gamut
 from .errors import (
     AmbiguousColorError,
     ColorError,
@@ -7,16 +17,27 @@ from .errors import (
     UnknownColorError,
 )
 
+## The Color API and the errors it raises. The conversion functions, the shape
+## predicates and the CSS parser stay in their own modules: they are a larger
+## surface than most callers want, and importing this package should not put
+## eighty names in reach of a typo. `clear_caches` is here because it is about
+## the package's memory rather than about any one conversion.
 __all__ = [
     "AmbiguousColorError",
     "Color",
     "ColorError",
     "Colour",
+    "HSL_equivalence",
     "InvalidColorError",
+    "RGB_color_picker",
+    "RGB_equivalence",
     "UnknownColorError",
+    "clear_caches",
     "color_scale",
     "colour_scale",
+    "identify_color",
     "in_srgb_gamut",
+    "make_color_factory",
 ]
 
 
