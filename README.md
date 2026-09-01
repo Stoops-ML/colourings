@@ -86,6 +86,15 @@ Color(Color("red"))
 
 Only one color input source is allowed per constructor call.
 
+Copying a color carries its alpha across. An explicit `alpha` overrides the
+copied one, rather than having to agree with it:
+
+```python
+translucent = Color(rgba=(255, 0, 0, 128))
+Color(translucent).alpha  # 0.502
+Color(translucent, alpha=0.25).alpha  # 0.25
+```
+
 A bare sequence is identified from its length and its component ranges, and a
 four-component one keeps the alpha it carries:
 

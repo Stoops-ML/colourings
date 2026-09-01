@@ -289,6 +289,36 @@ def test_four_component_sequence_alpha_can_be_confirmed():
         Color((255, 200, 200, 200), alpha=0.1)
 
 
+@pytest.mark.parametrize("cls", [Color, Colour])
+def test_copying_a_color_keeps_its_alpha(cls):
+    """Copying a colour is not a way to lose its alpha.
+
+    The conversion to HSL drops it, exactly as it does for a four-component
+    sequence, so the constructor has to put it back."""
+    original = cls(rgba=(255, 0, 0, 128))
+    copy = Color(original)
+    assert copy == original
+    assert copy.alpha == original.alpha
+    assert copy.alpha != 1
+    assert copy.rgba == original.rgba
+
+
+def test_copying_an_opaque_color_stays_opaque():
+    assert Color(Color("red")).alpha == 1
+
+
+def test_copying_a_color_takes_the_alpha_keyword_over_the_original():
+    """Unlike the four-component sequences, a disagreement is not an error.
+
+    A Color always carries an alpha, so there is no way to pass one without
+    also stating an alpha to contradict, which would leave no way to restate
+    an existing colour's opacity."""
+    original = Color(rgba=(255, 0, 0, 128))
+    assert Color(original, alpha=0.25).alpha == 0.25
+    assert Color(Color("red"), alpha=0.25).alpha == 0.25
+    assert original.alpha != 1  # the original is left alone
+
+
 def test_bad_identify_color():
     with pytest.raises(TypeError, match="Cannot identify color."):
         identify_color("a")

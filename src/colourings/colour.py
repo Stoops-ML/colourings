@@ -489,7 +489,8 @@ class Color:
     Parameters
     ----------
     color : str | Sequence[int | float] | Color | None, optional
-        Generic color input in any supported format.
+        Generic color input in any supported format. Another ``Color`` is
+        copied, alpha included, unless ``alpha`` names one to use instead.
     web : str | None, optional
         Web color name or hex string.
     hsl : Sequence[int | float] | None, optional
@@ -532,7 +533,9 @@ class Color:
     rgbaf : Sequence[int | float] | None, optional
         Normalized RGBA components in ``[0, 1]``.
     alpha : float | None, optional
-        Explicit alpha value in ``[0, 1]``.
+        Explicit alpha value in ``[0, 1]``. It overrides the alpha of a
+        ``Color`` passed as ``color``, but must agree with the one an
+        ``rgba``, ``hsla``, ``rgbaf`` or ``hslaf`` value states.
     pick_for : object, optional
         Arbitrary value used to deterministically pick a color.
     picker : ColorPicker, default=RGB_color_picker
@@ -633,14 +636,24 @@ class Color:
                 color = color.lower()
             func = identify_color(color)
             self.hsl = func(color)
-            ## RGBA and HSLA carry an alpha that the conversion to HSL drops,
-            ## so recover it here on that format's own scale. Without this a
-            ## positional four-component colour would silently come out opaque
-            ## while the equivalent keyword form kept its alpha.
+            ## Every input that carries an alpha loses it in the conversion to
+            ## HSL, so recover it here on that input's own scale. Without this
+            ## a positional colour would silently come out opaque while the
+            ## equivalent keyword form kept its alpha.
+            if isinstance(color, Color):
+                ## A Color is copied rather than reconciled. The four-component
+                ## sequences below state an alpha explicitly, so an `alpha` that
+                ## disagrees with one is a contradiction worth reporting; a
+                ## Color instead always carries an alpha, defaulting to 1.0
+                ## when nobody chose it, so treating a disagreement as an error
+                ## would reject `Color(other, alpha=0.5)` -- the ordinary way to
+                ## restate a colour's opacity -- for every opaque `other`.
+                if alpha is None:
+                    alpha = color.alpha
             ## The isinstance check is redundant at runtime, since only a
             ## sequence is ever identified as one of these, but it is what
             ## narrows `color` away from `str` and `Color` for the subscript.
-            if isinstance(color, Sequence) and not isinstance(color, str):
+            elif isinstance(color, Sequence) and not isinstance(color, str):
                 if func is rgba2hsl:
                     alpha = _alpha_from(alpha, color[3] / 255.0, "rgba")
                 elif func is hsla2hsl:
