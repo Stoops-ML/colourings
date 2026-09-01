@@ -1,3 +1,4 @@
+import math
 import re
 from typing import NamedTuple
 
@@ -361,6 +362,16 @@ LAB_DELTA = 6.0 / 29.0
 ## contrast must use these.
 WCAG_LUMINANCE_COEFFICIENTS = (0.2126, 0.7152, 0.0722)
 WCAG_CONTRAST_FLARE = 0.05
+
+## The luminance at which a colour stops being dark and starts being light,
+## derived rather than chosen: it is where contrast against white equals
+## contrast against black, so it is exactly the point at which the better text
+## colour on it changes. Solving
+##     (1 + flare) / (L + flare) == (L + flare) / flare
+## for L gives the square root below, 0.1791...
+WCAG_LIGHT_DARK_CROSSOVER = (
+    math.sqrt((1.0 + WCAG_CONTRAST_FLARE) * WCAG_CONTRAST_FLARE) - WCAG_CONTRAST_FLARE
+)
 
 ## The minimum contrast ratio WCAG 2.x asks for, by conformance level and text
 ## size. "Large" means 18pt, or 14pt bold; anything smaller is "normal". Note

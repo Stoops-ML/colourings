@@ -1738,3 +1738,78 @@ def test_every_adjustment_carries_alpha_and_leaves_the_original_alone(call):
     assert result is not original
     assert result.alpha == 0.4
     assert (original.hsl, original.alpha) == before
+
+
+def test_is_dark_agrees_with_the_better_text_colour_everywhere():
+    """The threshold is derived, not chosen: it is the luminance at which
+    contrast against white equals contrast against black. So `is_dark` and
+    `best_text_color` cannot disagree, and this asserts they do not."""
+    for red in range(0, 256, 13):
+        for green in range(0, 256, 17):
+            for blue in range(0, 256, 19):
+                color = Color(rgb=(red, green, blue))
+                assert color.is_dark == (color.best_text_color() == Color("white"))
+                assert color.is_light is not color.is_dark
+
+
+def test_is_dark_at_the_obvious_ends():
+    assert Color("black").is_dark is True
+    assert Color("navy").is_dark is True
+    assert Color("white").is_light is True
+    assert Color("yellow").is_light is True
+
+
+def test_complementary_is_half_a_turn():
+    assert Color("red").complementary() == Color("cyan")
+    assert Color("blue").complementary() == Color("yellow")
+    assert Color("red").complementary().complementary() == Color("red")
+
+
+def test_triadic_and_tetradic_are_evenly_spaced():
+    triad = Color("red").triadic()
+    assert [c.hue for c in triad] == [0.0, 120.0, 240.0]
+    assert triad == (Color("red"), Color("lime"), Color("blue"))
+    tetrad = Color("red").tetradic()
+    assert [c.hue for c in tetrad] == [0.0, 90.0, 180.0, 270.0]
+
+
+def test_analogous_sits_the_colour_between_its_neighbours():
+    left, middle, right = Color("red").analogous(60)
+    assert (left.hue, middle.hue, right.hue) == (300.0, 0.0, 60.0)
+    assert middle == Color("red")
+    assert Color("red").analogous()[0].hue == 330.0
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda c: c.complementary(),
+        lambda c: c.analogous()[0],
+        lambda c: c.triadic()[1],
+        lambda c: c.tetradic()[2],
+    ],
+)
+def test_harmonies_return_new_colours_and_carry_alpha(call):
+    original = Color("#3d7ab8", alpha=0.4)
+    result = call(original)
+    assert result is not original
+    assert result.alpha == 0.4
+    assert original.hex_l == "#3d7ab8"
+
+
+def test_repr_html_draws_the_colour():
+    html = Color("red")._repr_html_()
+    assert html.startswith("<div") and html.endswith("</div>")
+    assert "rgb(255 0 0)" in html
+    assert ">red</span>" in html
+    ## An opaque colour needs no checkerboard behind it.
+    assert "linear-gradient" not in html
+
+
+def test_repr_html_shows_alpha_over_a_checkerboard():
+    """Otherwise a translucent colour would be composited onto whatever the
+    notebook's background happens to be, and read as a different colour."""
+    html = Color("red", alpha=0.5)._repr_html_()
+    assert "rgb(255 0 0 / 0.5)" in html
+    assert "linear-gradient" in html
+    assert "red / 0.5" in html

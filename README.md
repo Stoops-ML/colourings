@@ -620,7 +620,48 @@ grey neutral in Oklab. Converting into sRGB clamps anything outside its gamut,
 since an out-of-gamut colour has no sRGB encoding; see
 [Ranges Are Not the Gamut](#ranges-are-not-the-gamut) for how to check first.
 
+## Harmonies
+
+Hue relationships, as new colors carrying this one's alpha:
+
+```python
+from colourings import Color
+
+Color("red").complementary()  # <Color cyan>
+Color("red").triadic()  # (<Color red>, <Color lime>, <Color blue>)
+Color("red").tetradic()
+# (<Color red>, <Color chartreuse>, <Color cyan>, <Color #7f00ff>)
+Color("red").analogous()  # (<Color #ff007f>, <Color red>, <Color #ff7f00>)
+Color("red").analogous(60)  # (<Color magenta>, <Color red>, <Color yellow>)
+```
+
+The base color is included, and `analogous` puts it in the middle, so each
+result reads in wheel order.
+
+## Light or Dark
+
+```python
+Color("navy").is_dark  # True
+Color("yellow").is_light  # True
+```
+
+The threshold is not a matter of taste: it is the luminance at which contrast
+against white equals contrast against black, so `is_dark` is exactly "white
+text reads better on this than black" and never disagrees with
+`best_text_color`.
+
 ## Previewing a Color
+
+In a notebook, a `Color` displays as a swatch — no toolkit, nothing to close:
+
+```python
+from colourings import Color
+
+Color("rebeccapurple")  # renders as a colored square with its name
+Color("red", alpha=0.5)  # drawn over a checkerboard, so the alpha is visible
+```
+
+
 
 `Color.preview()` opens a window filled with the color, sized in pixels.
 

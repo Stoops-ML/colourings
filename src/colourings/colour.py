@@ -55,7 +55,12 @@ from .definitions import CMYK as CMYKTuple
 
 ## The colour tuple types are aliased because this module already exposes
 ## ``HSL`` and ``RGB`` as the named-colour accessor singletons defined below.
-from .definitions import COLOR_NAME_TO_RGB, WCAG_CONTRAST_MINIMUMS, linspace
+from .definitions import (
+    COLOR_NAME_TO_RGB,
+    WCAG_CONTRAST_MINIMUMS,
+    WCAG_LIGHT_DARK_CROSSOVER,
+    linspace,
+)
 from .definitions import HSL as HSLTuple
 from .definitions import HSLA as HSLATuple
 from .definitions import HSV as HSVTuple
@@ -982,6 +987,30 @@ class Color:
         r, g, b = self.get_rgbf()
         return math.sqrt(0.299 * r**2 + 0.587 * g**2 + 0.114 * b**2)
 
+    def get_is_dark(self) -> bool:
+        """Whether white text reads better on this color than black.
+
+        The threshold is where contrast against white equals contrast against
+        black, so this is not a matter of taste: it agrees with
+        :meth:`best_text_color` for every color in the sRGB cube.
+
+        Returns
+        -------
+        bool
+            ``True`` when the color is dark enough to want light text.
+        """
+        return self.relative_luminance < WCAG_LIGHT_DARK_CROSSOVER
+
+    def get_is_light(self) -> bool:
+        """The complement of :attr:`is_dark`.
+
+        Returns
+        -------
+        bool
+            ``True`` when the color wants dark text.
+        """
+        return not self.get_is_dark()
+
     def get_relative_luminance(self) -> float:
         """WCAG 2.x relative luminance, as
         :func:`~colourings.conversions.rgb2relative_luminance` computes it.
@@ -1115,6 +1144,8 @@ class Color:
     hslaf = property(get_hslaf)
     luminance = property(get_luminance)
     relative_luminance = property(get_relative_luminance)
+    is_dark = property(get_is_dark)
+    is_light = property(get_is_light)
 
     def contrast_ratio(self, other: str | Sequence[int | float] | Color) -> float:
         """Compute the WCAG 2.x contrast ratio against another color.
@@ -1523,6 +1554,102 @@ class Color:
         'rgb(255 0 0 / 0.5)'
         """
         return hsla2css(self._hsl, self._alpha, form)
+
+    def complementary(self) -> Color:
+        """Return the color opposite this one on the hue wheel.
+
+        Returns
+        -------
+        Color
+            A new color half a turn away.
+
+        Examples
+        --------
+        >>> Color("red").complementary().web
+        'cyan'
+        """
+        return self.rotate_hue(180.0)
+
+    def analogous(self, angle: float = 30.0) -> tuple[Color, Color, Color]:
+        """Return this color between its two neighbours on the hue wheel.
+
+        Parameters
+        ----------
+        angle : float, default=30.0
+            How far to either side, in degrees.
+
+        Returns
+        -------
+        tuple[Color, Color, Color]
+            The three colors in wheel order, this one in the middle.
+        """
+        return (self.rotate_hue(-angle), self.rotate_hue(0.0), self.rotate_hue(angle))
+
+    def triadic(self) -> tuple[Color, Color, Color]:
+        """Return the three colors evenly spaced around the hue wheel.
+
+        Returns
+        -------
+        tuple[Color, Color, Color]
+            This color and the two a third of a turn away in each direction.
+        """
+        return (self.rotate_hue(0.0), self.rotate_hue(120.0), self.rotate_hue(240.0))
+
+    def tetradic(self) -> tuple[Color, Color, Color, Color]:
+        """Return the four colors evenly spaced around the hue wheel.
+
+        Returns
+        -------
+        tuple[Color, Color, Color, Color]
+            This color and the three a quarter of a turn apart.
+        """
+        return (
+            self.rotate_hue(0.0),
+            self.rotate_hue(90.0),
+            self.rotate_hue(180.0),
+            self.rotate_hue(270.0),
+        )
+
+    def _repr_html_(self) -> str:
+        """Render the color as a swatch, for a notebook.
+
+        Jupyter calls this when a ``Color`` is the value of a cell, so a color
+        shows as a color rather than as ``<Color #3d7ab8>``. Unlike
+        :meth:`preview` it needs no GUI toolkit and does not block.
+
+        A color that is not opaque is drawn over a checkerboard, so its alpha
+        is visible rather than being quietly composited onto whatever the
+        notebook's background happens to be.
+
+        Returns
+        -------
+        str
+            A fragment of HTML.
+        """
+        ## Nothing here is escaped because nothing here needs it: `web` is a
+        ## colour name or a hex string, and the rest is generated numbers.
+        label = self.web if self._alpha >= 1.0 else f"{self.web} / {self._alpha:g}"
+        fill = self.to_css("rgb")
+        if self._alpha >= 1.0:
+            background = f"background:{fill}"
+        else:
+            squares = "#bbbbbb 25%, transparent 25%, transparent 75%, #bbbbbb 75%"
+            background = (
+                f"background-image:linear-gradient({fill},{fill}),"
+                f"linear-gradient(45deg,{squares}),"
+                "linear-gradient(45deg,#bbbbbb 25%,#ffffff 25%,"
+                "#ffffff 75%,#bbbbbb 75%);"
+                "background-size:100% 100%,12px 12px,12px 12px;"
+                "background-position:0 0,0 0,6px 6px"
+            )
+        return (
+            '<div style="display:inline-flex;align-items:center;gap:8px;'
+            'font-family:monospace;font-size:12px">'
+            f'<div title="{label}" style="width:28px;height:28px;'
+            "border-radius:4px;border:1px solid rgba(128,128,128,0.4);"
+            f'{background}"></div>'
+            f"<span>{label}</span></div>"
+        )
 
     def range_to(
         self,
