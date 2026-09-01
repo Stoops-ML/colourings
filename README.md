@@ -14,6 +14,25 @@ It provides:
 
 This project is a modernized fork of [vaab/colour](https://github.com/vaab/colour/) with additional formats, typing, revised channel ranges, and updated packaging.
 
+## Migrating to 2.0
+
+Two things changed that code may notice, and one that it cannot:
+
+- **`Colour` is now `Color` itself**, not a subclass. `Colour is Color` is
+  `True`, `type(Colour("red"))` is `Color`, and a `Colour` stays a `Colour`
+  through a scale — which it did not before, since every constructor handed
+  back a `Color`. Only code that told the two apart with `isinstance` or
+  `type(...) is` is affected.
+- **The named-color accessors are `NAMED_HSL`, `NAMED_RGB` and `NAMED_HEX`.**
+  The old `HSL`, `RGB` and `HEX` still work and emit a `DeprecationWarning`
+  naming the replacement. They were renamed because they shadowed the tuple
+  types of the same name in `colourings.definitions`.
+- **`pick_for` now picks the same color in every process.** Its default key
+  ran hashable values through `hash()`, which Python salts per run, so those
+  colors changed on every restart — nothing could have depended on them.
+  Values that *were* stable, the unhashable ones, are unchanged. Pass
+  `pick_key=hash_or_str` for the old behaviour.
+
 ## Installation
 
 ```bash
@@ -365,16 +384,18 @@ about, so it is no longer the default.
 ## Convenience Objects and Aliases
 
 ```python
-from colourings.colour import HEX, HSL, RGB, Colour
+from colourings.colour import NAMED_HEX, NAMED_HSL, NAMED_RGB
+from colourings import Colour
 
-print(HSL.BLUE)  # HSL(hue=240.0, saturation=100.0, lightness=50.0)
-print(RGB.BLUE)  # RGB(red=0.0, green=0.0, blue=255.0)
-print(HEX.BLUE)  # #00f
+print(NAMED_HSL.BLUE)  # HSL(hue=240.0, saturation=100.0, lightness=50.0)
+print(NAMED_RGB.BLUE)  # RGB(red=0.0, green=0.0, blue=255.0)
+print(NAMED_HEX.BLUE)  # #00f
 
 assert Colour("red") == Colour("#f00")
 ```
 
-`Colour` is an alias subclass of `Color` for British spelling preference.
+`Colour` is `Color` — the same class under the British spelling, not a subclass
+of it, so `Colour is Color` and a `Colour` stays one through a scale.
 
 ## CSS Syntax
 
@@ -570,8 +591,9 @@ c.rgb = (0.0, 0.0, 255.0)
 
 The types are `RGB`, `RGBA`, `HSL`, `HSLA` and their normalised `RGBf`, `RGBAf`,
 `HSLf` and `HSLAf` counterparts, all importable from `colourings.definitions`.
-Note these are distinct from the same-named `colourings.colour.HSL` and
-`colourings.colour.RGB` accessor objects that look up colors by name.
+They used to share their names with the accessor objects in
+`colourings.colour`, which is why those are now `NAMED_HSL`, `NAMED_RGB` and
+`NAMED_HEX`.
 
 ## Function-Based Conversions
 
@@ -871,7 +893,7 @@ The conversion functions, the shape predicates and the CSS parser stay in their
 own modules: they are a much larger surface than most callers want, and
 importing the package should not put eighty names within reach of a typo.
 
-- `colourings.colour`: the named-color accessors `HSL`, `RGB`, `HEX`
+- `colourings.colour`: the named-color accessors `NAMED_HSL`, `NAMED_RGB`, `NAMED_HEX`
 - `colourings.conversions`: conversion utilities, plus `rgb2relative_luminance`, `contrast_ratio`, `in_srgb_gamut` and `clear_caches`
 - `colourings.css`: `css2hsl`, `css2hsla`, `hsla2css`, `is_css`
 - `colourings.difference`: `delta_e_cie76`, `delta_e_cie94`, `delta_e_ciede2000`, `delta_e_ok`, `hsl_difference`, `nearest_named_hsl`

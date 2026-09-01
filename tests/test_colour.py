@@ -11,9 +11,9 @@ from colourings.colour import (
     _BLEND_MODES,
     _KEYWORD_ALPHA_SCALES,
     _KEYWORD_INPUTS,
-    HEX,
-    HSL,
-    RGB,
+    NAMED_HEX,
+    NAMED_HSL,
+    NAMED_RGB,
     Color,
     Colour,
     HSL_equivalence,
@@ -421,17 +421,17 @@ def test_identify_color_refuses_what_it_cannot_place(value):
 
 
 def test_RGB():
-    assert RGB.WHITE == (255.0, 255.0, 255.0)
-    assert RGB.BLUE == (0.0, 0.0, 255.0)
+    assert NAMED_RGB.WHITE == (255.0, 255.0, 255.0)
+    assert NAMED_RGB.BLUE == (0.0, 0.0, 255.0)
     with pytest.raises(AttributeError):
-        RGB.DONOTEXISTS  # noqa: B018
+        NAMED_RGB.DONOTEXISTS  # noqa: B018
 
 
 def test_HEX():
-    assert HEX.WHITE == "#fff"
-    assert HEX.BLUE == "#00f"
+    assert NAMED_HEX.WHITE == "#fff"
+    assert NAMED_HEX.BLUE == "#00f"
     with pytest.raises(AttributeError):
-        HEX.DONOTEXISTS  # noqa: B018
+        NAMED_HEX.DONOTEXISTS  # noqa: B018
 
 
 def test_color_scale_num_sections():
@@ -829,7 +829,7 @@ def test_HSL_equivalence():
 
 def test_color_access():
     b = Color("black")
-    b.hsl = HSL.BLUE
+    b.hsl = NAMED_HSL.BLUE
     assert round(b.hue / 360.0, 4) == 0.6667
     assert b.saturation == 100.0
     assert b.lightness == 50
@@ -853,7 +853,7 @@ def test_thresholding():
 
 def test_color_setters():
     b = Color("black")
-    b.hsl = HSL.BLUE
+    b.hsl = NAMED_HSL.BLUE
     assert b.hsl == (240.0, 100.0, 50.0)
     b.rgb = (0.0, 0.0, 255.0)
     assert b.rgb == (0.0, 0.0, 255.0)
@@ -876,7 +876,7 @@ def test_color_setters():
 
 def test_color_change_values():
     b = Color("black")
-    b.hsl = HSL.BLUE
+    b.hsl = NAMED_HSL.BLUE
     b.hue = 0.0
     assert b.hex == "#f00"
     b.hue = 2.0 / 3 * 360.0
@@ -2113,3 +2113,63 @@ def test_picking_no_longer_quantises_through_a_string():
     direct = RGB_color_picker(stable_key("user:123"))
     assert picked.hsl == direct.hsl
     assert picked.rgbf == direct.rgbf
+
+
+def test_colour_is_the_same_class_as_color():
+    """It was a subclass, and that leaked: `Colour is Color` was False, the
+    repr said `<Color ...>` anyway, and every constructor handed back a Color,
+    so a Colour stopped being one the moment it went through a scale."""
+    assert Colour is Color
+    assert type(Colour("red")) is Color
+    assert repr(Colour("red")) == "<Color red>"
+    assert isinstance(Color("red"), Colour)
+    assert isinstance(Colour("red"), Color)
+
+
+def test_a_colour_survives_the_operations_that_used_to_demote_it():
+    scaled = color_scale([Colour("red"), Colour("blue")], 3)
+    assert all(isinstance(c, Colour) for c in scaled)
+    assert isinstance(next(Colour("red").range_to("blue", 3)), Colour)
+    assert isinstance(Colour("red").lighten(), Colour)
+    assert isinstance(Colour("red").mix("blue"), Colour)
+
+
+def test_subclassing_still_works_through_the_alias():
+    class Tint(Colour):
+        pass
+
+    assert Tint("red").hsl == (0.0, 100.0, 50.0)
+    assert isinstance(Tint("red"), Color)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [("HSL", NAMED_HSL), ("RGB", NAMED_RGB), ("HEX", NAMED_HEX)],
+)
+def test_the_pre_2_0_accessor_names_still_work_and_say_so(old, new):
+    """A rename that fails loudly. Reached through the module `__getattr__`
+    rather than left as a global, so the old name cannot be quietly served the
+    tuple type of the same name from `definitions`."""
+    import colourings.colour
+
+    with pytest.warns(DeprecationWarning, match=f"{old} was renamed"):
+        assert getattr(colourings.colour, old) is new
+
+
+def test_the_deprecation_message_names_the_replacement():
+    import colourings.colour
+
+    with pytest.warns(DeprecationWarning, match="NAMED_HSL") as record:
+        _ = colourings.colour.HSL
+    assert "shadowed" in str(record[0].message)
+    with pytest.warns(DeprecationWarning, match="NAMED_HEX") as record:
+        _ = colourings.colour.HEX
+    ## HEX never shadowed anything; only HSL and RGB did.
+    assert "shadowed" not in str(record[0].message)
+
+
+def test_an_unknown_module_attribute_still_raises():
+    import colourings.colour
+
+    with pytest.raises(AttributeError, match="has no attribute 'nope'"):
+        _ = colourings.colour.nope

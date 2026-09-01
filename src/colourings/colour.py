@@ -52,8 +52,10 @@ from .conversions import (
 )
 from .css import css2hsl, css2hsla, hsla2css, is_css
 
-## The colour tuple types are aliased because this module already exposes
-## ``HSL`` and ``RGB`` as the named-colour accessor singletons defined below.
+## The colour tuple types keep the ``*Tuple`` names, uniformly, so that nothing
+## in this module is called ``HSL`` or ``RGB`` -- the names the accessors below
+## used to take, and which a caller reaching for the old spelling would
+## otherwise receive silently as a NamedTuple.
 from .definitions import (
     CMYK as CMYKTuple,
     COLOR_NAME_TO_RGB,
@@ -102,7 +104,7 @@ class C_HSL:
         raise AttributeError(f"{self.__class__} instance has no attribute {value}")
 
 
-HSL = C_HSL()
+NAMED_HSL = C_HSL()
 
 
 class C_RGB:
@@ -115,7 +117,7 @@ class C_RGB:
     """
 
     def __getattr__(self, value):
-        return hsl2rgb(getattr(HSL, value))
+        return hsl2rgb(getattr(NAMED_HSL, value))
 
 
 class C_HEX:
@@ -128,11 +130,11 @@ class C_HEX:
     """
 
     def __getattr__(self, value):
-        return rgb2hex(getattr(RGB, value))
+        return rgb2hex(getattr(NAMED_RGB, value))
 
 
-RGB = C_RGB()
-HEX = C_HEX()
+NAMED_RGB = C_RGB()
+NAMED_HEX = C_HEX()
 
 
 ## Interpolation spaces for ``color_scale``. The key is the ``Color`` property
@@ -247,7 +249,7 @@ def _scale_space(
 
 
 def color_scale(
-    colors: Sequence[Color | Colour],
+    colors: Sequence[Color],
     num_steps: int,
     longer: bool = False,
     space: str = "hsl",
@@ -275,7 +277,7 @@ def color_scale(
 
     Parameters
     ----------
-    colors : Sequence[Color | Colour]
+    colors : Sequence[Color]
         Ordered color sequence used as interpolation control points.
     num_steps : int
         Total number of colors to generate, including endpoints.
@@ -601,13 +603,13 @@ _SEQUENCE_FORMATS: tuple[
 
 
 def identify_color(
-    color: str | Sequence[int | float] | Color | Colour,
+    color: str | Sequence[int | float] | Color,
 ) -> Callable[[Any], HSLTuple]:
     """Identify a color input format and return its HSL conversion callable.
 
     Parameters
     ----------
-    color : str | Sequence[int | float] | Color | Colour
+    color : str | Sequence[int | float] | Color
         Candidate color value in one supported representation.
 
     Returns
@@ -637,7 +639,6 @@ def identify_color(
     ):
         raise AmbiguousColorError("Cannot determine whether color is RGBA or HSLA.")
 
-    ## Colour subclasses Color, so one check covers both spellings.
     if isinstance(color, Color):
         return lambda existing: HSLTuple(*existing.hsl)
     if isinstance(color, str):
@@ -2124,10 +2125,7 @@ class Color:
         return hash(self.hex_l)
 
 
-class Colour(Color):
-    """British-spelling alias of :class:`Color`."""
-
-    __slots__ = ()
+Colour = Color
 
 
 def make_color_factory(**kwargs_defaults: Any) -> Callable[..., Color]:
@@ -2150,3 +2148,48 @@ def make_color_factory(**kwargs_defaults: Any) -> Callable[..., Color]:
         return Color(*args, **new_kwargs)
 
     return ColorFactory
+
+
+## The accessors were called ``HSL``, ``RGB`` and ``HEX`` before 2.0. Reached
+## through the module ``__getattr__`` rather than left as globals, so that the
+## old spelling still works, says what to use instead, and -- crucially --
+## cannot be confused with the tuple types of the same name.
+_RENAMED_IN_2_0 = {
+    "HSL": "NAMED_HSL",
+    "RGB": "NAMED_RGB",
+    "HEX": "NAMED_HEX",
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve the pre-2.0 names of the named-colour accessors.
+
+    Parameters
+    ----------
+    name : str
+        Attribute being looked up on the module.
+
+    Returns
+    -------
+    Any
+        The renamed accessor, for one of the three old names.
+
+    Raises
+    ------
+    AttributeError
+        Raised for any other name, as normal attribute lookup would.
+    """
+    renamed = _RENAMED_IN_2_0.get(name)
+    if renamed is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    reason = (
+        f"which shadowed the {name} tuple type in colourings.definitions"
+        if name in ("HSL", "RGB")
+        else "for consistency with the other two"
+    )
+    warnings.warn(
+        f"colourings.colour.{name} was renamed to {renamed} in 2.0, {reason}.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return globals()[renamed]

@@ -259,15 +259,17 @@ Convenience objects and aliases
 
 .. code-block:: python
 
-   from colourings.colour import HEX, HSL, RGB, Colour
+   from colourings.colour import NAMED_HEX, NAMED_HSL, NAMED_RGB
+   from colourings import Colour
 
-   print(HSL.BLUE)   # HSL(hue=240.0, saturation=100.0, lightness=50.0)
-   print(RGB.BLUE)   # RGB(red=0.0, green=0.0, blue=255.0)
-   print(HEX.BLUE)   # #00f
+   print(NAMED_HSL.BLUE)   # HSL(hue=240.0, saturation=100.0, lightness=50.0)
+   print(NAMED_RGB.BLUE)   # RGB(red=0.0, green=0.0, blue=255.0)
+   print(NAMED_HEX.BLUE)   # #00f
 
    assert Colour("red") == Colour("#f00")
 
-``Colour`` is an alias subclass of ``Color`` for British spelling preference.
+``Colour`` is ``Color`` -- the same class under the British spelling, not a
+subclass of it.
 
 Notes on value ranges
 ---------------------
