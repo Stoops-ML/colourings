@@ -1002,8 +1002,6 @@ def test_a_subclass_without_slots_does_take_arbitrary_attributes():
         pass
 
     assert Tint("red", foo=1).foo == 1  # type: ignore
-    ## The guard is on the name, not on where it would have been stored, so a
-    ## subclass cannot reach the slots either.
     with pytest.raises(ValueError, match="is stored state"):
         Tint("red", _hsl=(1, 2, 3))
 
@@ -1508,10 +1506,8 @@ def test_contrast_ratio_is_symmetric_and_ignores_alpha():
     assert Color("black", alpha=0.1).contrast_ratio(white) == 21.0
 
 
-## The greys accessibility tooling quotes for each WCAG threshold against
-## white, each paired with the next grey up, which is the first to fail it.
-## Sitting the tests on the boundary is the point: a threshold that is off by
-## one level, or compared with > instead of >=, moves exactly one of these.
+## Each grey is the last to clear its threshold against white, paired with the
+## next one up. A threshold off by a level, or a `>` for a `>=`, moves one case.
 @pytest.mark.parametrize(
     ("hex_value", "level", "size", "expected"),
     [
@@ -1649,7 +1645,6 @@ def test_grayscale_keeps_the_luminance_and_desaturating_does_not():
         )
         assert grey.red == grey.green == grey.blue
         assert color.desaturate(1.0).hex_l == "#7f7f7f"
-    ## Same lightness, and nothing like the same grey.
     assert Color("blue").grayscale().hex_l == "#4c4c4c"
     assert Color("yellow").grayscale().hex_l == "#f7f7f7"
 
@@ -1713,7 +1708,6 @@ def test_mix_blends_alpha_rather_than_carrying_it():
         0.5,
         1.0,
     ]
-    ## and neither operand is touched
     assert (clear.alpha, opaque.alpha) == (0.0, 1.0)
 
 
@@ -1802,7 +1796,6 @@ def test_repr_html_draws_the_colour():
     assert html.startswith("<div") and html.endswith("</div>")
     assert "rgb(255 0 0)" in html
     assert ">red</span>" in html
-    ## An opaque colour needs no checkerboard behind it.
     assert "linear-gradient" not in html
 
 

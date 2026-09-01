@@ -2147,10 +2147,6 @@ def _unclamped_rgbf_from_yuv(yuv: Sequence[int | float]) -> tuple[float, ...]:
     return (r, g, b)
 
 
-## The spaces that can address a colour sRGB cannot show. Every other input
-## format -- rgb, hsl, hsv, cmyk, hex, web and their variants -- is bounded by
-## its own component ranges, so it is representable by construction and has
-## nothing to ask about.
 _UNCLAMPED_RGBF_FROM: dict[
     str, Callable[[Sequence[int | float]], tuple[float, ...]]
 ] = {

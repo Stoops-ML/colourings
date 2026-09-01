@@ -333,10 +333,6 @@ def color_scale(
         channels = [linspace(a, b, num_colors) for a, b in zip(start, end, strict=True)]
         if hue_index is not None:
             channels[hue_index] = [(v * 360) % 360 for v in channels[hue_index]]
-        ## Alpha rides alongside the space's channels rather than being one of
-        ## them. It belongs to no colour space -- it is linear in every one, so
-        ## the space argument does not apply to it -- and each `to_hsl` above
-        ## takes exactly three components.
         alphas = linspace(colors[i].alpha, colors[i + 1].alpha, num_colors)
         add = [
             Color(hsl=to_hsl(values), alpha=alpha)
@@ -542,9 +538,8 @@ def _alpha_from(given: float | None, carried: float, format: str) -> float:
     return carried
 
 
-## The string formats, in the order they are tried. Hex comes before web
-## because ``is_web`` accepts hex too, and CSS comes last because it is the
-## broadest -- anything shaped like a colour function reaches it.
+## Tried in order: hex before web, since ``is_web`` accepts hex too, and CSS
+## last, being the broadest.
 _STRING_FORMATS: tuple[tuple[Callable[[str], bool], Callable[[Any], HSLTuple]], ...] = (
     (lambda text: is_long_hex(text) or is_short_hex(text), hex2hsl),
     (is_hex_alpha, hexa2hsl),
@@ -552,9 +547,6 @@ _STRING_FORMATS: tuple[tuple[Callable[[str], bool], Callable[[Any], HSLTuple]], 
     (is_css, css2hsl),
 )
 
-## The sequence formats, likewise. The three-component forms come first, so a
-## four-component value is never read as a three-component one with a stray
-## number after it.
 _SEQUENCE_FORMATS: tuple[
     tuple[Callable[[object], bool], Callable[[Any], HSLTuple]], ...
 ] = (
@@ -587,8 +579,6 @@ def identify_color(
     UnknownColorError
         Raised when the format cannot be identified.
     """
-    ## A sequence that is valid in two formats cannot be identified from its
-    ## components alone, and guessing would silently pick one.
     if (
         isinstance(color, Sequence)
         and len(color) == 3
@@ -800,23 +790,15 @@ class Color:
         # convert to hsl
         if color is not None:
             if isinstance(color, str):
-                ## Stripped as well as lowered, so that a value read out of a
-                ## file or a form is not rejected for the space around it.
                 color = color.strip().lower()
             func = identify_color(color)
             self.hsl = func(color)
-            ## Every input that carries an alpha loses it in the conversion to
-            ## HSL, so recover it here on that input's own scale. Without this
-            ## a positional colour would silently come out opaque while the
-            ## equivalent keyword form kept its alpha.
+            ## Every input that carries an alpha loses it on the way to HSL, so
+            ## recover it here on that input's own scale.
             if isinstance(color, Color):
-                ## A Color is copied rather than reconciled. The four-component
-                ## sequences below state an alpha explicitly, so an `alpha` that
-                ## disagrees with one is a contradiction worth reporting; a
-                ## Color instead always carries an alpha, defaulting to 1.0
-                ## when nobody chose it, so treating a disagreement as an error
-                ## would reject `Color(other, alpha=0.5)` -- the ordinary way to
-                ## restate a colour's opacity -- for every opaque `other`.
+                ## Copied rather than reconciled: a Color always carries an
+                ## alpha, so treating a disagreement as an error would reject
+                ## `Color(other, alpha=0.5)` for every opaque `other`.
                 if alpha is None:
                     alpha = color.alpha
             ## The isinstance check is redundant at runtime, since only a
@@ -888,12 +870,8 @@ class Color:
         self.equality = equality
         self.alpha = alpha if alpha is not None else 1.0
         for k, v in kwargs.items():
-            ## The stored attributes are reachable by name, and assigning one
-            ## here would skip the property that guards it: `_hsl` would take
-            ## any three objects and `_alpha` any number, leaving a colour that
-            ## fails later, somewhere else. `__slots__` exists to turn a
-            ## mistyped attribute into an AttributeError; letting keywords
-            ## write the slots would undo that for the two names it protects.
+            ## Assigning a slot here would skip the property that validates
+            ## it, which is what `__slots__` is present to prevent.
             if k in Color.__slots__:
                 raise ValueError(
                     f"{k!r} is stored state rather than a color property. "
@@ -1264,8 +1242,8 @@ class Color:
         >>> Color("navy").best_text_color()
         <Color white>
         """
-        ## A str is a Sequence, so `candidates="white"` would otherwise be read
-        ## as the four colours "w", "h", "i", "t", "e" and fail on the first.
+        ## A str is a Sequence, so `candidates="white"` would otherwise be
+        ## read as five one-letter colours.
         if isinstance(candidates, str):
             raise ValueError(
                 f"`candidates` must be a sequence of colors, not the single "
@@ -1449,7 +1427,6 @@ class Color:
         """
         return Color(rgb=rgb2grayscale(self.rgb), alpha=self._alpha)
 
-    ## British spelling, as with Colour and colour_scale.
     greyscale = grayscale
 
     def invert(self) -> Color:

@@ -17,11 +17,6 @@ from .errors import (
     UnknownColorError,
 )
 
-## The Color API and the errors it raises. The conversion functions, the shape
-## predicates and the CSS parser stay in their own modules: they are a larger
-## surface than most callers want, and importing this package should not put
-## eighty names in reach of a typo. `clear_caches` is here because it is about
-## the package's memory rather than about any one conversion.
 __all__ = [
     "AmbiguousColorError",
     "Color",

@@ -9,15 +9,9 @@ on:
     branches: [main]
   pull_request:
 
-## One run per branch. Pushing again to a pull request used to leave the
-## superseded run going to the end, holding a runner to report on a commit
-## nobody is waiting for any more. Cancelling is right for a pull request and
-## wrong for main, where every commit's result is a record of whether that
-## commit was green, so the cancellation is conditioned on the event.
-##
-## `github.ref` is the pull request's merge ref on `pull_request` and the
-## branch on `push`, so the two events never share a group and a merge does not
-## cancel the run of the pull request it came from.
+## One run per branch. Cancelling is right for a pull request and wrong for
+## main, where each commit's result records whether that commit was green, so
+## it is conditioned on the event.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -33,17 +27,10 @@ concurrency:
 permissions:
   contents: read
 
-## Every checkout below passes `persist-credentials: false`. By default the
-## action leaves the job's token in .git/config as an extauthheader, where any
-## later step -- a test, a linter, a build backend, anything they import -- can
-## read it and use it against the repository. Nothing here needs git after the
-## checkout, so nothing needs it left behind. `permissions` above caps what the
-## token could do; this removes the opportunity to reach for it at all.
-
-## Every job carries `timeout-minutes: 10`. The default is six hours, which is
-## what a hung job would sit at, burning a runner and blocking nothing useful.
-## The suite takes seconds, so ten minutes is already far more than the install
-## and the tests together will ever want.
+## Every checkout passes `persist-credentials: false`: by default the action
+## leaves the job's token in .git/config for every later step to read, and
+## nothing here uses git after the checkout. Every job carries a timeout, the
+## default being six hours.
 
 jobs:
   test:
@@ -97,15 +84,10 @@ jobs:
         run: python -m ruff format --diff
       - name: Build
         run: python -m build .
-      ## The build was being run and thrown away, which proved only that it did
-      ## not crash. These three failures are all silent otherwise: a wheel that
-      ## does not import, a py.typed that is declared in pyproject and not
-      ## actually packaged -- the package advertises itself as typed, so that
-      ## one degrades every downstream type check -- and a README that did not
-      ## make it into the metadata, which PyPI would render as an empty page.
-      ##
-      ## Run from the runner's temp directory so `import colourings` can only
-      ## resolve to the installed wheel and not to anything in the checkout.
+      ## The build was being thrown away, which proved only that it did not
+      ## crash. A wheel that does not import, a py.typed declared but not
+      ## packaged, and a README missing from the metadata are all silent.
+      ## Run from the temp directory so the import can only find the wheel.
       - name: Check the built wheel
         working-directory: ${{ runner.temp }}
         run: |
@@ -127,9 +109,8 @@ jobs:
           description = meta.get_payload() or meta["Description"] or ""
           assert len(description) > 1000, f"long description is {len(description)} characters"
 
-          ## The metadata the source declares, as the build actually emitted it.
-          ## The tests check pyproject.toml against the tree; only here is there
-          ## a fresh build to check that setuptools understood it.
+          ## Only here is there a fresh build to check setuptools understood
+          ## what pyproject.toml declares.
           licence = meta["License-Expression"]
           assert licence == "BSD-3-Clause", f"licence expression is {licence!r}"
           classifiers = meta.get_all("Classifier") or []
@@ -141,18 +122,11 @@ jobs:
           print("wheel imports, is typed, and carries the README and its licence")
           PY
 
-  ## Read the Docs builds after merge, so a malformed docstring or a broken
-  ## reference used to land and be discovered later, if at all. `-W` makes a
-  ## warning fail the build, which is the only way a docs check is worth having:
-  ## Sphinx reports almost everything that is wrong as a warning and exits 0.
-  ## Sphinx 8 and later report every warning before failing; 7.4 stops at the
-  ## first. `--keep-going` would force the former but is deprecated in 8 and a
-  ## candidate for removal, so it is left off rather than pinned to rot.
-  ##
-  ## Deliberately not `-n`. Nitpicky mode also fails on references to things
-  ## that are not documented, and the docstrings point at private helpers such
-  ## as `_srgb_to_linear` on purpose, to explain the arithmetic to someone
-  ## reading the source rather than the built page.
+  ## Sphinx reports almost everything wrong as a warning and exits 0, so `-W`
+  ## is what makes a docs job worth having. Not `-n`: nitpicky mode also fails
+  ## on references to undocumented objects, and the docstrings point at private
+  ## helpers on purpose. `--keep-going` is left off, being deprecated in Sphinx
+  ## 8, which keeps going anyway.
   docs:
     name: docs
     runs-on: ubuntu-latest
@@ -171,8 +145,7 @@ jobs:
             pyproject.toml
             docs/requirements.txt
       - name: Install dependencies
-        ## autodoc imports the package, so it has to be installed, not just
-        ## present on disk.
+        ## autodoc imports the package, so it has to be installed.
         run: |
           python -m pip install --upgrade pip
           python -m pip install . -r docs/requirements.txt

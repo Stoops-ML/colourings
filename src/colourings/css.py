@@ -23,9 +23,7 @@ import math
 import re
 from collections.abc import Callable, Sequence
 
-## `_cached` rather than a plain lru_cache so that these share the registry
-## `clear_caches` empties, and so the one public way to release the memory the
-## package holds keeps covering all of it.
+## `_cached` rather than lru_cache, so `clear_caches` reaches these too.
 from .conversions import (
     _cached,
     hsl2oklch,
@@ -42,9 +40,6 @@ from .definitions import HSL, HSLA
 from .errors import InvalidColorError
 from .identify import is_hsl
 
-## One function call: a name, then everything between the parentheses. Nested
-## parentheses are not part of any form handled here, so they are excluded
-## rather than balanced.
 CSS_FUNCTION = re.compile(r"([a-z]+)\(\s*([^()]*?)\s*\)")
 
 _NUMBER = r"[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?"
@@ -134,13 +129,9 @@ def _hsl_components(values: Sequence[float]) -> HSL:
     return HSL(*values)
 
 
-## Every function this module reads: the readers for its three components, and
-## the conversion that takes them to HSL.
-##
-## Chroma, and the a and b axes, take a number only. CSS gives them percentage
-## reference ranges too, but those differ per function -- and getting one wrong
-## would misread a color rather than reject it, which is the worse failure. A
-## percentage there is refused until the reference can be confirmed.
+## Chroma and the a/b axes take a number only: CSS gives them percentage
+## reference ranges that differ per function, and a wrong one would misread a
+## colour rather than reject it.
 _CSS_FUNCTIONS: dict[
     str,
     tuple[
@@ -258,8 +249,7 @@ def css2hsla(css: str) -> HSLA:
     readers, to_hsl = _CSS_FUNCTIONS[name]
 
     tokens, alpha_token = _split_arguments(arguments)
-    ## `rgba(r, g, b, a)` puts the alpha last instead of after a slash. Both
-    ## spellings are current, and either may appear with either separator.
+    ## `rgba(r, g, b, a)` puts the alpha last instead of after a slash.
     if alpha_token is None and len(tokens) == len(readers) + 1:
         alpha_token = tokens.pop()
     if len(tokens) != len(readers):
@@ -362,12 +352,9 @@ def hsla2css(
         body = f"{_trim(hue, 2)} {_trim(saturation, 2)}% {_trim(lightness, 2)}%"
     else:
         lightness, chroma, hue = hsl2oklch(hsl)
-        ## Five places. Oklch chroma spans only 0 to 0.4, so the usual three
-        ## decimals are coarser than an 8-bit channel and moved a colour by up
-        ## to five channel steps on the way back; four still lost the colours
-        ## sitting on the gamut boundary, where a hair of rounding decides
-        ## which side of the clip they land. Five round-trips every 8-bit
-        ## colour exactly, for three more characters.
+        ## Five places, not the usual three: oklch chroma spans only 0 to 0.4,
+        ## so three is coarser than an 8-bit channel, and four still loses the
+        ## colours sitting on the gamut boundary.
         body = f"{_trim(lightness, 5)} {_trim(chroma, 5)} {_trim(hue, 5)}"
     tail = "" if opaque else f" / {_trim(alpha, 4)}"
     return f"{form}({body}{tail})"

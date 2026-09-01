@@ -352,30 +352,21 @@ D65_WHITE_POINT: tuple[float, float, float] = (
 ## Breakpoint of the L*a*b* transfer function, delta = 6/29.
 LAB_DELTA = 6.0 / 29.0
 
-## WCAG 2.x relative luminance: the weights the standard gives for combining
-## linear-light sRGB channels, and the flare term added to both sides of a
-## contrast ratio so that black against white comes to exactly 21.
-##
-## Not to be confused with YUV_LUMA_COEFFICIENTS below. Those are BT.601's, for
-## a different set of primaries, and are applied to the channels as encoded
-## rather than to linear light. `Color.luminance` uses those; anything about
-## contrast must use these.
+## WCAG 2.x relative luminance weights, and the flare term that makes black
+## against white come to exactly 21. Not the BT.601 coefficients below: those
+## are for other primaries and apply to the channels as encoded.
 WCAG_LUMINANCE_COEFFICIENTS = (0.2126, 0.7152, 0.0722)
 WCAG_CONTRAST_FLARE = 0.05
 
-## The luminance at which a colour stops being dark and starts being light,
-## derived rather than chosen: it is where contrast against white equals
-## contrast against black, so it is exactly the point at which the better text
-## colour on it changes. Solving
+## Where contrast against white equals contrast against black, so exactly
+## where the better text colour changes. Solving
 ##     (1 + flare) / (L + flare) == (L + flare) / flare
-## for L gives the square root below, 0.1791...
+## for L gives the root below, 0.1791...
 WCAG_LIGHT_DARK_CROSSOVER = (
     math.sqrt((1.0 + WCAG_CONTRAST_FLARE) * WCAG_CONTRAST_FLARE) - WCAG_CONTRAST_FLARE
 )
 
-## The minimum contrast ratio WCAG 2.x asks for, by conformance level and text
-## size. "Large" means 18pt, or 14pt bold; anything smaller is "normal". Note
-## that AA large and AAA normal are the same 4.5 from opposite directions.
+## The minimum contrast ratio WCAG 2.x asks for. "Large" is 18pt, or 14pt bold.
 WCAG_CONTRAST_MINIMUMS: dict[tuple[str, str], float] = {
     ("AA", "normal"): 4.5,
     ("AA", "large"): 3.0,
@@ -437,9 +428,7 @@ COLOR_NAME_TO_RGB: dict[str, RGB] = {
 LONG_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 SHORT_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{3}$")
 
-## The same two forms with an alpha pair or digit on the end, as CSS
-## Color 4 allows. Kept separate from the pair above so that the length
-## alone still says whether a hex string carries an alpha.
+## The same two forms with an alpha pair or digit on the end.
 LONG_HEX_ALPHA_COLOR = re.compile(r"^#[0-9a-fA-F]{8}$")
 SHORT_HEX_ALPHA_COLOR = re.compile(r"^#[0-9a-fA-F]{4}$")
 

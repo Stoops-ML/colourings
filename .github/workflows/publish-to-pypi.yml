@@ -4,10 +4,8 @@ on:
   release:
     types: [created]
 
-## The build job only reads the repository. The publish job below declares its
-## own block, which replaces this one rather than adding to it, so its
-## id-token: write is unaffected -- and it deliberately keeps no contents
-## access, having nothing to read.
+## For the build job. The publish job's own block replaces this rather than
+## adding to it, so its id-token: write is unaffected.
 permissions:
   contents: read
 
@@ -17,9 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-    ## `persist-credentials: false` for the same reason as in workflow.yml: the
-    ## build runs arbitrary code from the build backend, and there is no reason
-    ## for the job's token to be sitting in .git/config while it does.
+    ## The build runs arbitrary build-backend code; the token has no reason to
+    ## be in .git/config while it does.
     - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       with:
         persist-credentials: false
@@ -31,13 +28,9 @@ jobs:
       run: python3 -m pip install build
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
-    ## Nothing tied the release to what is in the tree. The trigger publishes
-    ## whatever pyproject.toml says, so a release cut before the version bump
-    ## would try to republish the previous version -- rejected by PyPI after
-    ## the build, in the job that has the publishing credentials -- and a bump
-    ## without a matching tag would ship a version no tag points at. Compared
-    ## against the built wheel rather than against pyproject, because the wheel
-    ## is what actually gets uploaded.
+    ## Nothing tied the release to the tree: the trigger publishes whatever
+    ## pyproject.toml says, under whatever tag fired. Compared against the
+    ## built wheel, since that is what gets uploaded.
     - name: Check the tag matches the version being published
       run: |
         count=$(ls dist/*.whl | wc -l)
@@ -57,8 +50,8 @@ jobs:
       with:
         name: python-package-distributions
         path: dist/
-        ## Without this an empty upload succeeds and the publish job fails
-        ## later, holding the credentials, with nothing to say about why.
+        ## Otherwise an empty upload succeeds and the publish job fails later,
+        ## holding the credentials, with nothing to say about why.
         if-no-files-found: error
 
   publish-to-pypi:
