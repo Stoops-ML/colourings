@@ -433,4 +433,12 @@ def linspace(
         return [start]
     step = (stop - start) / (num - 1) if endpoint else (stop - start) / num
     result = [float(start + step * i) for i in range(num)]
+    if endpoint:
+        ## `start + step * (num - 1)` is not reliably `stop`: it lands a unit in
+        ## the last place away for about one interval in six, so the final
+        ## sample is assigned rather than computed. The docstring promises
+        ## `stop` is included, and a caller interpolating an alpha needs that
+        ## literally -- `Color.alpha` rejects 1.0000000000000002 outright,
+        ## its range check having none of the float tolerance `is_hsl` has.
+        result[-1] = float(stop)
     return result

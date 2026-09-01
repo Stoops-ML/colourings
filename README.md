@@ -196,6 +196,23 @@ A straight line between two saturated colors can leave the sRGB gamut. Those
 points are clamped, as everywhere else in the library, so a scale through one
 of them is a shade off the exact interpolant.
 
+### Alpha
+
+Alpha is interpolated alongside the color, so a scale can fade as well as
+shift. It belongs to no color space, so `space` does not apply to it and it is
+always interpolated linearly:
+
+```python
+from colourings import Color
+
+opaque = Color("red", alpha=1.0)
+clear = Color("blue", alpha=0.0)
+print([c.alpha for c in opaque.range_to(clear, 5)])  # [1.0, 0.75, 0.5, 0.25, 0.0]
+```
+
+A scale between colors that are all opaque is unaffected. The endpoints keep
+their alpha exactly, so a scale ending on a color reproduces it.
+
 ## Equality Behavior
 
 By default, `Color` equality compares RGB-equivalent rendered color (`hex_l`).

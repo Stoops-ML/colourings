@@ -224,6 +224,58 @@ def test_color_scale_with_exact_inputs():
     ) == [Color("blue"), Color("black"), Color("blue"), Color("orange"), Color("green")]
 
 
+def test_color_scale_interpolates_alpha():
+    scale = color_scale([Color("red", alpha=1.0), Color("blue", alpha=0.0)], 5)
+    assert [c.alpha for c in scale] == [1.0, 0.75, 0.5, 0.25, 0.0]
+
+
+def test_color_scale_keeps_the_endpoint_alphas_exactly():
+    """An endpoint's alpha is copied, not approximated.
+
+    Interpolating to 1.0000000000000002 would not merely be inexact, it would
+    raise: ``Color.alpha`` range-checks without float tolerance."""
+    start, end = Color(rgba=(255, 0, 0, 9)), Color("blue", alpha=1.0)
+    for steps in (2, 3, 5, 7, 9, 100):
+        scale = color_scale([start, end], steps)
+        assert scale[0].alpha == start.alpha
+        assert scale[-1].alpha == end.alpha
+        assert all(0 <= c.alpha <= 1 for c in scale)
+
+
+def test_color_scale_interpolates_alpha_per_section():
+    scale = color_scale(
+        [Color("red", alpha=0.0), Color("lime", alpha=1.0), Color("blue", alpha=0.5)],
+        5,
+    )
+    assert [c.alpha for c in scale] == [0.0, 0.5, 1.0, 0.75, 0.5]
+
+
+@pytest.mark.parametrize("space", ["hsl", "lab", "lch", "oklab", "oklch"])
+def test_color_scale_alpha_does_not_depend_on_the_space(space):
+    """Alpha belongs to no colour space, so it interpolates the same in each."""
+    scale = color_scale(
+        [Color("red", alpha=0.2), Color("blue", alpha=0.8)], 3, space=space
+    )
+    assert [c.alpha for c in scale] == [0.2, 0.5, 0.8]
+
+
+def test_color_scale_leaves_opaque_colors_opaque():
+    scale = color_scale([Color("red"), Color("blue")], 5)
+    assert [c.alpha for c in scale] == [1.0] * 5
+    assert [c.hex_l for c in scale] == [
+        "#ff0000",
+        "#ff007f",
+        "#ff00ff",
+        "#7f00ff",
+        "#0000ff",
+    ]
+
+
+def test_range_to_interpolates_alpha():
+    scale = list(Color("red", alpha=0.0).range_to(Color("blue", alpha=1.0), 5))
+    assert [c.alpha for c in scale] == [0.0, 0.25, 0.5, 0.75, 1.0]
+
+
 def test_bad_alpha():
     with pytest.raises(ValueError):
         Color(rgb=(1, 1, 1), alpha=-1)

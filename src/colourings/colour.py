@@ -189,6 +189,11 @@ def color_scale(
     the CIE equivalents, and are less uniform than the Ok pair, most visibly
     around blue.
 
+    Alpha is interpolated alongside the colour, linearly and independently of
+    ``space``, since it is part of no colour space. A scale between opaque
+    colours is therefore unchanged, and one between colours of differing
+    opacity fades between them rather than coming out opaque throughout.
+
     Parameters
     ----------
     colors : Sequence[Color | Colour]
@@ -259,7 +264,15 @@ def color_scale(
         channels = [linspace(a, b, num_colors) for a, b in zip(start, end, strict=True)]
         if hue_index is not None:
             channels[hue_index] = [(v * 360) % 360 for v in channels[hue_index]]
-        add = [Color(hsl=to_hsl(values)) for values in zip(*channels, strict=True)]
+        ## Alpha rides alongside the space's channels rather than being one of
+        ## them. It belongs to no colour space -- it is linear in every one, so
+        ## the space argument does not apply to it -- and each `to_hsl` above
+        ## takes exactly three components.
+        alphas = linspace(colors[i].alpha, colors[i + 1].alpha, num_colors)
+        add = [
+            Color(hsl=to_hsl(values), alpha=alpha)
+            for *values, alpha in zip(*channels, alphas, strict=True)
+        ]
 
         # add to output
         if i == 0:
@@ -919,6 +932,11 @@ class Color:
         space: str = "hsl",
     ) -> Generator[Color, None, None]:
         """Generate a color range from this color to another color.
+
+        Alpha is interpolated along with the color, as described on
+        :func:`color_scale`. The target supplies its own: a ``Color`` or a
+        four-component sequence carries one, and every other form is opaque,
+        having no way to say otherwise.
 
         Parameters
         ----------

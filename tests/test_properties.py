@@ -159,3 +159,28 @@ def test_scales_keep_their_endpoints_and_length():
                 assert len(scale) == steps
                 assert scale[0] == start
                 assert scale[-1] == end
+
+
+def test_scales_keep_their_endpoint_alphas_and_stay_in_range():
+    """The alpha of a scale behaves like its channels: bounded throughout, and
+    exactly the endpoint's at each end.
+
+    Alpha is checked separately from the channels above because nothing
+    quantises it. A channel that drifts a unit in the last place is rounded
+    away by the trip to 8-bit RGB, so the endpoint assertions there would hold
+    either way; an alpha that drifts the same amount is kept, reported, and --
+    above 1.0 -- rejected by ``Color.alpha`` outright.
+    """
+    alphas = [i / 255 for i in range(0, 256, 17)] + [0.0, 1.0]
+    for start_alpha in alphas:
+        for end_alpha in alphas:
+            start = Color("red", alpha=start_alpha)
+            end = Color("blue", alpha=end_alpha)
+            for steps in (2, 3, 7, 32):
+                scale = color_scale((start, end), steps)
+                assert scale[0].alpha == start_alpha
+                assert scale[-1].alpha == end_alpha
+                assert all(0.0 <= c.alpha <= 1.0 for c in scale)
+                ## Monotonic, so no step doubles back on the way across.
+                seen = [c.alpha for c in scale]
+                assert seen == sorted(seen, reverse=start_alpha > end_alpha)
