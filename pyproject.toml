@@ -1,9 +1,10 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "colourings"
+version = "1.0.0"
 authors = [
     {name = "Daniel Stoops", email = "danielstoops25@gmail.com"},
 ]
@@ -24,7 +25,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = []
-dynamic = ["version"]
 
 [dependency-groups]
 dev = [
@@ -38,9 +38,6 @@ dev = [
 [project.urls]
 Repository = "https://github.com/Stoops-ML/colourings"
 Documentation = "https://colourings.readthedocs.io/en/latest/"
-
-[tool.setuptools.dynamic]
-version = {attr = "colourings.__version__"}
 
 [tool.setuptools.package-data]
 "colourings" = ["py.typed"]
@@ -59,9 +56,14 @@ select = [
     "B9"
 ]
 
-
 [tool.ty.rules]
 all = "error"
 ## `@override` requires typing_extensions on Python 3.10/3.11, and this package
 ## has no runtime dependencies.
 missing-override-decorator = "ignore"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version_provider = "uv"
+tag_format = "v$version"
+update_changelog_on_bump = true
