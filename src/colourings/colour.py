@@ -76,6 +76,7 @@ from .definitions import (
     RGBf as RGBfTuple,
     linspace,
 )
+from .difference import hsl_difference, nearest_named_hsl
 from .errors import (
     AmbiguousColorError,
     InvalidColorError,
@@ -1802,6 +1803,82 @@ class Color:
         RGB(red=255.0, green=127.5, blue=127.5)
         """
         return self.blend(backdrop, "normal", linear)
+
+    def delta_e(
+        self, other: str | Sequence[int | float] | Color, metric: str = "ciede2000"
+    ) -> float:
+        """Measure how far this color is from another.
+
+        Roughly, on the three L*a*b* metrics: 1 is the smallest difference a
+        good eye can see side by side, 2 to 3 is noticeable, and above 5 they
+        read as different colors. ``ok`` is on Oklab's own scale and its
+        numbers are much smaller.
+
+        Alpha plays no part. Two colors differing only in opacity are the same
+        color at different strengths, and how far apart they look depends on
+        what is behind them -- :meth:`over` first, then ask.
+
+        Parameters
+        ----------
+        other : str | Sequence[int | float] | Color
+            The color to compare with, in any supported input format.
+        metric : str, default="ciede2000"
+            One of ``"cie76"``, ``"cie94"``, ``"ciede2000"`` or ``"ok"``, as
+            described in :mod:`colourings.difference`.
+
+        Returns
+        -------
+        float
+            The difference, on that metric's own scale, 0 for the same color.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``metric`` is not one of the four.
+
+        Examples
+        --------
+        >>> Color("black").delta_e("white")
+        100.0
+        >>> round(Color("red").delta_e("red"), 12)
+        0.0
+        """
+        return hsl_difference(self._hsl, Color(other)._hsl, metric)
+
+    def nearest_name(self, metric: str = "ok") -> str:
+        """Find the named color closest to this one.
+
+        Answers "what would I call this". An exact match gives that color's
+        own name; anything else gives the nearest, however far away it is, so
+        :meth:`delta_e` against it is worth checking before quoting it.
+
+        Parameters
+        ----------
+        metric : str, default="ok"
+            One of ``"cie76"``, ``"cie94"``, ``"ciede2000"`` or ``"ok"``. The
+            default is perceptual and cheap, which matters because this runs
+            over every name.
+
+        Returns
+        -------
+        str
+            The name, lowercase. :attr:`web` gives the canonical spelling for
+            a colour that matches one exactly -- ``RebeccaPurple`` rather than
+            ``rebeccapurple``.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``metric`` is not one of the four.
+
+        Examples
+        --------
+        >>> Color("#ff0001").nearest_name()
+        'red'
+        >>> Color("#123456").nearest_name()
+        'midnightblue'
+        """
+        return nearest_named_hsl(self._hsl, metric)
 
     def range_to(
         self,

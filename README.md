@@ -620,6 +620,55 @@ grey neutral in Oklab. Converting into sRGB clamps anything outside its gamut,
 since an out-of-gamut colour has no sRGB encoding; see
 [Ranges Are Not the Gamut](#ranges-are-not-the-gamut) for how to check first.
 
+## Colour Difference
+
+How far apart two colors are, and what to call one:
+
+```python
+from colourings import Color
+
+Color("black").delta_e("white")  # 100.0
+Color("#ff0000").delta_e("#ff0001")  # 0.098..., invisible
+Color("#123456").nearest_name()  # 'midnightblue'
+```
+
+Four metrics, in the order they were standardised:
+
+| metric | what it is |
+| --- | --- |
+| `cie76` | Euclidean distance in CIE L\*a\*b\*. Fast, and overstates blues badly |
+| `cie94` | Weights lightness, chroma and hue separately. Not symmetric |
+| `ciede2000` | What "delta E" means unqualified. The default |
+| `ok` | Euclidean distance in Oklab. Perceptual and cheap, on its own scale |
+
+Roughly, on the three L\*a\*b\* metrics: 1 is the smallest difference a good eye
+can see side by side, 2 to 3 is noticeable, above 5 they read as different
+colors. `ok` numbers are much smaller — Oklab's axes run to about 0.4, not 100
+— so a threshold does not carry across.
+
+The blue case is worth seeing, since it is why the later metrics exist:
+
+```python
+from colourings.difference import delta_e_cie76, delta_e_ciede2000
+
+blue1, blue2 = (32.0, 79.0, -104.0), (32.0, 69.0, -100.0)
+delta_e_cie76(blue1, blue2)  # 10.77
+delta_e_ciede2000(blue1, blue2)  # 2.77
+```
+
+`nearest_name` searches all 152 named colors and defaults to `ok`, being the
+cheap perceptual one. It returns the lowercase name; `web` gives the canonical
+spelling for an exact match. It always returns *something*, however far away —
+check `delta_e` against it before quoting it.
+
+> **On `ciede2000`:** its constants were written from the formula rather than
+> copied from a reference implementation. They are checked against properties
+> that hold by construction — exactly 0 for a color against itself, exactly 100
+> for black against white, symmetric in its arguments, and reducing to a
+> hand-computable expression for a pair differing only in lightness — but *not*
+> against the published Sharma-Wu-Dalal test set. Do that before relying on it
+> for compliance work.
+
 ## Compositing
 
 `over` draws this color on another, which is what its alpha means:
@@ -790,4 +839,5 @@ importing the package should not put eighty names within reach of a typo.
 - `colourings.colour`: the named-color accessors `HSL`, `RGB`, `HEX`
 - `colourings.conversions`: conversion utilities, plus `rgb2relative_luminance`, `contrast_ratio`, `in_srgb_gamut` and `clear_caches`
 - `colourings.css`: `css2hsl`, `css2hsla`, `hsla2css`, `is_css`
+- `colourings.difference`: `delta_e_cie76`, `delta_e_cie94`, `delta_e_ciede2000`, `delta_e_ok`, `hsl_difference`, `nearest_named_hsl`
 - `colourings.identify`: type/shape predicates like `is_rgb`, `is_hsl`, `is_web`

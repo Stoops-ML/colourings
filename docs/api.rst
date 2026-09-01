@@ -33,6 +33,14 @@ CSS syntax
    :undoc-members:
    :show-inheritance:
 
+Colour difference
+-----------------
+
+.. automodule:: colourings.difference
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Input identification helpers
 ----------------------------
 
