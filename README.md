@@ -86,6 +86,18 @@ Color(Color("red"))
 
 Only one color input source is allowed per constructor call.
 
+A bare sequence is identified from its length and its component ranges, and a
+four-component one keeps the alpha it carries:
+
+```python
+Color((255, 200, 200))  # RGB
+Color((255, 200, 200, 128))  # RGBA, alpha 0.502
+```
+
+That only works where the ranges tell the formats apart. `(0, 0, 0)` is
+equally valid RGB and HSL, so it raises `AmbiguousColorError`; name the format
+to settle it.
+
 ## Reading and Updating Channels
 
 ```python

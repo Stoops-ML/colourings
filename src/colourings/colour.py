@@ -386,6 +386,35 @@ def HSL_equivalence(c1: Color, c2: Color) -> bool:
     return c1._hsl == c2._hsl
 
 
+def _alpha_from(given: float | None, carried: float, format: str) -> float:
+    """Reconcile an ``alpha`` argument with the alpha a color value carries.
+
+    Parameters
+    ----------
+    given : float | None
+        Value passed as the ``alpha`` keyword, if any.
+    carried : float
+        Alpha carried by the color value, already scaled to ``[0, 1]``.
+    format : str
+        Name of the format the value was identified as, for the error message.
+
+    Returns
+    -------
+    float
+        The alpha to use.
+
+    Raises
+    ------
+    ValueError
+        Raised when both are given and they disagree.
+    """
+    if given is not None and given != carried:
+        raise ValueError(
+            f"Alpha value defined twice and does not have the same value: alpha={given} and alpha of {format}={carried}"
+        )
+    return carried
+
+
 def identify_color(
     color: str | Sequence[int | float] | Color | Colour,
 ) -> Callable[[Any], HSLTuple]:
@@ -442,10 +471,10 @@ def identify_color(
         return rgb2hsl
     elif isinstance(color, Sequence) and is_hsl(color):
         return lambda x: HSLTuple(*x)
-    # elif isinstance(color, Sequence) and is_rgba(color): NOTE: unreachable
-    #     return rgba2hsl
-    # elif isinstance(color, Sequence) and is_hsla(color): NOTE: unreachable
-    #     return hsla2hsl
+    elif isinstance(color, Sequence) and is_rgba(color):
+        return rgba2hsl
+    elif isinstance(color, Sequence) and is_hsla(color):
+        return hsla2hsl
     else:
         raise UnknownColorError("Cannot identify color.")
 
@@ -600,17 +629,26 @@ class Color:
                 color = color.lower()
             func = identify_color(color)
             self.hsl = func(color)
+            ## RGBA and HSLA carry an alpha that the conversion to HSL drops,
+            ## so recover it here on that format's own scale. Without this a
+            ## positional four-component colour would silently come out opaque
+            ## while the equivalent keyword form kept its alpha.
+            ## The isinstance check is redundant at runtime, since only a
+            ## sequence is ever identified as one of these, but it is what
+            ## narrows `color` away from `str` and `Color` for the subscript.
+            if isinstance(color, Sequence) and not isinstance(color, str):
+                if func is rgba2hsl:
+                    alpha = _alpha_from(alpha, color[3] / 255.0, "rgba")
+                elif func is hsla2hsl:
+                    alpha = _alpha_from(alpha, color[3] / 100.0, "hsla")
         elif web is not None:
             web = web.lower()
             self.hsl = web2hsl(web)
         elif hsl is not None:
             self.hsl = hsl
         elif hsla is not None:
-            if alpha is not None and alpha != hsla[3]:
-                raise ValueError(
-                    f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of hsla={hsla[3]}"
-                )
-            self.hsl, alpha = hsla2hsl(hsla), hsla[3] / 100
+            self.hsl = hsla2hsl(hsla)
+            alpha = _alpha_from(alpha, hsla[3] / 100.0, "hsla")
         elif hsv is not None:
             self.hsl = hsv2hsl(hsv)
         elif xyz is not None:
@@ -630,11 +668,8 @@ class Color:
         elif hslf is not None:
             self.hsl = hslf2hsl(hslf)
         elif hslaf is not None:
-            if alpha is not None and alpha != hslaf[3]:
-                raise ValueError(
-                    f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of hslaf={hslaf[3]}"
-                )
-            self.hsl, alpha = hslf2hsl(hslaf[:3]), hslaf[3]
+            self.hsl = hslf2hsl(hslaf[:3])
+            alpha = _alpha_from(alpha, hslaf[3], "hslaf")
         elif hex is not None:
             self.hsl = hex2hsl(hex)
         elif hex_l is not None:
@@ -642,19 +677,13 @@ class Color:
         elif rgb is not None:
             self.hsl = rgb2hsl(rgb)
         elif rgba is not None:
-            if alpha is not None and alpha != rgba[3] / 255.0:
-                raise ValueError(
-                    f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of rgba={rgba[3] / 255.0}"
-                )
-            self.hsl, alpha = rgba2hsl(rgba), rgba[3] / 255.0
+            self.hsl = rgba2hsl(rgba)
+            alpha = _alpha_from(alpha, rgba[3] / 255.0, "rgba")
         elif rgbf is not None:
             self.hsl = rgbf2hsl(rgbf)
         elif rgbaf is not None:
-            if alpha is not None and alpha != rgbaf[3]:
-                raise ValueError(
-                    f"Alpha value defined twice and does not have the same value: alpha={alpha} and alpha of rgbaf={rgbaf[3]}"
-                )
-            self.hsl, alpha = rgbaf2hsl(rgbaf), rgbaf[3]
+            self.hsl = rgbaf2hsl(rgbaf)
+            alpha = _alpha_from(alpha, rgbaf[3], "rgbaf")
         elif pick_for is not None:
             self.hsl = web2hsl(picker(pick_key(pick_for)).web)
         # elif isinstance(color, Color):

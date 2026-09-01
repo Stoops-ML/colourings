@@ -239,13 +239,54 @@ def test_bad_alpha():
         Color(hslaf=(1, 1, 1, 1), alpha=0)
 
 
-def test_alpha_entered_twice():
-    c = Color(rgba=(1, 1, 1, 255), alpha=1)
-    assert c.alpha == 1
-    Color(rgbaf=(1, 1, 1, 1), alpha=1)
-    assert c.alpha == 1
-    Color(hsla=(1, 1, 1, 1), alpha=1)
-    assert c.alpha == 1
+ALPHA_CARRYING = [
+    ("rgba", (1, 1, 1, 255)),
+    ("rgbaf", (1, 1, 1, 1)),
+    ("hsla", (1, 1, 1, 100)),
+    ("hslaf", (0, 0, 0, 1)),
+]
+
+
+@pytest.mark.parametrize(("space", "value"), ALPHA_CARRYING)
+def test_alpha_entered_twice(space, value):
+    """An alpha keyword agreeing with the value's own alpha is accepted."""
+    assert Color(**{space: value}, alpha=1).alpha == 1
+
+
+@pytest.mark.parametrize(("space", "value"), ALPHA_CARRYING)
+def test_alpha_entered_twice_disagreeing(space, value):
+    with pytest.raises(ValueError, match="Alpha value defined twice"):
+        Color(**{space: value}, alpha=0.5)
+
+
+def test_hsla_alpha_is_compared_on_its_own_scale():
+    """hsla carries alpha in [0, 100] while the keyword is always [0, 1]."""
+    assert Color(hsla=(300, 50, 50, 50), alpha=0.5).alpha == 0.5
+    with pytest.raises(ValueError, match="Alpha value defined twice"):
+        Color(hsla=(300, 50, 50, 50), alpha=50)
+
+
+@pytest.mark.parametrize(
+    ("value", "space"),
+    [
+        ((255, 200, 200, 200), "rgba"),
+        ((300, 50, 50, 50), "hsla"),
+    ],
+)
+def test_four_component_sequences_are_identified(value, space):
+    """A four-component sequence outside the other format's ranges is not
+    ambiguous, so it identifies, and it keeps the alpha it carries."""
+    positional = Color(value)
+    keyword = Color(**{space: value})
+    assert positional == keyword
+    assert positional.alpha == keyword.alpha
+    assert positional.alpha != 1
+
+
+def test_four_component_sequence_alpha_can_be_confirmed():
+    assert Color((255, 200, 200, 200), alpha=200 / 255.0).alpha == 200 / 255.0
+    with pytest.raises(ValueError, match="Alpha value defined twice"):
+        Color((255, 200, 200, 200), alpha=0.1)
 
 
 def test_bad_identify_color():
