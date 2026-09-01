@@ -1,4 +1,5 @@
 import math
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -38,6 +39,22 @@ def test_preview(mock_tk):
     mock_root.config.assert_called_once_with(background=c.hex_l)
     mock_root.title.assert_called_once_with(f"{str(c)} preview")
     mock_root.mainloop.assert_called_once()
+
+
+def test_preview_without_tkinter():
+    """The one import that can be missing must say which package supplies it.
+
+    Setting the entry to None makes ``import tkinter`` raise, which is what a
+    minimal Linux install without python3-tkinter looks like from in here.
+    """
+    c = Colour("red")
+    with (
+        patch.dict(sys.modules, {"tkinter": None}),
+        pytest.raises(ImportError, match="python3-tkinter") as excinfo,
+    ):
+        c.preview()
+    assert "python3-tk" in str(excinfo.value)
+    assert excinfo.value.__cause__ is not None
 
 
 def test_preview_invalid_size_x():

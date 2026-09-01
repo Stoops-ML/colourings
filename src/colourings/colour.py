@@ -890,6 +890,16 @@ class Color:
     def preview(self, size_x: int | float = 200, size_y: int | float = 200) -> None:
         """Display a Tkinter preview window filled with the current color.
 
+        This is the only part of the library that needs a GUI toolkit, so
+        ``tkinter`` is imported here rather than at module scope. Being in the
+        standard library does not make it free to import, nor guarantee it is
+        installed: it pulls in the ``_tkinter`` extension and links Tcl/Tk,
+        which costs around three times what importing the rest of this package
+        does, and most distributions ship it as a separate package that a
+        minimal install will not have. Importing it at module scope would make
+        ``import colourings`` slower for everyone and impossible on a headless
+        box, in exchange for a debugging aid most callers never reach for.
+
         Parameters
         ----------
         size_x : int | float, default=200
@@ -901,8 +911,25 @@ class Color:
         -------
         None
             This method displays a GUI window and does not return a value.
+
+        Raises
+        ------
+        ImportError
+            Raised when ``tkinter`` is not installed, naming the package that
+            provides it.
+        TypeError
+            Raised when either dimension is not a number.
         """
-        import tkinter
+        try:
+            import tkinter
+        except ImportError as error:
+            raise ImportError(
+                "Color.preview() needs tkinter, which is not installed. It "
+                "ships with CPython on Windows and macOS, but most Linux "
+                "distributions package it separately: install python3-tkinter "
+                "on the Red Hat family, or python3-tk on Debian and Ubuntu. "
+                "Nothing else in colourings needs it."
+            ) from error
 
         if not isinstance(size_x, int | float):
             raise TypeError("`size_x` must be of integer or float type")
