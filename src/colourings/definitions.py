@@ -351,6 +351,17 @@ D65_WHITE_POINT: tuple[float, float, float] = (
 ## Breakpoint of the L*a*b* transfer function, delta = 6/29.
 LAB_DELTA = 6.0 / 29.0
 
+## WCAG 2.x relative luminance: the weights the standard gives for combining
+## linear-light sRGB channels, and the flare term added to both sides of a
+## contrast ratio so that black against white comes to exactly 21.
+##
+## Not to be confused with YUV_LUMA_COEFFICIENTS below. Those are BT.601's, for
+## a different set of primaries, and are applied to the channels as encoded
+## rather than to linear light. `Color.luminance` uses those; anything about
+## contrast must use these.
+WCAG_LUMINANCE_COEFFICIENTS = (0.2126, 0.7152, 0.0722)
+WCAG_CONTRAST_FLARE = 0.05
+
 ## BT.601 luma coefficients, with the scale factors that turn the B-Y and R-Y
 ## differences into U and V. Working from the differences rather than a rounded
 ## 3x3 matrix keeps a grey at exactly U = V = 0; the published matrix leaves

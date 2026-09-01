@@ -27,6 +27,8 @@ from .definitions import (
     RGB_TO_XYZ_MATRIX,
     RGBA,
     SHORT_HEX_COLOR,
+    WCAG_CONTRAST_FLARE,
+    WCAG_LUMINANCE_COEFFICIENTS,
     XYZ,
     XYZ_TO_RGB_MATRIX,
     YUV,
@@ -1125,6 +1127,91 @@ def _linear_to_srgb(channel: float) -> float:
     if channel <= 0.0031308:
         return channel * 12.92
     return float(1.055 * channel ** (1 / 2.4) - 0.055)
+
+
+@_cached
+def rgb2relative_luminance(rgb: Sequence[int | float]) -> float:
+    """Compute the WCAG 2.x relative luminance of an RGB color.
+
+    This is luminance in the colorimetric sense: the channels are linearised
+    before being weighted, so the result is proportional to the light the
+    color emits. It is what a contrast ratio is built from, and it is not what
+    :attr:`~colourings.colour.Color.luminance` returns.
+
+    The standard's text gives the transfer function's breakpoint as 0.03928
+    where sRGB itself gives 0.04045. This uses :func:`_srgb_to_linear`, and so
+    sRGB's, both because it is the one the rest of the library applies and
+    because the difference is unobservable: no 8-bit level falls between the
+    two, and a float channel that does moves by at most 7.6e-07, two
+    ten-thousandths of a level.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    float
+        Relative luminance in ``[0, 1]``: 0 for black, 1 for white, and
+        exactly the channel's coefficient for each primary.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when ``rgb`` is not a valid RGB value.
+
+    Examples
+    --------
+    >>> rgb2relative_luminance((255, 255, 255))
+    1.0
+    >>> rgb2relative_luminance((255, 0, 0))
+    0.2126
+    """
+    if not is_rgb(rgb):
+        raise InvalidColorError("Input is not an RGB type.")
+    red, green, blue = (_srgb_to_linear(c) for c in rgb2rgbf(rgb))
+    kr, kg, kb = WCAG_LUMINANCE_COEFFICIENTS
+    return kr * red + kg * green + kb * blue
+
+
+def contrast_ratio(rgb1: Sequence[int | float], rgb2: Sequence[int | float]) -> float:
+    """Compute the WCAG 2.x contrast ratio between two RGB colors.
+
+    Symmetric: the lighter of the two is always the numerator, so the order of
+    the arguments does not matter.
+
+    Alpha plays no part. A contrast ratio is between two opaque colors, and a
+    translucent one has no contrast of its own -- it depends on whatever is
+    behind it. Composite first, then ask.
+
+    Parameters
+    ----------
+    rgb1 : Sequence[int | float]
+        First RGB sequence in the ``[0, 255]`` range.
+    rgb2 : Sequence[int | float]
+        Second RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    float
+        Contrast ratio in ``[1, 21]``: 1 for two colors of equal luminance,
+        and exactly 21 for black against white.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when either value is not a valid RGB value.
+
+    Examples
+    --------
+    >>> contrast_ratio((0, 0, 0), (255, 255, 255))
+    21.0
+    """
+    lighter, darker = sorted(
+        (rgb2relative_luminance(rgb1), rgb2relative_luminance(rgb2)), reverse=True
+    )
+    return (lighter + WCAG_CONTRAST_FLARE) / (darker + WCAG_CONTRAST_FLARE)
 
 
 @_cached

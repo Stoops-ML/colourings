@@ -339,6 +339,38 @@ assert Colour("red") == Colour("#f00")
 
 `Colour` is an alias subclass of `Color` for British spelling preference.
 
+## Contrast and Luminance
+
+`Color.relative_luminance` is WCAG 2.x relative luminance, and
+`Color.contrast_ratio` is the ratio built from it:
+
+```python
+from colourings import Color
+
+Color("black").contrast_ratio("white")  # 21.0
+Color("#767676").contrast_ratio("white")  # 4.5422...
+Color("white").relative_luminance  # 1.0
+Color("red").relative_luminance  # 0.2126
+```
+
+`contrast_ratio` takes any supported input format, and is symmetric — which
+color is the text and which the background does not matter. WCAG 2.x asks for
+at least 4.5 for normal text and 3 for large text at AA, and 7 and 4.5 at AAA.
+
+Alpha plays no part on either side. A contrast ratio is between two opaque
+colors, and a translucent one has no contrast of its own: it depends on
+whatever shows through it. Composite first, then ask.
+
+> **`Color.luminance` is a different quantity, and is not the one to use here.**
+> It is the root mean square of the channels under BT.601's luma weights, taken
+> without linearising them — a rough model of how bright a color *looks*, not of
+> how much light it carries. `#777777` is `0.467` by `luminance` and `0.185` by
+> `relative_luminance`. It keeps its name and behaviour because that is what it
+> has always returned.
+
+The pure-function forms are `rgb2relative_luminance` and `contrast_ratio`, both
+in `colourings.conversions`.
+
 ## Named Components
 
 Conversions and the `Color` tuple attributes return named tuples, so components
@@ -514,7 +546,7 @@ Errors about how a helper was *called* -- more than one color argument to
 Top-level exports:
 
 ```python
-from colourings import Color, Colour, color_scale, colour_scale
+from colourings import Color, Colour, color_scale, colour_scale, in_srgb_gamut
 from colourings import (
     ColorError,
     InvalidColorError,
@@ -526,5 +558,5 @@ from colourings import (
 Additional APIs are available from submodules:
 
 - `colourings.colour`: `HSL_equivalence`, `RGB_equivalence`, `RGB_color_picker`, `make_color_factory`, `identify_color`, `HSL`, `RGB`, `HEX`
-- `colourings.conversions`: conversion utilities and `clear_caches`
+- `colourings.conversions`: conversion utilities, plus `rgb2relative_luminance`, `contrast_ratio`, `in_srgb_gamut` and `clear_caches`
 - `colourings.identify`: type/shape predicates like `is_rgb`, `is_hsl`, `is_web`

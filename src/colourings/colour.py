@@ -33,6 +33,7 @@ from .conversions import (
     oklch2hsl,
     rgb2hex,
     rgb2hsl,
+    rgb2relative_luminance,
     rgb2rgba,
     rgb2rgbaf,
     rgba2hsl,
@@ -42,6 +43,9 @@ from .conversions import (
     web2hsl,
     xyz2hsl,
     yuv2hsl,
+)
+from .conversions import (
+    contrast_ratio as _contrast_ratio,
 )
 from .definitions import CMYK as CMYKTuple
 
@@ -837,8 +841,38 @@ class Color:
         return self.hsl.lightness
 
     def get_luminance(self) -> float:
+        """Perceived brightness, from the channels as they are encoded.
+
+        This is **not** luminance in the colorimetric sense, and it must not be
+        used to judge contrast. It is the root mean square of the sRGB channels
+        under BT.601's luma weights, taken without linearising them, which is a
+        rough model of how bright a colour looks rather than of how much light
+        it carries. The two part company by a lot: ``#777777`` is 0.467 here
+        and 0.185 as :attr:`relative_luminance`.
+
+        Kept, under this name, because it is what this property has always
+        returned. For contrast, and for anything else that calls itself
+        luminance elsewhere, use :attr:`relative_luminance` and
+        :meth:`contrast_ratio`.
+
+        Returns
+        -------
+        float
+            Perceived brightness in ``[0, 1]``.
+        """
         r, g, b = self.get_rgbf()
         return math.sqrt(0.299 * r**2 + 0.587 * g**2 + 0.114 * b**2)
+
+    def get_relative_luminance(self) -> float:
+        """WCAG 2.x relative luminance, as
+        :func:`~colourings.conversions.rgb2relative_luminance` computes it.
+
+        Returns
+        -------
+        float
+            Relative luminance in ``[0, 1]``.
+        """
+        return rgb2relative_luminance(self.rgb)
 
     def get_red(self) -> float:
         return self.rgb.red
@@ -961,6 +995,35 @@ class Color:
     hsla = property(get_hsla)
     hslaf = property(get_hslaf)
     luminance = property(get_luminance)
+    relative_luminance = property(get_relative_luminance)
+
+    def contrast_ratio(self, other: str | Sequence[int | float] | Color) -> float:
+        """Compute the WCAG 2.x contrast ratio against another color.
+
+        Symmetric, so which color is the text and which the background does
+        not matter. WCAG 2.x asks for at least 4.5 for normal text and 3 for
+        large text at AA, and 7 and 4.5 at AAA.
+
+        Alpha plays no part, on either side. A contrast ratio is between two
+        opaque colors, and a translucent one has no contrast of its own --
+        it depends on whatever shows through it. Composite first, then ask.
+
+        Parameters
+        ----------
+        other : str | Sequence[int | float] | Color
+            The other color, in any supported input format.
+
+        Returns
+        -------
+        float
+            Contrast ratio in ``[1, 21]``.
+
+        Examples
+        --------
+        >>> Color("black").contrast_ratio("white")
+        21.0
+        """
+        return _contrast_ratio(self.rgb, Color(other).rgb)
 
     def range_to(
         self,

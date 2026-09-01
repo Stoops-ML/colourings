@@ -5,6 +5,7 @@ import pytest
 from colourings.conversions import (
     clear_caches,
     cmyk2rgb,
+    contrast_ratio,
     hex2hsl,
     hex2hsv,
     hex2rgb,
@@ -41,6 +42,7 @@ from colourings.conversions import (
     rgb2lch,
     rgb2oklab,
     rgb2oklch,
+    rgb2relative_luminance,
     rgb2web,
     rgb2xyz,
     rgb2yuv,
@@ -782,3 +784,65 @@ def test_in_srgb_gamut_rejects_a_malformed_value(space, value):
     """Out of the format's own range is a different error from out of gamut."""
     with pytest.raises(InvalidColorError):
         in_srgb_gamut(value, space)
+
+
+def test_rgb2relative_luminance_anchors():
+    """The primaries must come back as exactly their own coefficients.
+
+    That is what says the channels were linearised before being weighted: a
+    primary is 1.0 linear in one channel and 0.0 in the others, so nothing but
+    the coefficient survives. Getting anything else back means the transfer
+    function was skipped, which is the bug `Color.luminance` embodies."""
+    assert rgb2relative_luminance((255, 255, 255)) == 1.0
+    assert rgb2relative_luminance((0, 0, 0)) == 0.0
+    assert rgb2relative_luminance((255, 0, 0)) == 0.2126
+    assert rgb2relative_luminance((0, 255, 0)) == 0.7152
+    assert rgb2relative_luminance((0, 0, 255)) == 0.0722
+
+
+def test_rgb2relative_luminance_is_monotonic_and_bounded():
+    previous = -1.0
+    for value in range(256):
+        luminance = rgb2relative_luminance((value, value, value))
+        assert 0.0 <= luminance <= 1.0
+        assert luminance > previous
+        previous = luminance
+
+
+def test_rgb2relative_luminance_rejects_a_malformed_value():
+    with pytest.raises(InvalidColorError, match="Input is not an RGB type."):
+        rgb2relative_luminance((256, 0, 0))
+
+
+def test_contrast_ratio_anchors():
+    assert contrast_ratio((0, 0, 0), (255, 255, 255)) == 21.0
+    assert contrast_ratio((255, 0, 0), (255, 0, 0)) == 1.0
+
+
+def test_contrast_ratio_is_symmetric():
+    for other in ((255, 255, 255), (128, 128, 128), (0, 0, 255)):
+        assert contrast_ratio((0, 0, 0), other) == contrast_ratio(other, (0, 0, 0))
+
+
+@pytest.mark.parametrize(
+    ("rgb", "expected"),
+    [
+        ((0x76, 0x76, 0x76), 4.54),
+        ((0xFF, 0x00, 0x00), 4.00),
+        ((0x00, 0x00, 0xFF), 8.59),
+        ((0x59, 0x59, 0x59), 7.00),
+        ((0x94, 0x94, 0x94), 3.03),
+    ],
+)
+def test_contrast_ratio_matches_published_values_against_white(rgb, expected):
+    """Values quoted widely for these colours on white, to two decimals."""
+    assert contrast_ratio(rgb, (255, 255, 255)) == pytest.approx(expected, abs=0.01)
+
+
+def test_contrast_ratio_stays_within_its_range():
+    values = range(0, 256, 51)
+    for r in values:
+        for g in values:
+            for b in values:
+                ratio = contrast_ratio((r, g, b), (255, 255, 255))
+                assert 1.0 <= ratio <= 21.0

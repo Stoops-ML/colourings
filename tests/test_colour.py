@@ -1462,3 +1462,30 @@ def test_range_to_accepts_a_space():
     direct = color_scale((Color("red"), Color("blue")), 5, space="oklab")
     assert list(Color("red").range_to("blue", 5, space="oklab")) == direct
     assert list(Color("red").range_to("blue", 5)) != direct
+
+
+def test_relative_luminance_is_not_luminance():
+    """The two are different quantities, and the docstrings now say so.
+
+    Pinned because the names are one word apart and the values are not: using
+    `luminance` for contrast is the mistake this pair exists to prevent."""
+    grey = Color("#777777")
+    assert grey.luminance == pytest.approx(0.4667, abs=0.0001)
+    assert grey.relative_luminance == pytest.approx(0.1845, abs=0.0001)
+    assert Color("white").relative_luminance == 1.0
+    assert Color("black").relative_luminance == 0.0
+
+
+def test_contrast_ratio_accepts_any_input_format():
+    black = Color("black")
+    for white in ("white", "#ffffff", "#fff", (255, 255, 255), Color("white")):
+        assert black.contrast_ratio(white) == 21.0
+
+
+def test_contrast_ratio_is_symmetric_and_ignores_alpha():
+    """Alpha is deliberately not consulted: a translucent colour has no
+    contrast of its own, only the composite does."""
+    black, white = Color("black"), Color("white")
+    assert black.contrast_ratio(white) == white.contrast_ratio(black) == 21.0
+    assert black.contrast_ratio(Color("white", alpha=0.1)) == 21.0
+    assert Color("black", alpha=0.1).contrast_ratio(white) == 21.0
