@@ -1566,3 +1566,158 @@ def test_best_text_color_rejects_a_bare_string():
 def test_best_text_color_rejects_an_empty_choice():
     with pytest.raises(ValueError, match="at least one color"):
         Color("navy").best_text_color([])
+
+
+def test_relative_steps_never_clip_and_land_exactly_on_the_limit():
+    """The reason relative is the default: the step is a fraction of what is
+    left, so it cannot overshoot and 1.0 reaches the end exactly."""
+    for hex_value in ("#000000", "#808080", "#e0e0e0", "#ffffff"):
+        color = Color(hex_value)
+        assert color.lighten(1.0).lightness == 100.0
+        assert color.darken(1.0).lightness == 0.0
+        assert color.saturate(1.0).saturation == 100.0
+        assert color.desaturate(1.0).saturation == 0.0
+        for amount in (0.0, 0.1, 0.5, 0.9, 1.0):
+            assert 0.0 <= color.lighten(amount).lightness <= 100.0
+            assert 0.0 <= color.darken(amount).lightness <= 100.0
+
+
+def test_absolute_steps_are_flat_and_clamp():
+    """Absolute moves by the same amount wherever it starts, and stops at the
+    end rather than running past it."""
+    assert Color("#000000").lighten(0.1, relative=False).lightness == 10.0
+    mid = Color("#808080")
+    assert mid.lighten(0.1, relative=False).lightness == pytest.approx(
+        mid.lightness + 10.0
+    )
+    assert Color("#e0e0e0").lighten(0.9, relative=False).lightness == 100.0
+    assert Color("#202020").darken(0.9, relative=False).lightness == 0.0
+
+
+def test_a_zero_step_changes_nothing():
+    original = Color("#3d7ab8")
+    for method in ("lighten", "darken", "saturate", "desaturate"):
+        for relative in (True, False):
+            assert getattr(original, method)(0.0, relative=relative) == original
+
+
+@pytest.mark.parametrize("method", ["lighten", "darken", "saturate", "desaturate"])
+@pytest.mark.parametrize("amount", [-0.1, 1.1, 2, -1])
+def test_a_step_outside_the_unit_range_is_refused(method, amount):
+    with pytest.raises(ValueError, match="must be between 0 and 1"):
+        getattr(Color("red"), method)(amount)
+
+
+def test_rotate_hue_wraps_in_both_directions():
+    red = Color("red")
+    assert red.rotate_hue(180) == Color("cyan")
+    assert red.rotate_hue(-180) == Color("cyan")
+    assert red.rotate_hue(360) == red
+    assert red.rotate_hue(-360) == red
+    assert red.rotate_hue(720) == red
+    assert red.rotate_hue(120) == Color("lime")
+
+
+def test_grayscale_keeps_the_luminance_and_desaturating_does_not():
+    """The two greys are different, and the difference is the whole point.
+
+    `desaturate(1.0)` holds HSL lightness, so every fully saturated colour
+    collapses to the same mid grey whatever its brightness. `grayscale` holds
+    luminance, so blue stays dark and yellow stays bright."""
+    for name in ("blue", "yellow", "red", "lime"):
+        color = Color(name)
+        grey = color.grayscale()
+        assert grey.relative_luminance == pytest.approx(
+            color.relative_luminance, abs=1e-12
+        )
+        assert grey.red == grey.green == grey.blue
+        assert color.desaturate(1.0).hex_l == "#7f7f7f"
+    ## Same lightness, and nothing like the same grey.
+    assert Color("blue").grayscale().hex_l == "#4c4c4c"
+    assert Color("yellow").grayscale().hex_l == "#f7f7f7"
+
+
+def test_greyscale_is_the_same_method():
+    assert Color.greyscale is Color.grayscale
+    assert Color("blue").greyscale() == Color("blue").grayscale()
+
+
+def test_invert_is_its_own_inverse():
+    for name in ("red", "black", "white", "#123456", "rebeccapurple"):
+        color = Color(name)
+        assert color.invert().invert() == color
+    assert Color("black").invert() == Color("white")
+    assert Color("red").invert() == Color("cyan")
+    assert Color("#123456").invert().hex_l == "#edcba9"
+
+
+def test_mix_reaches_both_endpoints_exactly():
+    red, blue = Color("red"), Color("blue")
+    for space in ("hsl", "lab", "lch", "oklab", "oklch"):
+        assert red.mix(blue, 0.0, space=space) == red
+        assert red.mix(blue, 1.0, space=space) == blue
+
+
+def test_mix_defaults_to_oklab_and_takes_any_input_format():
+    assert Color("red").mix("blue") == Color("red").mix("blue", space="oklab")
+    assert Color("red").mix("blue") != Color("red").mix("blue", space="hsl")
+    for other in ("blue", "#0000ff", (0, 0, 255), Color("blue")):
+        assert Color("red").mix(other, 0.5) == Color("red").mix("blue", 0.5)
+
+
+def test_mix_agrees_with_the_midpoint_of_a_three_step_scale():
+    """`mix` and `color_scale` interpolate the same way, so they must agree
+    where they overlap."""
+    for space in ("hsl", "lab", "lch", "oklab", "oklch"):
+        scale = color_scale((Color("red"), Color("blue")), 3, space=space)
+        assert Color("red").mix("blue", 0.5, space=space) == scale[1]
+
+
+def test_mix_takes_the_longer_arc_when_asked():
+    assert Color("red").mix("blue", 0.5, space="hsl", longer=True) == Color("lime")
+    with pytest.raises(ValueError, match="no hue channel"):
+        Color("red").mix("blue", space="oklab", longer=True)
+
+
+def test_mix_rejects_a_bad_amount_or_space():
+    with pytest.raises(ValueError, match="must be between 0 and 1"):
+        Color("red").mix("blue", 1.5)
+    with pytest.raises(ValueError, match="Unknown interpolation space"):
+        Color("red").mix("blue", space="nope")
+
+
+def test_mix_blends_alpha_rather_than_carrying_it():
+    """Unlike the single-colour adjustments, `mix` has two alphas to reconcile,
+    so it interpolates between them the way it does every other channel."""
+    clear, opaque = Color("red", alpha=0.0), Color("blue", alpha=1.0)
+    assert [clear.mix(opaque, t).alpha for t in (0.0, 0.25, 0.5, 1.0)] == [
+        0.0,
+        0.25,
+        0.5,
+        1.0,
+    ]
+    ## and neither operand is touched
+    assert (clear.alpha, opaque.alpha) == (0.0, 1.0)
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda c: c.lighten(0.3),
+        lambda c: c.darken(0.3),
+        lambda c: c.saturate(0.3),
+        lambda c: c.desaturate(0.3),
+        lambda c: c.rotate_hue(90),
+        lambda c: c.grayscale(),
+        lambda c: c.invert(),
+    ],
+)
+def test_every_adjustment_carries_alpha_and_leaves_the_original_alone(call):
+    """`mix` is deliberately absent: it blends alpha rather than carrying it,
+    which is what test_mix_blends_alpha covers."""
+    original = Color("#3d7ab8", alpha=0.4)
+    before = original.hsl, original.alpha
+    result = call(original)
+    assert result is not original
+    assert result.alpha == 0.4
+    assert (original.hsl, original.alpha) == before

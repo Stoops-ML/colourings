@@ -339,6 +339,71 @@ assert Colour("red") == Colour("#f00")
 
 `Colour` is an alias subclass of `Color` for British spelling preference.
 
+## Adjusting a Color
+
+Every one of these returns a new color and leaves the original alone, carrying
+its alpha across:
+
+```python
+from colourings import Color
+
+c = Color("#3d7ab8")
+
+c.lighten(0.2)  # and darken, saturate, desaturate
+c.rotate_hue(180)
+c.grayscale()  # greyscale() is the same method
+c.invert()
+c.mix("white", 0.3)
+```
+
+### Absolute and relative steps
+
+`lighten`, `darken`, `saturate` and `desaturate` take an amount in `[0, 1]` and
+a `relative` flag that decides how to read it:
+
+- **relative** (the default) — a fraction of the distance still available. A
+  step can never clip, and `1.0` lands exactly on the limit, so
+  `lighten(1.0)` is white and `darken(1.0)` is black.
+- **absolute** (`relative=False`) — a fraction of the whole range, added flat
+  and clamped. This is what Sass's `lighten()` does.
+
+```python
+Color("#e0e0e0").lightness  # 87.84
+Color("#e0e0e0").lighten(0.1).lightness  # 89.06, a tenth of what was left
+Color("#e0e0e0").lighten(0.1, relative=False).lightness  # 97.84, a flat +10
+```
+
+These move HSL lightness and saturation, which are geometric rather than
+perceptual quantities. For a step that looks the same size wherever it starts,
+`mix` toward white or black in `oklab` instead.
+
+### `grayscale` is not `desaturate(1.0)`
+
+They produce different greys, and the difference is large:
+
+```python
+Color("blue").desaturate(1.0)  # <Color #7f7f7f> -- holds HSL lightness
+Color("blue").grayscale()  # <Color #4c4c4c> -- holds luminance
+Color("yellow").grayscale()  # <Color #f7f7f7>
+```
+
+Desaturating holds HSL lightness, so every fully saturated color collapses to
+the same mid grey whatever its brightness. `grayscale` holds relative luminance
+exactly, so blue stays dark and yellow stays bright — which is what you want
+when the grey has to stand in for the color.
+
+### Mixing
+
+```python
+Color("red").mix("blue")  # <Color #8c53a2>, halfway in oklab
+Color("red").mix("blue", 0.25)  # <Color #c6496d>
+Color("red").mix("blue", 0.5, space="hsl")  # <Color magenta>
+```
+
+`mix` defaults to `oklab`, unlike `color_scale`, which defaults to `hsl` only
+because changing it would move every existing caller's output. Alpha is blended
+too, so mixing an opaque color with a transparent one fades.
+
 ## Contrast and Luminance
 
 `Color.relative_luminance` is WCAG 2.x relative luminance, and

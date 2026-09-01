@@ -31,6 +31,7 @@ from .conversions import (
     lch2hsl,
     oklab2hsl,
     oklch2hsl,
+    rgb2grayscale,
     rgb2hex,
     rgb2hsl,
     rgb2relative_luminance,
@@ -171,6 +172,70 @@ def _unwrap_hue(start: list[float], end: list[float], index: int, longer: bool) 
     start[index], end[index] = h1, h2
 
 
+def _check_amount(amount: float) -> None:
+    """Reject a step or blend position outside ``[0, 1]``.
+
+    Parameters
+    ----------
+    amount : float
+        Value to check.
+
+    Returns
+    -------
+    None
+        Returns nothing when the value is in range.
+
+    Raises
+    ------
+    ValueError
+        Raised when ``amount`` is outside ``[0, 1]``.
+    """
+    if not 0.0 <= amount <= 1.0:
+        raise ValueError(f"`amount` must be between 0 and 1, not {amount!r}.")
+
+
+def _scale_space(
+    space: str, longer: bool
+) -> tuple[Callable[[Sequence[float]], HSLTuple], int | None]:
+    """Look up an interpolation space, rejecting one that cannot do the job.
+
+    Shared by :func:`color_scale` and :meth:`Color.mix`, so the two accept the
+    same spaces and refuse them for the same reasons.
+
+    Parameters
+    ----------
+    space : str
+        Name of the space to interpolate in.
+    longer : bool
+        Whether the caller asked for the longer hue arc, which only a space
+        with a hue channel can give.
+
+    Returns
+    -------
+    tuple[Callable[[Sequence[float]], HSLTuple], int | None]
+        The conversion back to HSL, and the index of the hue channel or
+        ``None`` when the space has none.
+
+    Raises
+    ------
+    ValueError
+        Raised when ``space`` is not supported.
+    ValueError
+        Raised when ``longer`` is asked for in a space without a hue channel.
+    """
+    if space not in _SCALE_SPACES:
+        raise ValueError(
+            f"Unknown interpolation space {space!r}. Choose one of: "
+            f"{', '.join(sorted(_SCALE_SPACES))}."
+        )
+    to_hsl, hue_index = _SCALE_SPACES[space]
+    if longer and hue_index is None:
+        raise ValueError(
+            f"The longer hue arc is not defined in {space!r}, which has no hue channel."
+        )
+    return to_hsl, hue_index
+
+
 def color_scale(
     colors: Sequence[Color | Colour],
     num_steps: int,
@@ -234,16 +299,7 @@ def color_scale(
         raise ValueError(
             "Number of steps must be greater than or equal to the number of colors."
         )
-    if space not in _SCALE_SPACES:
-        raise ValueError(
-            f"Unknown interpolation space {space!r}. Choose one of: "
-            f"{', '.join(sorted(_SCALE_SPACES))}."
-        )
-    to_hsl, hue_index = _SCALE_SPACES[space]
-    if longer and hue_index is None:
-        raise ValueError(
-            f"The longer hue arc is not defined in {space!r}, which has no hue channel."
-        )
+    to_hsl, hue_index = _scale_space(space, longer)
 
     # linearly interpolate between colours
     num_sections = len(colors) - 1
@@ -287,6 +343,47 @@ def color_scale(
 
 
 colour_scale = color_scale
+
+
+def _adjust(
+    current: float, amount: float, maximum: float, up: bool, relative: bool
+) -> float:
+    """Move a channel up or down by an amount given as a fraction of its range.
+
+    The same ``amount`` reads two ways, which is what ``relative`` selects
+    between, and both are on a ``[0, 1]`` scale so that the flag changes the
+    meaning of the number rather than its units.
+
+    Relative is the default everywhere it is offered because it cannot clip:
+    the step is a fraction of the distance still available, so ``1.0`` lands
+    exactly on the limit and nothing beyond it is lost. Absolute is a fixed
+    step regardless of where the channel already is, which is what Sass's
+    ``lighten()`` does and why it is unhelpful near the ends -- lightening an
+    already pale colour by a tenth does nothing visible, then clips.
+
+    Parameters
+    ----------
+    current : float
+        Current value of the channel.
+    amount : float
+        Size of the step, in ``[0, 1]``.
+    maximum : float
+        Upper bound of the channel; the lower bound is always zero.
+    up : bool
+        Whether to move towards ``maximum`` rather than towards zero.
+    relative : bool
+        Whether ``amount`` is a fraction of the remaining distance rather than
+        of the whole range.
+
+    Returns
+    -------
+    float
+        The new value, held inside ``[0, maximum]``.
+    """
+    room = (maximum - current) if up else current
+    step = amount * (room if relative else maximum)
+    value = current + step if up else current - step
+    return min(max(value, 0.0), maximum)
 
 
 class PickKey(Protocol):
@@ -1125,6 +1222,253 @@ class Color:
         if not colors:
             raise ValueError("`candidates` must contain at least one color.")
         return max(colors, key=self.contrast_ratio)
+
+    def _with_hsl(self, hsl: Sequence[float]) -> Color:
+        """Build a new color from HSL components, carrying this one's alpha."""
+        return Color(hsl=hsl, alpha=self._alpha)
+
+    def lighten(self, amount: float = 0.1, relative: bool = True) -> Color:
+        """Return a lighter copy of this color.
+
+        Moves HSL lightness, which is a geometric quantity rather than a
+        perceptual one, so a step of a given size does not look the same size
+        everywhere. When that matters, ``mix("white", amount)`` in ``oklab``
+        lightens perceptually instead.
+
+        Parameters
+        ----------
+        amount : float, default=0.1
+            Size of the step, in ``[0, 1]``.
+        relative : bool, default=True
+            When ``True``, ``amount`` is a fraction of the lightness still
+            available, so ``1.0`` gives white and nothing ever clips. When
+            ``False``, it is a fraction of the whole range, added flat and
+            clamped -- the behaviour of Sass's ``lighten()``.
+
+        Returns
+        -------
+        Color
+            A new color; this one is unchanged. Alpha is carried over.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``amount`` is outside ``[0, 1]``.
+
+        Examples
+        --------
+        >>> Color("#808080").lighten(0.5).hex_l
+        '#bfbfbf'
+        """
+        _check_amount(amount)
+        hue, saturation, lightness = self._hsl
+        return self._with_hsl(
+            HSLTuple(hue, saturation, _adjust(lightness, amount, 100.0, True, relative))
+        )
+
+    def darken(self, amount: float = 0.1, relative: bool = True) -> Color:
+        """Return a darker copy of this color.
+
+        The mirror of :meth:`lighten`, with ``relative`` meaning a fraction of
+        the lightness there is to remove, so ``1.0`` gives black.
+
+        Parameters
+        ----------
+        amount : float, default=0.1
+            Size of the step, in ``[0, 1]``.
+        relative : bool, default=True
+            Whether ``amount`` is a fraction of the current lightness rather
+            than of the whole range.
+
+        Returns
+        -------
+        Color
+            A new color; this one is unchanged. Alpha is carried over.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``amount`` is outside ``[0, 1]``.
+        """
+        _check_amount(amount)
+        hue, saturation, lightness = self._hsl
+        return self._with_hsl(
+            HSLTuple(
+                hue, saturation, _adjust(lightness, amount, 100.0, False, relative)
+            )
+        )
+
+    def saturate(self, amount: float = 0.1, relative: bool = True) -> Color:
+        """Return a more saturated copy of this color.
+
+        Parameters
+        ----------
+        amount : float, default=0.1
+            Size of the step, in ``[0, 1]``.
+        relative : bool, default=True
+            Whether ``amount`` is a fraction of the saturation still available
+            rather than of the whole range.
+
+        Returns
+        -------
+        Color
+            A new color; this one is unchanged. Alpha is carried over.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``amount`` is outside ``[0, 1]``.
+        """
+        _check_amount(amount)
+        hue, saturation, lightness = self._hsl
+        return self._with_hsl(
+            HSLTuple(hue, _adjust(saturation, amount, 100.0, True, relative), lightness)
+        )
+
+    def desaturate(self, amount: float = 0.1, relative: bool = True) -> Color:
+        """Return a less saturated copy of this color.
+
+        ``desaturate(1.0)`` gives a grey of the same HSL lightness, which is
+        not the same grey as :meth:`grayscale`: this holds lightness, that
+        holds luminance. For blue the two are far apart.
+
+        Parameters
+        ----------
+        amount : float, default=0.1
+            Size of the step, in ``[0, 1]``.
+        relative : bool, default=True
+            Whether ``amount`` is a fraction of the current saturation rather
+            than of the whole range.
+
+        Returns
+        -------
+        Color
+            A new color; this one is unchanged. Alpha is carried over.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``amount`` is outside ``[0, 1]``.
+        """
+        _check_amount(amount)
+        hue, saturation, lightness = self._hsl
+        return self._with_hsl(
+            HSLTuple(
+                hue, _adjust(saturation, amount, 100.0, False, relative), lightness
+            )
+        )
+
+    def rotate_hue(self, degrees: float) -> Color:
+        """Return a copy with the hue turned around the color wheel.
+
+        Any angle is accepted and wrapped, so ``180`` and ``-180`` give the
+        same color and ``360`` gives this one back.
+
+        Parameters
+        ----------
+        degrees : float
+            How far to turn, positive or negative.
+
+        Returns
+        -------
+        Color
+            A new color; this one is unchanged. Alpha is carried over.
+
+        Examples
+        --------
+        >>> Color("red").rotate_hue(180).web
+        'cyan'
+        """
+        hue, saturation, lightness = self._hsl
+        return self._with_hsl(HSLTuple((hue + degrees) % 360.0, saturation, lightness))
+
+    def grayscale(self) -> Color:
+        """Return the grey with the same luminance as this color.
+
+        Not ``desaturate(1.0)``, which holds HSL lightness instead and so
+        changes how bright the color is. See
+        :func:`~colourings.conversions.rgb2grayscale`.
+
+        Returns
+        -------
+        Color
+            A new color; this one is unchanged. Alpha is carried over.
+        """
+        return Color(rgb=rgb2grayscale(self.rgb), alpha=self._alpha)
+
+    ## British spelling, as with Colour and colour_scale.
+    greyscale = grayscale
+
+    def invert(self) -> Color:
+        """Return the color with every RGB channel reflected about its range.
+
+        Applied to the channels as encoded, which is what the CSS ``invert()``
+        filter does. Alpha is left alone: inverting the color is not a request
+        to change how opaque it is.
+
+        Returns
+        -------
+        Color
+            A new color; this one is unchanged. Alpha is carried over.
+
+        Examples
+        --------
+        >>> Color("black").invert().web
+        'white'
+        """
+        red, green, blue = self.rgb
+        return Color(rgb=(255.0 - red, 255.0 - green, 255.0 - blue), alpha=self._alpha)
+
+    def mix(
+        self,
+        other: str | Sequence[int | float] | Color,
+        amount: float = 0.5,
+        space: str = "oklab",
+        longer: bool = False,
+    ) -> Color:
+        """Blend this color with another, in a chosen space.
+
+        Unlike :func:`color_scale`, which defaults to ``hsl`` only because
+        changing it would move every existing caller's output, this defaults to
+        ``oklab``: it is new, so it can start on the space worth using.
+
+        Alpha is blended too, linearly, as it is in a scale.
+
+        Parameters
+        ----------
+        other : str | Sequence[int | float] | Color
+            The color to blend towards, in any supported input format.
+        amount : float, default=0.5
+            How far to go, in ``[0, 1]``. ``0`` is this color and ``1`` is
+            ``other``.
+        space : str, default="oklab"
+            Space to blend in, as described on :func:`color_scale`.
+        longer : bool, default=False
+            Whether to take the longer hue arc, in a space that has a hue.
+
+        Returns
+        -------
+        Color
+            A new color; this one is unchanged.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``amount`` is outside ``[0, 1]``, when ``space`` is not
+            supported, or when ``longer`` is asked for in a space with no hue.
+        """
+        _check_amount(amount)
+        to_hsl, hue_index = _scale_space(space, longer)
+        other = Color(other)
+        start = list(getattr(self, space))
+        end = list(getattr(other, space))
+        if hue_index is not None:
+            _unwrap_hue(start, end, hue_index, longer)
+        values = [a + (b - a) * amount for a, b in zip(start, end, strict=True)]
+        if hue_index is not None:
+            values[hue_index] = (values[hue_index] * 360) % 360
+        alpha = self._alpha + (other._alpha - self._alpha) * amount
+        return Color(hsl=to_hsl(values), alpha=alpha)
 
     def range_to(
         self,

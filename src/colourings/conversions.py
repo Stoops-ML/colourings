@@ -1175,6 +1175,41 @@ def rgb2relative_luminance(rgb: Sequence[int | float]) -> float:
     return kr * red + kg * green + kb * blue
 
 
+@_cached
+def rgb2grayscale(rgb: Sequence[int | float]) -> RGB:
+    """Convert an RGB color to the grey of the same luminance.
+
+    Not the same as taking the saturation to zero, which holds HSL lightness
+    instead and so changes how bright the color is: ``blue`` desaturated that
+    way keeps HSL lightness 50 and comes out mid grey, where its luminance puts
+    it close to black. This preserves :func:`rgb2relative_luminance` exactly,
+    which is what makes it the one to use when the grey has to stand in for the
+    color -- printing, a contrast check, a disabled state.
+
+    Parameters
+    ----------
+    rgb : Sequence[int | float]
+        RGB sequence in the ``[0, 255]`` range.
+
+    Returns
+    -------
+    RGB
+        A grey, all three channels equal, with the luminance of the input.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when ``rgb`` is not a valid RGB value.
+
+    Examples
+    --------
+    >>> rgb2grayscale((0, 0, 255))  # blue is dark, not mid grey
+    RGB(red=75.96269735836901, green=75.96269735836901, blue=75.96269735836901)
+    """
+    channel = _threshold(_linear_to_srgb(rgb2relative_luminance(rgb)) * 255.0)
+    return RGB(channel, channel, channel)
+
+
 def contrast_ratio(rgb1: Sequence[int | float], rgb2: Sequence[int | float]) -> float:
     """Compute the WCAG 2.x contrast ratio between two RGB colors.
 
