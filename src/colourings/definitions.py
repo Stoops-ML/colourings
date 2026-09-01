@@ -362,6 +362,16 @@ LAB_DELTA = 6.0 / 29.0
 WCAG_LUMINANCE_COEFFICIENTS = (0.2126, 0.7152, 0.0722)
 WCAG_CONTRAST_FLARE = 0.05
 
+## The minimum contrast ratio WCAG 2.x asks for, by conformance level and text
+## size. "Large" means 18pt, or 14pt bold; anything smaller is "normal". Note
+## that AA large and AAA normal are the same 4.5 from opposite directions.
+WCAG_CONTRAST_MINIMUMS: dict[tuple[str, str], float] = {
+    ("AA", "normal"): 4.5,
+    ("AA", "large"): 3.0,
+    ("AAA", "normal"): 7.0,
+    ("AAA", "large"): 4.5,
+}
+
 ## BT.601 luma coefficients, with the scale factors that turn the B-Y and R-Y
 ## differences into U and V. Working from the differences rather than a rounded
 ## 3x3 matrix keeps a grey at exactly U = V = 0; the published matrix leaves

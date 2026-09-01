@@ -51,7 +51,7 @@ from .definitions import CMYK as CMYKTuple
 
 ## The colour tuple types are aliased because this module already exposes
 ## ``HSL`` and ``RGB`` as the named-colour accessor singletons defined below.
-from .definitions import COLOR_NAME_TO_RGB, linspace
+from .definitions import COLOR_NAME_TO_RGB, WCAG_CONTRAST_MINIMUMS, linspace
 from .definitions import HSL as HSLTuple
 from .definitions import HSLA as HSLATuple
 from .definitions import HSV as HSVTuple
@@ -1024,6 +1024,107 @@ class Color:
         21.0
         """
         return _contrast_ratio(self.rgb, Color(other).rgb)
+
+    def is_readable(
+        self,
+        other: str | Sequence[int | float] | Color,
+        level: str = "AA",
+        size: str = "normal",
+    ) -> bool:
+        """Check whether text and background meet a WCAG 2.x contrast minimum.
+
+        Symmetric, like :meth:`contrast_ratio`, so it does not matter which of
+        the two colors is the text.
+
+        The comparison is against the exact ratio, not a rounded one. A pair at
+        4.4999 fails ``AA`` even though it would display as "4.50", which is
+        where this can disagree with a tool that rounds before comparing.
+
+        Parameters
+        ----------
+        other : str | Sequence[int | float] | Color
+            The other color, in any supported input format.
+        level : str, default="AA"
+            Conformance level, ``"AA"`` or ``"AAA"``. Case-insensitive.
+        size : str, default="normal"
+            Text size, ``"normal"`` or ``"large"``. Large is 18pt, or 14pt
+            bold. Case-insensitive.
+
+        Returns
+        -------
+        bool
+            ``True`` when the contrast ratio is at least the minimum for that
+            level and size.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``level`` and ``size`` are not a pair WCAG defines.
+
+        Examples
+        --------
+        >>> Color("#767676").is_readable("white")
+        True
+        >>> Color("#777777").is_readable("white")
+        False
+        """
+        wanted = (level.upper(), size.lower())
+        if wanted not in WCAG_CONTRAST_MINIMUMS:
+            pairs = ", ".join(
+                f"{lvl}/{sz}" for lvl, sz in sorted(WCAG_CONTRAST_MINIMUMS)
+            )
+            raise ValueError(
+                f"No WCAG minimum for level {level!r} at size {size!r}. "
+                f"Choose one of: {pairs}."
+            )
+        return self.contrast_ratio(other) >= WCAG_CONTRAST_MINIMUMS[wanted]
+
+    def best_text_color(
+        self,
+        candidates: Sequence[str | Sequence[int | float] | Color] = ("black", "white"),
+    ) -> Color:
+        """Pick the candidate that contrasts most with this color.
+
+        Named for the common case -- this color is a background, and the
+        answer is what to write on it -- but it is only a maximum of
+        :meth:`contrast_ratio`, so it serves the reverse just as well.
+
+        Contrast alone is the whole of the judgement. It says nothing about
+        whether the result looks right, and a tie goes to whichever candidate
+        came first, so the order of ``candidates`` is worth choosing.
+
+        Parameters
+        ----------
+        candidates : Sequence[str | Sequence[int | float] | Color], default=("black", "white")
+            Colors to choose between, in any supported input format.
+
+        Returns
+        -------
+        Color
+            The candidate with the highest contrast ratio against this color.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``candidates`` is empty, or is a single string rather
+            than a sequence of them.
+
+        Examples
+        --------
+        >>> Color("navy").best_text_color()
+        <Color white>
+        """
+        ## A str is a Sequence, so `candidates="white"` would otherwise be read
+        ## as the four colours "w", "h", "i", "t", "e" and fail on the first.
+        if isinstance(candidates, str):
+            raise ValueError(
+                f"`candidates` must be a sequence of colors, not the single "
+                f"color {candidates!r}. Pass [{candidates!r}] to mean one."
+            )
+        colors = [Color(candidate) for candidate in candidates]
+        if not colors:
+            raise ValueError("`candidates` must contain at least one color.")
+        return max(colors, key=self.contrast_ratio)
 
     def range_to(
         self,

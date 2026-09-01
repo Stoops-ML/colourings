@@ -354,8 +354,34 @@ Color("red").relative_luminance  # 0.2126
 ```
 
 `contrast_ratio` takes any supported input format, and is symmetric — which
-color is the text and which the background does not matter. WCAG 2.x asks for
-at least 4.5 for normal text and 3 for large text at AA, and 7 and 4.5 at AAA.
+color is the text and which the background does not matter.
+
+`is_readable` applies the WCAG thresholds, and `best_text_color` picks whichever
+candidate contrasts most:
+
+```python
+Color("#767676").is_readable("white")  # True, 4.54 clears AA
+Color("#777777").is_readable("white")  # False, 4.48 does not
+Color("#777777").is_readable("white", size="large")  # True, large text needs 3
+Color("#777777").is_readable("white", level="AAA")  # False, AAA needs 7
+
+Color("navy").best_text_color()  # <Color white>
+Color("navy").best_text_color(["#eeeeee", "#333333"])  # <Color #eee>
+```
+
+| level | size | minimum |
+| --- | --- | --- |
+| `AA` | `normal` | 4.5 |
+| `AA` | `large` | 3 |
+| `AAA` | `normal` | 7 |
+| `AAA` | `large` | 4.5 |
+
+Large means 18pt, or 14pt bold. The table is
+`colourings.definitions.WCAG_CONTRAST_MINIMUMS`. `is_readable` compares against
+the exact ratio rather than a rounded one, so a pair at 4.4999 fails `AA` even
+though it would display as "4.50" — which is where it can disagree with a tool
+that rounds first. `best_text_color` judges on contrast alone, and a tie goes to
+whichever candidate came first, so their order is worth choosing.
 
 Alpha plays no part on either side. A contrast ratio is between two opaque
 colors, and a translucent one has no contrast of its own: it depends on

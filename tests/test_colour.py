@@ -1489,3 +1489,80 @@ def test_contrast_ratio_is_symmetric_and_ignores_alpha():
     assert black.contrast_ratio(white) == white.contrast_ratio(black) == 21.0
     assert black.contrast_ratio(Color("white", alpha=0.1)) == 21.0
     assert Color("black", alpha=0.1).contrast_ratio(white) == 21.0
+
+
+## The greys accessibility tooling quotes for each WCAG threshold against
+## white, each paired with the next grey up, which is the first to fail it.
+## Sitting the tests on the boundary is the point: a threshold that is off by
+## one level, or compared with > instead of >=, moves exactly one of these.
+@pytest.mark.parametrize(
+    ("hex_value", "level", "size", "expected"),
+    [
+        ("#595959", "AAA", "normal", True),  # 7.0047, the last to clear 7
+        ("#5a5a5a", "AAA", "normal", False),  # 6.8969
+        ("#767676", "AA", "normal", True),  # 4.5422, the last to clear 4.5
+        ("#777777", "AA", "normal", False),  # 4.4781
+        ("#767676", "AAA", "large", True),  # AAA large is also 4.5
+        ("#777777", "AAA", "large", False),
+        ("#949494", "AA", "large", True),  # 3.0335, the last to clear 3
+        ("#959595", "AA", "large", False),  # 2.9953
+    ],
+)
+def test_is_readable_sits_on_the_wcag_thresholds(hex_value, level, size, expected):
+    assert Color(hex_value).is_readable("white", level=level, size=size) is expected
+
+
+def test_is_readable_is_symmetric_and_ignores_alpha():
+    text, background = Color("#767676"), Color("white")
+    assert text.is_readable(background) == background.is_readable(text) is True
+    assert text.is_readable(Color("white", alpha=0.1)) is True
+
+
+def test_is_readable_accepts_either_case():
+    assert Color("#767676").is_readable("white", level="aa", size="NORMAL") is True
+
+
+@pytest.mark.parametrize(
+    ("level", "size"),
+    [("A", "normal"), ("AA", "huge"), ("AAAA", "large"), ("", "")],
+)
+def test_is_readable_rejects_a_pair_wcag_does_not_define(level, size):
+    with pytest.raises(ValueError, match="No WCAG minimum"):
+        Color("white").is_readable("black", level=level, size=size)
+
+
+def test_best_text_color_defaults_to_black_or_white():
+    assert Color("black").best_text_color() == Color("white")
+    assert Color("white").best_text_color() == Color("black")
+    assert Color("navy").best_text_color() == Color("white")
+    assert Color("yellow").best_text_color() == Color("black")
+
+
+def test_best_text_color_switches_where_the_contrast_does():
+    """#757575 is the last grey that white wins on, #767676 the first black does.
+
+    Which is not the midpoint of the range, because relative luminance is not
+    linear in the channel value -- picking by lightness instead would put the
+    switch in the wrong place."""
+    assert Color("#757575").best_text_color() == Color("white")
+    assert Color("#767676").best_text_color() == Color("black")
+
+
+def test_best_text_color_takes_the_candidates_it_is_given():
+    assert Color("navy").best_text_color(["#eeeeee", "#333333", "red"]) == Color("#eee")
+    assert Color("navy").best_text_color([Color("red")]) == Color("red")
+
+
+def test_best_text_color_rejects_a_bare_string():
+    """A str is a Sequence, so "white" would iterate as five one-letter colours.
+
+    No `type: ignore` here, and that is the point: `str` genuinely satisfies
+    `Sequence[str | ...]`, so the annotation cannot rule this out and the check
+    has to happen at runtime."""
+    with pytest.raises(ValueError, match="not the single color"):
+        Color("navy").best_text_color("white")
+
+
+def test_best_text_color_rejects_an_empty_choice():
+    with pytest.raises(ValueError, match="at least one color"):
+        Color("navy").best_text_color([])
