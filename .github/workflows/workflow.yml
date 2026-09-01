@@ -97,6 +97,38 @@ jobs:
         run: python -m ruff format --diff
       - name: Build
         run: python -m build .
+      ## The build was being run and thrown away, which proved only that it did
+      ## not crash. These three failures are all silent otherwise: a wheel that
+      ## does not import, a py.typed that is declared in pyproject and not
+      ## actually packaged -- the package advertises itself as typed, so that
+      ## one degrades every downstream type check -- and a README that did not
+      ## make it into the metadata, which PyPI would render as an empty page.
+      ##
+      ## Run from the runner's temp directory so `import colourings` can only
+      ## resolve to the installed wheel and not to anything in the checkout.
+      - name: Check the built wheel
+        working-directory: ${{ runner.temp }}
+        run: |
+          python -m pip install --force-reinstall "$GITHUB_WORKSPACE"/dist/*.whl
+          python - <<'PY'
+          import pathlib
+          from importlib.metadata import metadata
+
+          import colourings
+
+          print("version:", colourings.__version__)
+
+          marker = pathlib.Path(colourings.__file__).parent / "py.typed"
+          assert marker.exists(), "py.typed is declared in pyproject but not in the wheel"
+
+          meta = metadata("colourings")
+          content_type = meta["Description-Content-Type"]
+          assert content_type == "text/markdown", f"long description is {content_type!r}"
+          description = meta.get_payload() or meta["Description"] or ""
+          assert len(description) > 1000, f"long description is {len(description)} characters"
+
+          print("wheel imports, is typed, and carries the README")
+          PY
 
   coverage:
     name: coverage

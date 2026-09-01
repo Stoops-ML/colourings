@@ -4,6 +4,13 @@ on:
   release:
     types: [created]
 
+## The build job only reads the repository. The publish job below declares its
+## own block, which replaces this one rather than adding to it, so its
+## id-token: write is unaffected -- and it deliberately keeps no contents
+## access, having nothing to read.
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build distribution 📦
@@ -24,11 +31,35 @@ jobs:
       run: python3 -m pip install build
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
+    ## Nothing tied the release to what is in the tree. The trigger publishes
+    ## whatever pyproject.toml says, so a release cut before the version bump
+    ## would try to republish the previous version -- rejected by PyPI after
+    ## the build, in the job that has the publishing credentials -- and a bump
+    ## without a matching tag would ship a version no tag points at. Compared
+    ## against the built wheel rather than against pyproject, because the wheel
+    ## is what actually gets uploaded.
+    - name: Check the tag matches the version being published
+      run: |
+        count=$(ls dist/*.whl | wc -l)
+        if [ "$count" -ne 1 ]; then
+          echo "::error::Expected exactly one wheel in dist/, found $count."
+          exit 1
+        fi
+        built=$(basename "$(ls dist/*.whl)" | cut -d- -f2)
+        tag=${GITHUB_REF_NAME#v}
+        if [ "$built" != "$tag" ]; then
+          echo "::error::Release tag $GITHUB_REF_NAME asks for version '$tag', but the build produced '$built'. Bump the version in pyproject.toml, or retag."
+          exit 1
+        fi
+        echo "Tag $GITHUB_REF_NAME matches the built version $built."
     - name: Store the distribution packages
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: python-package-distributions
         path: dist/
+        ## Without this an empty upload succeeds and the publish job fails
+        ## later, holding the credentials, with nothing to say about why.
+        if-no-files-found: error
 
   publish-to-pypi:
     name: >-
