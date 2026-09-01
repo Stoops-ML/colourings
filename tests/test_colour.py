@@ -1,4 +1,5 @@
 import copy
+import inspect
 import math
 import sys
 from unittest.mock import MagicMock, patch
@@ -6,6 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from colourings.colour import (
+    _KEYWORD_ALPHA_SCALES,
+    _KEYWORD_INPUTS,
     HEX,
     HSL,
     RGB,
@@ -1806,3 +1809,48 @@ def test_repr_html_shows_alpha_over_a_checkerboard():
     assert "rgb(255 0 0 / 0.5)" in html
     assert "linear-gradient" in html
     assert "red / 0.5" in html
+
+
+def test_every_colour_input_has_a_converter():
+    """The signature, the dispatch table and the alpha scales have to agree.
+
+    They are three lists of the same formats, and nothing but this makes them
+    match. Adding a keyword without a table entry used to be caught by an
+    unreachable `else` at runtime, and only for the caller who tried it."""
+    reserved = {"self", "color", "pick_for", "alpha", "picker", "pick_key", "equality"}
+    parameters = inspect.signature(Color.__init__).parameters
+    inputs = {
+        name
+        for name, parameter in parameters.items()
+        if name not in reserved and parameter.kind is not parameter.VAR_KEYWORD
+    }
+    assert inputs == set(_KEYWORD_INPUTS)
+    assert set(_KEYWORD_ALPHA_SCALES) == {"hsla", "rgba", "hslaf", "rgbaf"}
+    assert set(_KEYWORD_ALPHA_SCALES) <= inputs
+
+
+@pytest.mark.parametrize(
+    ("build", "half", "opaque"),
+    [
+        (lambda a: Color(hsla=(0.0, 100.0, 50.0, a)), 50.0, 100.0),
+        (lambda a: Color(rgba=(255.0, 0.0, 0.0, a)), 127.5, 255.0),
+        (lambda a: Color(hslaf=(0.0, 1.0, 0.5, a)), 0.5, 1.0),
+        (lambda a: Color(rgbaf=(1.0, 0.0, 0.0, a)), 0.5, 1.0),
+    ],
+    ids=["hsla", "rgba", "hslaf", "rgbaf"],
+)
+def test_every_alpha_carrying_input_reads_its_own_scale(build, half, opaque):
+    """Each states its alpha on a different scale, so a table entry swapped
+    between two of them would still produce a perfectly valid colour."""
+    assert build(half).alpha == pytest.approx(0.5)
+    assert build(opaque).alpha == 1.0
+
+
+def test_the_one_input_rule_names_every_input():
+    """The message is built from the same mapping the dispatch uses, so it
+    cannot drift from the parameters it lists."""
+    with pytest.raises(ValueError, match="Only one of") as excinfo:
+        Color()
+    message = str(excinfo.value)
+    for name in ("color", "pick_for", *_KEYWORD_INPUTS):
+        assert f"'{name}'" in message

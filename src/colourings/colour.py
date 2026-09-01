@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from .conversions import (
     cmyk2hsl,
+    contrast_ratio as _contrast_ratio,
     hex2hsl,
     hex2rgb,
     hex2rgba,
@@ -47,35 +48,32 @@ from .conversions import (
     xyz2hsl,
     yuv2hsl,
 )
-from .conversions import (
-    contrast_ratio as _contrast_ratio,
-)
 from .css import css2hsl, css2hsla, hsla2css, is_css
-from .definitions import CMYK as CMYKTuple
 
 ## The colour tuple types are aliased because this module already exposes
 ## ``HSL`` and ``RGB`` as the named-colour accessor singletons defined below.
 from .definitions import (
+    CMYK as CMYKTuple,
     COLOR_NAME_TO_RGB,
+    HSL as HSLTuple,
+    HSLA as HSLATuple,
+    HSV as HSVTuple,
+    LAB as LABTuple,
+    LCH as LCHTuple,
+    OKLAB as OKLABTuple,
+    OKLCH as OKLCHTuple,
+    RGB as RGBTuple,
+    RGBA as RGBATuple,
     WCAG_CONTRAST_MINIMUMS,
     WCAG_LIGHT_DARK_CROSSOVER,
+    XYZ as XYZTuple,
+    YUV as YUVTuple,
+    HSLAf as HSLAfTuple,
+    HSLf as HSLfTuple,
+    RGBAf as RGBAfTuple,
+    RGBf as RGBfTuple,
     linspace,
 )
-from .definitions import HSL as HSLTuple
-from .definitions import HSLA as HSLATuple
-from .definitions import HSV as HSVTuple
-from .definitions import LAB as LABTuple
-from .definitions import LCH as LCHTuple
-from .definitions import OKLAB as OKLABTuple
-from .definitions import OKLCH as OKLCHTuple
-from .definitions import RGB as RGBTuple
-from .definitions import RGBA as RGBATuple
-from .definitions import XYZ as XYZTuple
-from .definitions import YUV as YUVTuple
-from .definitions import HSLAf as HSLAfTuple
-from .definitions import HSLf as HSLfTuple
-from .definitions import RGBAf as RGBAfTuple
-from .definitions import RGBf as RGBfTuple
 from .errors import (
     AmbiguousColorError,
     InvalidColorError,
@@ -608,6 +606,108 @@ def identify_color(
     raise UnknownColorError("Cannot identify color.")
 
 
+def _apply_property_keywords(color: Color, keywords: dict[str, Any]) -> None:
+    """Set writable colour properties named as trailing keyword arguments.
+
+    Parameters
+    ----------
+    color : Color
+        The colour to set them on.
+    keywords : dict[str, Any]
+        Property names and the values to assign.
+
+    Returns
+    -------
+    None
+        The colour is modified in place.
+
+    Raises
+    ------
+    ValueError
+        Raised when a name is one of the stored attributes.
+    AttributeError
+        Raised when a name is not a writable property.
+    """
+    for name, value in keywords.items():
+        ## Assigning a slot here would skip the property that validates it,
+        ## which is what `__slots__` is present to prevent.
+        if name in Color.__slots__:
+            raise ValueError(
+                f"{name!r} is stored state rather than a color property. "
+                f"Set {name.lstrip('_')!r} instead."
+            )
+        setattr(color, name, value)
+
+
+def _carried_alpha(
+    value: str | Sequence[int | float], func: Callable[[Any], HSLTuple]
+) -> tuple[str, float] | None:
+    """The alpha a positional colour value carries, and the format stating it.
+
+    Every input that carries an alpha loses it on the way to HSL, so it is
+    read back here, on that format's own scale.
+
+    Parameters
+    ----------
+    value : str | Sequence[int | float]
+        The value given as ``color``, already identified.
+    func : Callable[[Any], HSLTuple]
+        The converter :func:`identify_color` chose for it, which is what says
+        which format the value turned out to be.
+
+    Returns
+    -------
+    tuple[str, float] | None
+        The format's name and its alpha in ``[0, 1]``, or ``None`` when the
+        format carries no alpha.
+    """
+    if isinstance(value, str):
+        if func is hexa2hsl:
+            return "hex", hex2rgba(value)[3] / 255.0
+        if func is css2hsl:
+            return "css", css2hsla(value)[3] / 100.0
+        return None
+    if func is rgba2hsl:
+        return "rgba", value[3] / 255.0
+    if func is hsla2hsl:
+        return "hsla", value[3] / 100.0
+    return None
+
+
+## The keyword colour inputs, each with the conversion that takes it to HSL.
+## `color` and `pick_for` are not here: one is identified rather than named,
+## and the other needs the picker arguments.
+_KEYWORD_INPUTS: dict[str, Callable[[Any], Any]] = {
+    "web": lambda value: web2hsl(value.strip().lower()),
+    "hsl": lambda value: value,
+    "hsla": hsla2hsl,
+    "hslf": hslf2hsl,
+    "hslaf": lambda value: hslf2hsl(value[:3]),
+    "hsv": hsv2hsl,
+    "xyz": xyz2hsl,
+    "lab": lab2hsl,
+    "lch": lch2hsl,
+    "oklab": oklab2hsl,
+    "oklch": oklch2hsl,
+    "cmyk": cmyk2hsl,
+    "yuv": yuv2hsl,
+    "hex": hex2hsl,
+    "hex_l": hex2hsl,
+    "rgb": rgb2hsl,
+    "rgba": rgba2hsl,
+    "rgbf": rgbf2hsl,
+    "rgbaf": rgbaf2hsl,
+}
+
+## The scale the fourth component is on, for the inputs that carry an alpha.
+_KEYWORD_ALPHA_SCALES: dict[str, float] = {
+    "hsla": 100.0,
+    "rgba": 255.0,
+    "hslaf": 1.0,
+    "rgbaf": 1.0,
+}
+
+
 class Color:
     """Abstraction over a color with multi-format conversion properties.
 
@@ -723,7 +823,7 @@ class Color:
     _alpha: float
     equality: ColorEquality
 
-    def __init__(  # noqa: C901
+    def __init__(
         self,
         color: str | Sequence[int | float] | Color | None = None,
         *,
@@ -754,130 +854,68 @@ class Color:
         **kwargs: Any,
     ):
         # checks
-        if (
-            sum(
-                v is not None
-                for v in (
-                    color,
-                    web,
-                    hsl,
-                    hsla,
-                    hslf,
-                    hslaf,
-                    hsv,
-                    xyz,
-                    lab,
-                    lch,
-                    oklab,
-                    oklch,
-                    cmyk,
-                    yuv,
-                    hex,
-                    hex_l,
-                    rgb,
-                    rgba,
-                    rgbf,
-                    rgbaf,
-                    pick_for,
-                )
-            )
-            != 1
-        ):
+        ## Typed as Any because the dispatch below is dynamic: the values are
+        ## the parameters, whose real types are on the signature.
+        inputs: dict[str, Any] = {
+            "color": color,
+            "web": web,
+            "hsl": hsl,
+            "hsla": hsla,
+            "hslf": hslf,
+            "hslaf": hslaf,
+            "hsv": hsv,
+            "xyz": xyz,
+            "lab": lab,
+            "lch": lch,
+            "oklab": oklab,
+            "oklch": oklch,
+            "cmyk": cmyk,
+            "yuv": yuv,
+            "hex": hex,
+            "hex_l": hex_l,
+            "rgb": rgb,
+            "rgba": rgba,
+            "rgbf": rgbf,
+            "rgbaf": rgbaf,
+            "pick_for": pick_for,
+        }
+        given = [name for name, value in inputs.items() if value is not None]
+        if len(given) != 1:
+            names = [f"{name!r}" for name in inputs]
             raise ValueError(
-                "Only one of 'color', 'web', 'hsl', 'hsla', 'hslf', 'hslaf', 'hsv', 'xyz', 'lab', 'lch', 'oklab', 'oklch', 'cmyk', 'yuv', 'hex', 'hex_l', 'rgb', 'rgba', 'rgbf', 'rgbaf' or 'pick_for' may be entered."
+                f"Only one of {', '.join(names[:-1])} or {names[-1]} may be entered."
             )
+        source = given[0]
+        value = inputs[source]
 
         # convert to hsl
-        if color is not None:
-            if isinstance(color, str):
-                color = color.strip().lower()
-            func = identify_color(color)
-            self.hsl = func(color)
-            ## Every input that carries an alpha loses it on the way to HSL, so
-            ## recover it here on that input's own scale.
-            if isinstance(color, Color):
+        if source == "color":
+            if isinstance(value, str):
+                value = value.strip().lower()
+            func = identify_color(value)
+            self.hsl = func(value)
+            if isinstance(value, Color):
                 ## Copied rather than reconciled: a Color always carries an
                 ## alpha, so treating a disagreement as an error would reject
                 ## `Color(other, alpha=0.5)` for every opaque `other`.
                 if alpha is None:
-                    alpha = color.alpha
-            ## The isinstance check is redundant at runtime, since only a
-            ## sequence is ever identified as one of these, but it is what
-            ## narrows `color` away from `str` and `Color` for the subscript.
-            elif isinstance(color, str) and func is hexa2hsl:
-                alpha = _alpha_from(alpha, hex2rgba(color)[3] / 255.0, "hex")
-            elif isinstance(color, str) and func is css2hsl:
-                alpha = _alpha_from(alpha, css2hsla(color)[3] / 100.0, "css")
-            elif isinstance(color, Sequence) and not isinstance(color, str):
-                if func is rgba2hsl:
-                    alpha = _alpha_from(alpha, color[3] / 255.0, "rgba")
-                elif func is hsla2hsl:
-                    alpha = _alpha_from(alpha, color[3] / 100.0, "hsla")
-        elif web is not None:
-            web = web.strip().lower()
-            self.hsl = web2hsl(web)
-        elif hsl is not None:
-            self.hsl = hsl
-        elif hsla is not None:
-            self.hsl = hsla2hsl(hsla)
-            alpha = _alpha_from(alpha, hsla[3] / 100.0, "hsla")
-        elif hsv is not None:
-            self.hsl = hsv2hsl(hsv)
-        elif xyz is not None:
-            self.hsl = xyz2hsl(xyz)
-        elif lab is not None:
-            self.hsl = lab2hsl(lab)
-        elif lch is not None:
-            self.hsl = lch2hsl(lch)
-        elif oklab is not None:
-            self.hsl = oklab2hsl(oklab)
-        elif oklch is not None:
-            self.hsl = oklch2hsl(oklch)
-        elif cmyk is not None:
-            self.hsl = cmyk2hsl(cmyk)
-        elif yuv is not None:
-            self.hsl = yuv2hsl(yuv)
-        elif hslf is not None:
-            self.hsl = hslf2hsl(hslf)
-        elif hslaf is not None:
-            self.hsl = hslf2hsl(hslaf[:3])
-            alpha = _alpha_from(alpha, hslaf[3], "hslaf")
-        elif hex is not None:
-            self.hsl = hex2hsl(hex)
-        elif hex_l is not None:
-            self.hsl = hex2hsl(hex_l)
-        elif rgb is not None:
-            self.hsl = rgb2hsl(rgb)
-        elif rgba is not None:
-            self.hsl = rgba2hsl(rgba)
-            alpha = _alpha_from(alpha, rgba[3] / 255.0, "rgba")
-        elif rgbf is not None:
-            self.hsl = rgbf2hsl(rgbf)
-        elif rgbaf is not None:
-            self.hsl = rgbaf2hsl(rgbaf)
-            alpha = _alpha_from(alpha, rgbaf[3], "rgbaf")
-        elif pick_for is not None:
-            self.hsl = web2hsl(picker(pick_key(pick_for)).web)
-        # elif isinstance(color, Color):
-        #     self.web = web2hsl(color.web)
-        else:  # pragma: no cover
-            ## Unreachable: the check above proves exactly one input is set and
-            ## every one of them has a branch. Kept so that adding a new input
-            ## without a branch fails loudly instead of leaving _hsl unset.
-            raise UnknownColorError("Input not recognised")
+                    alpha = value.alpha
+            else:
+                carried = _carried_alpha(value, func)
+                if carried is not None:
+                    alpha = _alpha_from(alpha, carried[1], carried[0])
+        elif source == "pick_for":
+            self.hsl = web2hsl(picker(pick_key(value)).web)
+        else:
+            self.hsl = _KEYWORD_INPUTS[source](value)
+            scale = _KEYWORD_ALPHA_SCALES.get(source)
+            if scale is not None:
+                alpha = _alpha_from(alpha, value[3] / scale, source)
 
         # set attributes
         self.equality = equality
         self.alpha = alpha if alpha is not None else 1.0
-        for k, v in kwargs.items():
-            ## Assigning a slot here would skip the property that validates
-            ## it, which is what `__slots__` is present to prevent.
-            if k in Color.__slots__:
-                raise ValueError(
-                    f"{k!r} is stored state rather than a color property. "
-                    f"Set {k.lstrip('_')!r} instead."
-                )
-            setattr(self, k, v)
+        _apply_property_keywords(self, kwargs)
 
     def get_hsl(self) -> HSLTuple:
         return self._hsl
