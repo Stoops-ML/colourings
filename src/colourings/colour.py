@@ -410,8 +410,50 @@ class ColorEquality(Protocol):
     def __call__(self, c1: Color, c2: Color, /) -> bool: ...
 
 
+def stable_key(obj: object) -> str:
+    """Return a pick key that is the same in every process.
+
+    The type name is included so that two objects of different type with the
+    same string form are still told apart.
+
+    Stable for anything whose ``str`` is derived from its value -- strings,
+    numbers, tuples, lists, dicts of those. **Not** stable for an object
+    relying on the default ``__repr__``, because that contains its address,
+    which changes every run and between instances. Give such a class a
+    ``__str__``, or pass a ``pick_key`` that reads the fields you care about.
+
+    Parameters
+    ----------
+    obj : object
+        Object to key.
+
+    Returns
+    -------
+    str
+        A type-qualified string key.
+
+    Examples
+    --------
+    >>> stable_key("user:123")
+    'struser:123'
+    >>> stable_key([1, 2])
+    'list[1, 2]'
+    """
+    return f"{type(obj).__name__}{obj}"
+
+
 def hash_or_str(obj: object) -> str | int:
-    """Return a stable hash key for an object, with a string fallback.
+    """Return a hash-based pick key for an object, with a string fallback.
+
+    Was the default ``pick_key``, and is not any more: the key it builds is a
+    tuple containing the type name, and hashing a string is salted per
+    process, so every hashable object came out a different colour each run
+    while every unhashable one -- taking the fallback -- was stable. Which of
+    those a caller got depended on nothing they would think to care about.
+
+    Kept for a caller who wants keys that hold within one process and are
+    discarded with it, and who would rather compare by ``__eq__`` than by
+    string form. :func:`stable_key` is the default now.
 
     Parameters
     ----------
@@ -807,11 +849,14 @@ class Color:
         ``Color`` passed as ``color``, but must agree with the one an
         ``rgba``, ``hsla``, ``rgbaf`` or ``hslaf`` value states.
     pick_for : object, optional
-        Arbitrary value used to deterministically pick a color.
+        Arbitrary value to pick a color for. The same value gives the same
+        color, in this process and in any other, subject to the caveat on
+        :func:`stable_key`.
     picker : ColorPicker, default=RGB_color_picker
         Picker function used with ``pick_for``.
-    pick_key : PickKey, default=hash_or_str
-        Key function used before passing values to ``picker``.
+    pick_key : PickKey, default=stable_key
+        Key function used before passing values to ``picker``. Pass
+        :func:`hash_or_str` for the old per-process behaviour.
     equality : ColorEquality, default=RGB_equivalence
         Equality strategy used by ``__eq__``. It always defaults to
         ``RGB_equivalence``, including when ``color`` is a ``Color`` carrying
@@ -876,7 +921,7 @@ class Color:
         alpha: float | None = None,
         pick_for: object = None,
         picker: ColorPicker = RGB_color_picker,
-        pick_key: PickKey = hash_or_str,
+        pick_key: PickKey = stable_key,
         equality: ColorEquality = RGB_equivalence,
         **kwargs: Any,
     ):
@@ -932,7 +977,9 @@ class Color:
                 if carried is not None:
                     alpha = _alpha_from(alpha, carried[1], carried[0])
         elif source == "pick_for":
-            self.hsl = web2hsl(picker(pick_key(value)).web)
+            ## Taken as HSL rather than through `.web`, which quantised the
+            ## picked colour to 8 bits per channel by way of a string.
+            self.hsl = picker(pick_key(value)).hsl
         else:
             self.hsl = _KEYWORD_INPUTS[source](value)
             scale = _KEYWORD_ALPHA_SCALES.get(source)

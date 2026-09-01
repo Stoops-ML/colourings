@@ -338,20 +338,29 @@ print(Color(pick_for="user:123") == Color(pick_for="user:123"))  # True
 print(Color(pick_for="user:123") == Color(pick_for="user:456"))  # False
 ```
 
-The default `pick_key` runs hashable objects through `hash()`, which Python
-salts per process, so a color picked this way is stable **within one run** and
-not across runs. For a color that survives a restart, pick from the string
-form directly:
+The same value gives the same color in every process, so a color picked for a
+user, a host or a branch survives a restart:
 
 ```python
-from colourings.colour import RGB_color_picker
-
-print(RGB_color_picker("user:123").hex_l)  # #fae644, every run
+print(Color(pick_for="user:123").hex_l)  # #1b1069, every run
 ```
+
+The one exception is an object relying on the default `__repr__`, whose string
+form contains its address — that changes every run and between instances, and
+no key function can recover from it. Give such a class a `__str__`, or pass a
+`pick_key` that reads the fields you care about.
 
 You can override the picking strategy with:
 - `picker`: callable that returns a color-like value
 - `pick_key`: callable that maps objects to comparable keys
+
+`hash_or_str` was the default and is still available for keys that should hold
+within one process and be discarded with it. It runs hashable objects through
+`hash()`, which Python salts per process — and because the key it builds
+contains the type name, and string hashing is what gets salted, *every*
+hashable object came out a different color each run while every unhashable one
+was stable. Which of those you got depended on nothing you would think to care
+about, so it is no longer the default.
 
 ## Convenience Objects and Aliases
 

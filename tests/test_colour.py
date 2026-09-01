@@ -1,6 +1,7 @@
 import copy
 import inspect
 import math
+import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -23,6 +24,7 @@ from colourings.colour import (
     hash_or_str,
     identify_color,
     make_color_factory,
+    stable_key,
 )
 from colourings.conversions import hsl2rgb
 from colourings.errors import (
@@ -558,8 +560,6 @@ def test_RGB_color_picker():
     assert RGB_color_picker("Something") == RGB_color_picker("Something")
     assert RGB_color_picker("Something") != RGB_color_picker("Something else")
     assert isinstance(RGB_color_picker("Something"), Color)
-    ## The picker takes str(obj), so unlike pick_for it is stable across
-    ## processes and can be pinned.
     assert RGB_color_picker("Something").hex_l == "#f58146"
 
 
@@ -629,8 +629,10 @@ def test_pick_for():
     assert Color(pick_for=[3, 4]).hex_l == "#3594b1"
 
 
-def test_pick_for_is_stable_within_a_process():
-    """True for any key, hashable or not, since the pick key is computed once."""
+def test_pick_for_is_stable_within_a_process_even_for_a_bare_object():
+    """An object with the default __repr__ carries its address in its string
+    form, so it is the one case the default key cannot make stable across
+    processes. Within one, it still holds."""
     foo = object()
     assert Color(pick_for=foo) == Color(pick_for=foo)
 
@@ -2039,3 +2041,75 @@ def test_a_strategy_looser_than_the_hash_does_break_the_contract():
     assert bright == dark
     assert hash(bright) != hash(dark)
     assert dark not in {bright}  # despite comparing equal
+
+
+def _picked_in_a_fresh_process(expression):
+    """Pick a colour in a separate interpreter, so hash salting is re-rolled."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from colourings import Color\n"
+            "from colourings.colour import hash_or_str, stable_key\n"
+            f"print({expression})\n",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        'Color(pick_for="user:123").hex_l',
+        "Color(pick_for=42).hex_l",
+        "Color(pick_for=[1, 2]).hex_l",
+        'Color(pick_for=("a", "b")).hex_l',
+        'Color(pick_for={"a": 1}).hex_l',
+    ],
+)
+def test_pick_for_is_stable_across_processes(expression):
+    """The point of the default key. Run in subprocesses because the salt that
+    used to break this is only re-rolled by a new interpreter."""
+    first = _picked_in_a_fresh_process(expression)
+    assert first == _picked_in_a_fresh_process(expression)
+    assert first == str(eval(expression))  # noqa: S307
+
+
+def test_hash_or_str_is_still_per_process():
+    """Kept, and kept honest: it is the reason the default had to change."""
+    expression = 'Color(pick_for="user:123", pick_key=hash_or_str).hex_l'
+    runs = {_picked_in_a_fresh_process(expression) for _ in range(4)}
+    assert len(runs) > 1
+
+
+def test_the_old_default_was_stable_only_for_unhashable_keys():
+    """Which is the finding that settled this: whether a caller got a stable
+    colour depended on whether their key happened to be hashable."""
+    assert isinstance(hash_or_str([1, 2]), str)  # the stable fallback
+    assert isinstance(hash_or_str("hello"), int)  # the salted path
+    assert isinstance(hash_or_str(42), int)
+
+
+def test_stable_key_distinguishes_type_from_value():
+    assert stable_key("user:123") == "struser:123"
+    assert stable_key([1, 2]) == "list[1, 2]"
+    assert stable_key(1) != stable_key("1")
+    assert stable_key(1) != stable_key(1.0)
+
+
+def test_stable_key_matches_the_old_fallback_for_unhashable_keys():
+    """Why the pinned list colours in this file did not have to change."""
+    for value in ([1, 2], {"a": 1}, {1, 2}):
+        assert stable_key(value) == hash_or_str(value)
+
+
+def test_picking_no_longer_quantises_through_a_string():
+    """The picked colour used to be routed through `.web`, costing it every
+    bit of precision below 8 per channel."""
+    picked = Color(pick_for="user:123")
+    direct = RGB_color_picker(stable_key("user:123"))
+    assert picked.hsl == direct.hsl
+    assert picked.rgbf == direct.rgbf
