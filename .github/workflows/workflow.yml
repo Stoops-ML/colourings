@@ -9,6 +9,19 @@ on:
     branches: [main]
   pull_request:
 
+## One run per branch. Pushing again to a pull request used to leave the
+## superseded run going to the end, holding a runner to report on a commit
+## nobody is waiting for any more. Cancelling is right for a pull request and
+## wrong for main, where every commit's result is a record of whether that
+## commit was green, so the cancellation is conditioned on the event.
+##
+## `github.ref` is the pull request's merge ref on `pull_request` and the
+## branch on `push`, so the two events never share a group and a merge does not
+## cancel the run of the pull request it came from.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 ## Actions are pinned to commit SHAs, not tags. A tag is a mutable ref: both
 ## `@main` and `@v5` can be repointed at new code by whoever owns the action,
 ## which is the whole of the supply-chain exposure. The trailing comment names
@@ -20,16 +33,31 @@ on:
 permissions:
   contents: read
 
+## Every checkout below passes `persist-credentials: false`. By default the
+## action leaves the job's token in .git/config as an extauthheader, where any
+## later step -- a test, a linter, a build backend, anything they import -- can
+## read it and use it against the repository. Nothing here needs git after the
+## checkout, so nothing needs it left behind. `permissions` above caps what the
+## token could do; this removes the opportunity to reach for it at all.
+
+## Every job carries `timeout-minutes: 10`. The default is six hours, which is
+## what a hung job would sit at, burning a runner and blocking nothing useful.
+## The suite takes seconds, so ten minutes is already far more than the install
+## and the tests together will ever want.
+
 jobs:
   test:
     name: test (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
@@ -46,8 +74,11 @@ jobs:
   quality:
     name: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
@@ -70,8 +101,11 @@ jobs:
   coverage:
     name: coverage
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
