@@ -298,8 +298,34 @@ print(Color(c).equality is RGB_equivalence)  # True, the default
 print(copy.copy(c).equality is HSL_equivalence)  # True
 ```
 
-Note also that `==` consults both operands and accepts either verdict, so a
-stricter strategy only holds where both colors carry it.
+### What `==` costs, and `equals`
+
+`==` consults both operands and accepts either verdict, which keeps it
+symmetric but has three consequences. None of them bite while every color uses
+the default:
+
+- **It is not transitive across mixed strategies.** With `a` and `c` strict and
+  `b` loose, `a == b` and `b == c` can both hold while `a == c` does not —
+  and `set`, `dict`, `in` and `assertEqual` all assume otherwise.
+- **A strict strategy only holds where both colors carry it**, since the looser
+  one need only agree once to satisfy the `or`.
+- **A strategy looser than `hex_l` breaks the hash contract**, so `b in {a}` can
+  be `False` where `a == b`. A *stricter* one is fine: `HSL_equivalence` lets
+  two colors share a hash while comparing unequal, which is an ordinary
+  collision that `set` resolves by comparing.
+
+`equals` has none of these. It takes the strategy as an argument rather than
+from the operands, so it is reflexive, symmetric and transitive whenever that
+strategy is — and both built-ins are:
+
+```python
+from colourings import Color, HSL_equivalence
+
+Color("red").equals("#f00")  # True, by hex_l
+Color("red").equals("#f00", HSL_equivalence)  # True, by HSL
+```
+
+Use `equals` where the answer matters and `==` where the default is fine.
 
 ## Deterministic Color Picking for Objects
 

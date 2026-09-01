@@ -1960,3 +1960,82 @@ def test_every_blend_stays_in_range_and_leaves_its_operands_alone(mode):
     assert 0.0 <= result.alpha <= 1.0
     assert (source.hsl, source.alpha, backdrop.hsl, backdrop.alpha) == before
     assert result is not source and result is not backdrop
+
+
+## `a` and `c` carry a strategy stricter than the hash, `b` a looser one, and
+## all three render the same hex. That is the arrangement in which `==` misbehaves.
+def _mixed_strategy_trio():
+    return (
+        Color(hsl=(0, 100, 50.0000001), equality=HSL_equivalence),
+        Color(hsl=(0, 100, 50), equality=RGB_equivalence),
+        Color(hsl=(0, 100, 50.0000002), equality=HSL_equivalence),
+    )
+
+
+def test_equality_is_not_transitive_across_mixed_strategies():
+    """Documented rather than fixed: `==` consults both operands, so a loose
+    strategy on one of them satisfies the `or` for every pair it touches."""
+    a, b, c = _mixed_strategy_trio()
+    assert a == b
+    assert b == c
+    assert a != c
+
+
+def test_a_strict_strategy_is_unenforceable_through_the_operator():
+    a, b, _ = _mixed_strategy_trio()
+    assert a == b  # the loose strategy on b decides it
+    assert not a.equals(b, HSL_equivalence)  # naming one does not
+
+
+def test_equals_is_reflexive_symmetric_and_transitive():
+    """The property `==` lacks. One strategy is applied to both operands, so
+    whatever holds for the strategy holds for the comparison."""
+    a, b, c = _mixed_strategy_trio()
+    for equality in (RGB_equivalence, HSL_equivalence):
+        for first in (a, b, c):
+            assert first.equals(first, equality)
+        for first, second in ((a, b), (b, c), (a, c), (b, a), (c, b), (c, a)):
+            assert first.equals(second, equality) == second.equals(first, equality)
+        if a.equals(b, equality) and b.equals(c, equality):
+            assert a.equals(c, equality)
+
+
+def test_equals_ignores_what_the_operands_carry():
+    a, b, _ = _mixed_strategy_trio()
+    assert a.equals(b) == b.equals(a)
+    assert a.equals(b, HSL_equivalence) == b.equals(a, HSL_equivalence)
+    ## a carries HSL_equivalence, and equals does not consult it.
+    assert a.equals(b) is True
+
+
+def test_equals_takes_any_input_format():
+    red = Color("red")
+    assert red.equals("red")
+    assert red.equals("#f00")
+    assert red.equals("rgb(255 0 0)")
+    assert red.equals(Color("red"))
+    assert not red.equals("blue")
+
+
+def test_a_strategy_stricter_than_the_hash_is_only_a_collision():
+    """Not a contract violation. Python requires that equal objects hash
+    equal, not the converse, so `set` and `dict` resolve this by comparing."""
+    a, _, c = _mixed_strategy_trio()
+    assert hash(a) == hash(c)
+    assert a != c
+    assert len({a, c}) == 2
+    assert len({a: 1, c: 2}) == 2
+
+
+def test_a_strategy_looser_than_the_hash_does_break_the_contract():
+    """This is the direction that bites, and it needs a custom strategy:
+    neither built-in is looser than `hex_l`."""
+
+    def same_hue(first, second):
+        return round(first.hue) == round(second.hue)
+
+    bright = Color("#ff0000", equality=same_hue)
+    dark = Color("#7f0000", equality=same_hue)
+    assert bright == dark
+    assert hash(bright) != hash(dark)
+    assert dark not in {bright}  # despite comparing equal

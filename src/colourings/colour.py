@@ -1977,6 +1977,41 @@ class Color:
     def __repr__(self) -> str:
         return f"<Color {self.web}>"
 
+    def equals(
+        self,
+        other: str | Sequence[int | float] | Color,
+        equality: ColorEquality = RGB_equivalence,
+    ) -> bool:
+        """Compare with a named strategy, ignoring what either color carries.
+
+        A well-behaved comparison, which ``==`` is not: it applies one
+        strategy to both operands, so it is reflexive, symmetric and
+        transitive whenever that strategy is -- and both built-in strategies
+        are. Reach for this wherever the answer matters, and for ``==``
+        wherever the default is fine.
+
+        Parameters
+        ----------
+        other : str | Sequence[int | float] | Color
+            The color to compare with, in any supported input format.
+        equality : ColorEquality, default=RGB_equivalence
+            The strategy to apply. Deliberately not either operand's own: the
+            point is an answer that does not depend on how they were built.
+
+        Returns
+        -------
+        bool
+            Whether that strategy considers the two equal.
+
+        Examples
+        --------
+        >>> Color("red").equals("#f00")
+        True
+        >>> Color("red").equals("#f00", HSL_equivalence)
+        True
+        """
+        return equality(self, Color(other))
+
     def __eq__(self, other: object) -> bool:
         """Compare two colors using their equality strategies.
 
@@ -1984,6 +2019,22 @@ class Color:
         consulting only ``self`` made ``==`` asymmetric: ``a == b`` and
         ``b == a`` could disagree when the two carried different strategies.
         When they share one, which is the usual case, the result is unchanged.
+
+        Consulting both costs more than it looks, and all three of these bite
+        only once a colour carries something other than the default:
+
+        - **Not transitive across mixed strategies.** With ``a`` and ``c``
+          strict and ``b`` loose, ``a == b`` and ``b == c`` can both hold
+          while ``a == c`` does not. ``set``, ``dict``, ``in`` and
+          ``assertEqual`` all assume otherwise.
+        - **A strict strategy is unenforceable unless both operands carry
+          it**, since the looser one only has to agree once for ``or`` to be
+          satisfied.
+        - **A strategy looser than ``hex_l`` breaks the hash contract**, so
+          ``b in {a}`` can be ``False`` where ``a == b``. See :meth:`__hash__`.
+
+        :meth:`equals` has none of these, taking the strategy as an argument
+        rather than from the operands.
 
         Parameters
         ----------
@@ -2006,9 +2057,14 @@ class Color:
 
         This matches both built-in equality strategies: ``RGB_equivalence``
         compares ``hex_l`` directly, and two colors with equal HSL always
-        render the same ``hex_l``. A custom ``equality`` that treats colors
-        with different ``hex_l`` as equal breaks that correspondence, and such
-        colors should not be relied on as dict keys or set members.
+        render the same ``hex_l``.
+
+        Only a strategy *looser* than ``hex_l`` breaks the contract, and it
+        breaks it properly: two colors that compare equal can hash apart, so
+        ``b in {a}`` is ``False`` where ``a == b``, and a set holds both. A
+        *stricter* strategy is fine -- ``HSL_equivalence`` lets two colors
+        share a hash while comparing unequal, which is an ordinary collision
+        that ``set`` and ``dict`` resolve by comparing.
 
         ``Color`` is mutable, so the hash follows the current value. Do not
         mutate a color while it is held in a set or used as a dict key.
