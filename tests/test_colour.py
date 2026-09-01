@@ -438,6 +438,21 @@ def test_RGB_color_picker():
     assert RGB_color_picker("Something") == RGB_color_picker("Something")
     assert RGB_color_picker("Something") != RGB_color_picker("Something else")
     assert isinstance(RGB_color_picker("Something"), Color)
+    ## The picker takes str(obj), so unlike pick_for it is stable across
+    ## processes and can be pinned.
+    assert RGB_color_picker("Something").hex_l == "#f58146"
+
+
+def test_RGB_color_picker_uses_the_whole_cube():
+    """It scaled the digest to [0, 1] and then handed it to rgb2hex, which
+    reads [0, 255], so every channel rounded to 0 or 1 and only eight colours
+    were reachable."""
+    colors = [RGB_color_picker(f"user:{i}") for i in range(500)]
+    assert len({c.hex_l for c in colors}) == 500
+    channels = [ch for c in colors for ch in c.rgb]
+    assert max(channels) > 250
+    assert min(channels) < 5
+    assert 100 < sum(channels) / len(channels) < 155
 
 
 def test_hash_or_str_falls_back_to_type_qualified_string_for_unhashable_objects():
@@ -475,12 +490,29 @@ def test_only_one_input():
         Color(color="red", pick_for="foo")
 
 
-@pytest.mark.xfail(strict=False)
 def test_pick_for():
+    """Equal keys give one colour, different keys give different ones.
+
+    The keys are unhashable on purpose. hash_or_str falls back to a string for
+    those, whereas a hashable key goes through hash(), which is salted per
+    process -- so the colour, and whether a given pair of keys collides, would
+    vary from run to run. That was what the xfail on this test covered: with
+    RGB_color_picker collapsing every digest onto eight near-black colours,
+    two arbitrary keys collided about half the time, and the test only passed
+    reliably because object() lands at a predictable address under pytest.
+    """
+    assert Color(pick_for=[1, 2]) == Color(pick_for=[1, 2])
+    assert Color(pick_for=[1, 2]) != Color(pick_for=[3, 4])
+    ## pinned, so a regression in the picker cannot pass by being merely
+    ## self-consistent
+    assert Color(pick_for=[1, 2]).hex_l == "#5162f9"
+    assert Color(pick_for=[3, 4]).hex_l == "#3594b1"
+
+
+def test_pick_for_is_stable_within_a_process():
+    """True for any key, hashable or not, since the pick key is computed once."""
     foo = object()
-    bar = object()
     assert Color(pick_for=foo) == Color(pick_for=foo)
-    assert Color(pick_for=foo) != Color(pick_for=bar)
 
 
 def test_cannot_identify():

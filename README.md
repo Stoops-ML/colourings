@@ -210,13 +210,24 @@ print(c1 == c2)  # False
 
 ## Deterministic Color Picking for Objects
 
-Use `pick_for` to map Python objects to stable colors:
+Use `pick_for` to map Python objects to colors:
 
 ```python
 from colourings.colour import Color
 
-print(Color(pick_for="user:123").web)  # #010000
 print(Color(pick_for="user:123") == Color(pick_for="user:123"))  # True
+print(Color(pick_for="user:123") == Color(pick_for="user:456"))  # False
+```
+
+The default `pick_key` runs hashable objects through `hash()`, which Python
+salts per process, so a color picked this way is stable **within one run** and
+not across runs. For a color that survives a restart, pick from the string
+form directly:
+
+```python
+from colourings.colour import RGB_color_picker
+
+print(RGB_color_picker("user:123").hex_l)  # #fae644, every run
 ```
 
 You can override the picking strategy with:

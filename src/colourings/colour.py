@@ -347,7 +347,11 @@ def RGB_color_picker(obj: object) -> Color:
         for d in splitted_digest
     ]
 
-    return Color(rgb2hex(components))  ## Profit!
+    ## Built from the normalised components directly. Handing them to rgb2hex
+    ## instead treated a [0, 1] value as a [0, 255] one, so every channel
+    ## rounded to 0 or 1 and the whole digest collapsed onto eight
+    ## near-black colours, which is not enough to tell two objects apart.
+    return Color(rgbf=components)  ## Profit!
 
 
 def RGB_equivalence(c1: Color, c2: Color) -> bool:
