@@ -397,6 +397,23 @@ def test_bad_identify_color():
         identify_color((0, 0, 0, 0))
 
 
+@pytest.mark.parametrize(
+    "value",
+    [
+        123,  # neither a string nor a sequence
+        None,
+        (1, 2),  # a sequence, but of no recognised length
+        (1, 2, 3, 4, 5),
+        (),
+        "nope",  # a string matching no string format
+        "rgb(1 2 3",  # not quite a colour function
+    ],
+)
+def test_identify_color_refuses_what_it_cannot_place(value):
+    with pytest.raises(UnknownColorError, match="Cannot identify color."):
+        identify_color(value)
+
+
 def test_RGB():
     assert RGB.WHITE == (255.0, 255.0, 255.0)
     assert RGB.BLUE == (0.0, 0.0, 255.0)

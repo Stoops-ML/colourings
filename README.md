@@ -117,6 +117,8 @@ Color(xyz=(41.2456, 21.2673, 1.9334))
 Color(cmyk=(0, 100, 100, 0))
 Color(yuv=(0.299, -0.147108, 0.614777))
 Color(Color("red"))
+Color("rgb(255 0 0)")  # and the other CSS forms, below
+Color("#ff000080")  # hex with alpha
 ```
 
 Only one color input source is allowed per constructor call.
@@ -338,6 +340,47 @@ assert Colour("red") == Colour("#f00")
 ```
 
 `Colour` is an alias subclass of `Color` for British spelling preference.
+
+## CSS Syntax
+
+Colors can be read from, and written back to, the syntax CSS uses:
+
+```python
+from colourings import Color
+
+Color("rgb(255, 0, 0)")  # legacy commas
+Color("rgb(255 0 0 / 50%)")  # CSS Color 4, alpha after a slash
+Color("hsl(0deg 100% 50%)")  # deg, grad, rad and turn all work
+Color("oklch(0.62796 0.25768 29.23389)")
+Color("#ff000080")  # 8-digit hex, and #RGBA
+Color("transparent")  # black with no alpha
+```
+
+`rgb`, `rgba`, `hsl`, `hsla`, `lab`, `lch`, `oklab` and `oklch` are read, with
+either comma or space separators, in any case, and with surrounding whitespace
+ignored. Whitespace is now ignored around every string form, not just these.
+
+```python
+Color("red").to_css()  # '#f00'
+Color("red", alpha=0.5).to_css("rgb")  # 'rgb(255 0 0 / 0.5)'
+Color("red").to_css("hsl")  # 'hsl(0 100% 50%)'
+Color("red").to_css("oklch")  # 'oklch(0.62796 0.25768 29.23389)'
+```
+
+Output uses the space-separated syntax a browser itself serialises to, and
+includes the alpha only when the color is not opaque. Every form round-trips
+exactly: reading back what `to_css` wrote gives the same 8-bit color, alpha
+included.
+
+Two things to know:
+
+- **Out of range is an error, not a clamp.** A browser reads `rgb(300 0 0)` as
+  red; here it raises. Quietly turning one color into another is what this
+  library avoids elsewhere, and reading a stylesheet is not a reason to start.
+- **Chroma and the `a`/`b` axes take numbers only.** CSS also allows
+  percentages there, but the reference each one scales against differs per
+  function, and using the wrong one would misread a color rather than reject
+  it. `oklch(0.5 50% 200)` raises until that can be confirmed.
 
 ## Adjusting a Color
 
@@ -650,4 +693,5 @@ Additional APIs are available from submodules:
 
 - `colourings.colour`: `HSL_equivalence`, `RGB_equivalence`, `RGB_color_picker`, `make_color_factory`, `identify_color`, `HSL`, `RGB`, `HEX`
 - `colourings.conversions`: conversion utilities, plus `rgb2relative_luminance`, `contrast_ratio`, `in_srgb_gamut` and `clear_caches`
+- `colourings.css`: `css2hsl`, `css2hsla`, `hsla2css`, `is_css`
 - `colourings.identify`: type/shape predicates like `is_rgb`, `is_hsl`, `is_web`

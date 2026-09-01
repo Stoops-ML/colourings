@@ -25,6 +25,14 @@ Conversions
    :undoc-members:
    :show-inheritance:
 
+CSS syntax
+----------
+
+.. automodule:: colourings.css
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Input identification helpers
 ----------------------------
 

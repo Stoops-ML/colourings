@@ -43,6 +43,7 @@ from .definitions import (
 from .errors import ColorError, InvalidColorError
 from .identify import (
     is_cmyk,
+    is_hex_alpha,
     is_hsl,
     is_hsla,
     is_hslf,
@@ -50,6 +51,7 @@ from .identify import (
     is_lab,
     is_lch,
     is_long_hex,
+    is_long_hex_alpha,
     is_oklab,
     is_oklch,
     is_rgb,
@@ -699,6 +701,99 @@ def hex2rgb(hex: str) -> RGB:
         _threshold(float(int(g, 16))),
         _threshold(float(int(b, 16))),
     )
+
+
+@_cached
+def hex2rgba(hex: str) -> RGBA:
+    """Convert a hexadecimal color with alpha to RGBA components.
+
+    Accepts the 4-digit and 8-digit forms. The plain 3-digit and 6-digit forms
+    carry no alpha and belong to :func:`hex2rgb`.
+
+    Parameters
+    ----------
+    hex : str
+        Hex color string with alpha, like ``#aabbccdd`` or ``#abcd``.
+
+    Returns
+    -------
+    RGBA
+        RGBA tuple, alpha included, all four in the ``[0, 255]`` range.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when the string is not a hex color carrying an alpha.
+
+    Examples
+    --------
+    >>> hex2rgba("#ff000080")
+    RGBA(red=255.0, green=0.0, blue=0.0, alpha=128.0)
+    """
+    if not is_hex_alpha(hex):
+        raise InvalidColorError(f"Invalid value for hexadecimal with alpha: {hex!r}.")
+    body = hex[1:]
+    if not is_long_hex_alpha(hex):
+        body = "".join(digit * 2 for digit in body)
+    return RGBA(
+        _threshold(float(int(body[0:2], 16))),
+        _threshold(float(int(body[2:4], 16))),
+        _threshold(float(int(body[4:6], 16))),
+        _threshold(float(int(body[6:8], 16))),
+    )
+
+
+@_cached
+def hexa2hsl(hex: str) -> HSL:
+    """Convert a hexadecimal color with alpha to HSL, dropping the alpha.
+
+    HSL has no alpha channel, so the one the string carries is lost here.
+    :func:`hex2rgba` keeps it.
+
+    Parameters
+    ----------
+    hex : str
+        Hex color string with alpha.
+
+    Returns
+    -------
+    HSL
+        HSL tuple.
+    """
+    return rgba2hsl(hex2rgba(hex))
+
+
+def rgba2hex(rgba: Sequence[int | float], force_long: bool = False) -> str:
+    """Convert RGBA components to a hexadecimal color string with alpha.
+
+    Parameters
+    ----------
+    rgba : Sequence[int | float]
+        RGBA sequence in the ``[0, 255]`` range.
+    force_long : bool, default=False
+        Whether to force 8-digit output even when the 4-digit form would do.
+
+    Returns
+    -------
+    str
+        Hex color string with alpha, prefixed with ``#``.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when ``rgba`` is not a valid RGBA value.
+
+    Examples
+    --------
+    >>> rgba2hex((255, 0, 0, 128))
+    '#ff000080'
+    """
+    if not is_rgba(rgba):
+        raise InvalidColorError("Input is not of RGBA type.")
+    hx = "".join(f"{int(c + 0.5 - FLOAT_ERROR):02x}" for c in rgba)
+    if not force_long and hx[0::2] == hx[1::2]:
+        hx = "".join(hx[0::2])
+    return f"#{hx}"
 
 
 @_cached

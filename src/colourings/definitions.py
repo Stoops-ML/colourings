@@ -426,6 +426,12 @@ COLOR_NAME_TO_RGB: dict[str, RGB] = {
 LONG_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 SHORT_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{3}$")
 
+## The same two forms with an alpha pair or digit on the end, as CSS
+## Color 4 allows. Kept separate from the pair above so that the length
+## alone still says whether a hex string carries an alpha.
+LONG_HEX_ALPHA_COLOR = re.compile(r"^#[0-9a-fA-F]{8}$")
+SHORT_HEX_ALPHA_COLOR = re.compile(r"^#[0-9a-fA-F]{4}$")
+
 
 def linspace(
     start: int | float, stop: int | float, num: int, endpoint: bool = True

@@ -3,7 +3,9 @@ from collections.abc import Sequence
 from .definitions import (
     COLOR_NAME_TO_RGB,
     FLOAT_ERROR,
+    LONG_HEX_ALPHA_COLOR,
     LONG_HEX_COLOR,
+    SHORT_HEX_ALPHA_COLOR,
     SHORT_HEX_COLOR,
 )
 
@@ -118,6 +120,54 @@ def is_short_hex(color: str) -> bool:
         True if the value matches a short hex format like ``#abc``.
     """
     return bool(SHORT_HEX_COLOR.fullmatch(color))
+
+
+def is_long_hex_alpha(color: str) -> bool:
+    """Check whether a string is an 8-digit hexadecimal color with alpha.
+
+    Parameters
+    ----------
+    color : str
+        Candidate color string.
+
+    Returns
+    -------
+    bool
+        True if the value matches a long hex-with-alpha form like ``#aabbccdd``.
+    """
+    return bool(LONG_HEX_ALPHA_COLOR.fullmatch(color))
+
+
+def is_short_hex_alpha(color: str) -> bool:
+    """Check whether a string is a 4-digit hexadecimal color with alpha.
+
+    Parameters
+    ----------
+    color : str
+        Candidate color string.
+
+    Returns
+    -------
+    bool
+        True if the value matches a short hex-with-alpha form like ``#abcd``.
+    """
+    return bool(SHORT_HEX_ALPHA_COLOR.fullmatch(color))
+
+
+def is_hex_alpha(color: str) -> bool:
+    """Check whether a string is a hexadecimal color that carries an alpha.
+
+    Parameters
+    ----------
+    color : str
+        Candidate color string.
+
+    Returns
+    -------
+    bool
+        True for either the 4-digit or the 8-digit form.
+    """
+    return is_long_hex_alpha(color) or is_short_hex_alpha(color)
 
 
 def is_rgb(color: object) -> bool:

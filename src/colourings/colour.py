@@ -10,7 +10,9 @@ from .conversions import (
     cmyk2hsl,
     hex2hsl,
     hex2rgb,
+    hex2rgba,
     hex2web,
+    hexa2hsl,
     hsl2cmyk,
     hsl2hsla,
     hsl2hslaf,
@@ -48,6 +50,7 @@ from .conversions import (
 from .conversions import (
     contrast_ratio as _contrast_ratio,
 )
+from .css import css2hsl, css2hsla, hsla2css, is_css
 from .definitions import CMYK as CMYKTuple
 
 ## The colour tuple types are aliased because this module already exposes
@@ -74,6 +77,7 @@ from .errors import (
     UnknownColorError,
 )
 from .identify import (
+    is_hex_alpha,
     is_hsl,
     is_hsla,
     is_long_hex,
@@ -533,6 +537,29 @@ def _alpha_from(given: float | None, carried: float, format: str) -> float:
     return carried
 
 
+## The string formats, in the order they are tried. Hex comes before web
+## because ``is_web`` accepts hex too, and CSS comes last because it is the
+## broadest -- anything shaped like a colour function reaches it.
+_STRING_FORMATS: tuple[tuple[Callable[[str], bool], Callable[[Any], HSLTuple]], ...] = (
+    (lambda text: is_long_hex(text) or is_short_hex(text), hex2hsl),
+    (is_hex_alpha, hexa2hsl),
+    (is_web, web2hsl),
+    (is_css, css2hsl),
+)
+
+## The sequence formats, likewise. The three-component forms come first, so a
+## four-component value is never read as a three-component one with a stray
+## number after it.
+_SEQUENCE_FORMATS: tuple[
+    tuple[Callable[[object], bool], Callable[[Any], HSLTuple]], ...
+] = (
+    (is_rgb, rgb2hsl),
+    (is_hsl, lambda values: HSLTuple(*values)),
+    (is_rgba, rgba2hsl),
+    (is_hsla, hsla2hsl),
+)
+
+
 def identify_color(
     color: str | Sequence[int | float] | Color | Colour,
 ) -> Callable[[Any], HSLTuple]:
@@ -555,7 +582,8 @@ def identify_color(
     UnknownColorError
         Raised when the format cannot be identified.
     """
-    # checks
+    ## A sequence that is valid in two formats cannot be identified from its
+    ## components alone, and guessing would silently pick one.
     if (
         isinstance(color, Sequence)
         and len(color) == 3
@@ -563,38 +591,26 @@ def identify_color(
         and is_hsl(color)
     ):
         raise AmbiguousColorError("Cannot determine whether color is RGB or HSL.")
-    elif (
+    if (
         isinstance(color, Sequence)
         and len(color) == 4
         and is_rgba(color)
         and is_hsla(color)
     ):
         raise AmbiguousColorError("Cannot determine whether color is RGBA or HSLA.")
-    else:
-        pass
 
-    # identify colour
-    if isinstance(color, Color | Colour):
-        return lambda x: HSLTuple(*x.hsl)
-    elif (
-        isinstance(color, str)
-        and is_long_hex(color)
-        or isinstance(color, str)
-        and is_short_hex(color)
-    ):
-        return hex2hsl
-    elif isinstance(color, str) and is_web(color):
-        return web2hsl
-    elif isinstance(color, Sequence) and is_rgb(color):
-        return rgb2hsl
-    elif isinstance(color, Sequence) and is_hsl(color):
-        return lambda x: HSLTuple(*x)
-    elif isinstance(color, Sequence) and is_rgba(color):
-        return rgba2hsl
-    elif isinstance(color, Sequence) and is_hsla(color):
-        return hsla2hsl
-    else:
-        raise UnknownColorError("Cannot identify color.")
+    ## Colour subclasses Color, so one check covers both spellings.
+    if isinstance(color, Color):
+        return lambda existing: HSLTuple(*existing.hsl)
+    if isinstance(color, str):
+        for matches, convert in _STRING_FORMATS:
+            if matches(color):
+                return convert
+    elif isinstance(color, Sequence):
+        for matches, convert in _SEQUENCE_FORMATS:
+            if matches(color):
+                return convert
+    raise UnknownColorError("Cannot identify color.")
 
 
 class Color:
@@ -779,7 +795,9 @@ class Color:
         # convert to hsl
         if color is not None:
             if isinstance(color, str):
-                color = color.lower()
+                ## Stripped as well as lowered, so that a value read out of a
+                ## file or a form is not rejected for the space around it.
+                color = color.strip().lower()
             func = identify_color(color)
             self.hsl = func(color)
             ## Every input that carries an alpha loses it in the conversion to
@@ -799,13 +817,17 @@ class Color:
             ## The isinstance check is redundant at runtime, since only a
             ## sequence is ever identified as one of these, but it is what
             ## narrows `color` away from `str` and `Color` for the subscript.
+            elif isinstance(color, str) and func is hexa2hsl:
+                alpha = _alpha_from(alpha, hex2rgba(color)[3] / 255.0, "hex")
+            elif isinstance(color, str) and func is css2hsl:
+                alpha = _alpha_from(alpha, css2hsla(color)[3] / 100.0, "css")
             elif isinstance(color, Sequence) and not isinstance(color, str):
                 if func is rgba2hsl:
                     alpha = _alpha_from(alpha, color[3] / 255.0, "rgba")
                 elif func is hsla2hsl:
                     alpha = _alpha_from(alpha, color[3] / 100.0, "hsla")
         elif web is not None:
-            web = web.lower()
+            web = web.strip().lower()
             self.hsl = web2hsl(web)
         elif hsl is not None:
             self.hsl = hsl
@@ -1469,6 +1491,38 @@ class Color:
             values[hue_index] = (values[hue_index] * 360) % 360
         alpha = self._alpha + (other._alpha - self._alpha) * amount
         return Color(hsl=to_hsl(values), alpha=alpha)
+
+    def to_css(self, form: str = "hex") -> str:
+        """Write this color as CSS.
+
+        Alpha is included only when the color is not opaque, so an opaque one
+        comes out in the short form everyone already reads. The functional
+        forms use the space-separated syntax with a slash before the alpha,
+        which is what a browser serialises to.
+
+        Parameters
+        ----------
+        form : str, default="hex"
+            One of ``"hex"``, ``"rgb"``, ``"hsl"`` or ``"oklch"``.
+
+        Returns
+        -------
+        str
+            The color as CSS.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``form`` is not one of the four.
+
+        Examples
+        --------
+        >>> Color("red").to_css()
+        '#f00'
+        >>> Color("red", alpha=0.5).to_css("rgb")
+        'rgb(255 0 0 / 0.5)'
+        """
+        return hsla2css(self._hsl, self._alpha, form)
 
     def range_to(
         self,
