@@ -53,9 +53,9 @@ from .conversions import (
     yuv2hsl,
 )
 from .css import (
-    _CSS_FUNCTIONS,
     COLOR_MIX,
     CSS_FUNCTION,
+    CSS_FUNCTION_NAMES,
     _split_outside_parentheses,
     css2hsl,
     css2hsla,
@@ -972,7 +972,7 @@ def _suggestion_for(text: str) -> str:
         name = function.group(1)
         return (
             f" There is no color function called {name!r}."
-            f"{_did_you_mean(name, _CSS_FUNCTIONS)}"
+            f"{_did_you_mean(name, CSS_FUNCTION_NAMES)}"
         )
     if text.startswith("#"):
         digits = text[1:]

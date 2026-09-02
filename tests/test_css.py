@@ -4,8 +4,16 @@ import pytest
 
 from colourings import Color
 from colourings.conversions import hex2rgba, rgba2hex
-from colourings.css import css2hsl, css2hsla, hsla2css, is_css
-from colourings.errors import InvalidColorError
+from colourings.css import (
+    CSS_FUNCTION_NAMES,
+    LINEAR_P3_TO_LINEAR_SRGB,
+    XYZ_D65_TO_LINEAR_SRGB,
+    css2hsl,
+    css2hsla,
+    hsla2css,
+    is_css,
+)
+from colourings.errors import InvalidColorError, UnknownColorError
 
 
 @pytest.mark.parametrize(
@@ -267,3 +275,168 @@ def test_hsl_components_outside_their_range_are_refused():
     for text in ("hsl(0 200% 50%)", "hsl(0 100% 150%)", "hsl(0 -10% 50%)"):
         with pytest.raises(InvalidColorError, match="not an HSL type"):
             Color(text)
+
+
+## --- color() and the predefined spaces --------------------------------------
+
+
+def _rgb_to_xyz_from_chromaticities(primaries, white):
+    """Derive a linear-RGB to XYZ matrix from primaries and a white point.
+
+    The textbook construction: each primary as an XYZ direction, scaled so
+    that the three together send white to the white point. Written out here so
+    that the matrix in the package has a second, independent source -- rather
+    than being trusted because it was copied carefully.
+    """
+
+    def direction(x, y):
+        return (x / y, 1.0, (1.0 - x - y) / y)
+
+    def determinant(rows):
+        return (
+            rows[0][0] * (rows[1][1] * rows[2][2] - rows[1][2] * rows[2][1])
+            - rows[0][1] * (rows[1][0] * rows[2][2] - rows[1][2] * rows[2][0])
+            + rows[0][2] * (rows[1][0] * rows[2][1] - rows[1][1] * rows[2][0])
+        )
+
+    columns = [direction(*primary) for primary in primaries]
+    target = direction(*white)
+    base = [[columns[j][i] for j in range(3)] for i in range(3)]
+    whole = determinant(base)
+    scales = []
+    for index in range(3):
+        replaced = [row[:] for row in base]
+        for row in range(3):
+            replaced[row][index] = target[row]
+        scales.append(determinant(replaced) / whole)
+    return [[columns[j][i] * scales[j] for j in range(3)] for i in range(3)]
+
+
+def test_the_display_p3_matrix_agrees_with_its_own_chromaticities():
+    """The constant in the package is the product of two matrices copied from
+    CSS Color 4's sample code. This derives the first of them from the
+    published Display P3 primaries and D65 instead, which is a different route
+    to the same number -- and they agree to machine precision.
+    """
+    derived = _rgb_to_xyz_from_chromaticities(
+        [(0.680, 0.320), (0.265, 0.690), (0.150, 0.060)], (0.3127, 0.3290)
+    )
+    ## The specification's `lin_P3_to_XYZ`, as the exact rationals it gives.
+    published = [
+        [608311 / 1250200, 189793 / 714400, 198249 / 1000160],
+        [35783 / 156275, 247089 / 357200, 198249 / 2500400],
+        [0.0, 32229 / 714400, 5220557 / 5000800],
+    ]
+    for derived_row, published_row in zip(derived, published, strict=True):
+        for got, want in zip(derived_row, published_row, strict=True):
+            assert got == pytest.approx(want, abs=1e-12)
+
+
+@pytest.mark.parametrize("matrix", [LINEAR_P3_TO_LINEAR_SRGB, XYZ_D65_TO_LINEAR_SRGB])
+def test_each_conversion_matrix_sends_white_to_white(matrix):
+    """display-p3, sRGB and XYZ here are all relative to D65, so white has to
+    survive each matrix. A transcription slip in any coefficient shows up as a
+    colour cast on greys, which is the hardest kind to notice by eye."""
+    white = (
+        (1.0, 1.0, 1.0)
+        if matrix is LINEAR_P3_TO_LINEAR_SRGB
+        else (
+            0.9504559270516716,
+            1.0,
+            1.0890577507598784,
+        )
+    )
+    for row in matrix:
+        assert sum(
+            coefficient * value for coefficient, value in zip(row, white, strict=True)
+        ) == pytest.approx(1.0, abs=1e-12)
+
+
+@pytest.mark.parametrize(
+    "rgbf", [(0.0, 0.0, 0.0), (1.0, 1.0, 1.0), (0.2, 0.5, 0.7), (1.0, 0.0, 0.0)]
+)
+def test_color_srgb_is_the_colour_it_names(rgbf):
+    """`color(srgb ...)` is just normalised RGB, so it has to agree exactly
+    with building the same colour from `rgbf`."""
+    written = " ".join(str(value) for value in rgbf)
+    for got, want in zip(Color(f"color(srgb {written})").rgbf, rgbf, strict=True):
+        assert got == pytest.approx(want, abs=1e-12)
+
+
+def test_color_srgb_takes_percentages_as_well_as_numbers():
+    assert Color("color(srgb 100% 0% 0%)") == Color("color(srgb 1 0 0)")
+    assert Color("color(srgb 50% 50% 50%)") == Color("color(srgb 0.5 0.5 0.5)")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "color(display-p3 1 1 1)",
+        "color(srgb 1 1 1)",
+        "color(srgb-linear 1 1 1)",
+        "color(xyz 0.9504559270516716 1 1.0890577507598784)",
+        "color(xyz-d65 0.9504559270516716 1 1.0890577507598784)",
+    ],
+)
+def test_white_is_white_in_every_space_that_is_read(text):
+    """The end-to-end form of the matrix check above: every one of these
+    spaces is D65, so each of these is white and not a near-white."""
+    assert Color(text) == Color("white")
+
+
+def test_a_display_p3_colour_inside_srgb_is_converted_rather_than_clipped():
+    """P3 covers sRGB, so a modest P3 value has an exact sRGB answer. If the
+    matrix were wrong this would still produce *a* colour, which is why the
+    matrix is checked separately above."""
+    inside = Color("color(display-p3 0.2 0.5 0.7)")
+    assert inside.hex_l == "#0082b7"
+    ## And it is genuinely a conversion: the same numbers read as sRGB differ.
+    assert inside != Color("color(srgb 0.2 0.5 0.7)")
+
+
+def test_a_display_p3_colour_outside_srgb_is_clipped_and_says_nothing():
+    """The documented compromise. P3 red has no sRGB equivalent, so it lands
+    on sRGB red -- the same rule as every other out-of-gamut input here."""
+    assert Color("color(display-p3 1 0 0)") == Color("red")
+
+
+def test_color_carries_an_alpha():
+    assert Color("color(srgb 1 0 0 / 50%)").alpha == pytest.approx(0.5)
+    assert Color("color(display-p3 0 0 1 / 0.25)").alpha == pytest.approx(0.25)
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("color(rec2020 1 0 0)", "cannot read 'rec2020' yet"),
+        ("color(prophoto-rgb 1 0 0)", "cannot read 'prophoto-rgb' yet"),
+        ("color(a98-rgb 1 0 0)", "cannot read 'a98-rgb' yet"),
+        ("color(xyz-d50 1 1 1)", "cannot read 'xyz-d50' yet"),
+        ("color(nonsense 1 0 0)", "is not a predefined color space"),
+        ("color(srgb 1 0)", "takes 3 components"),
+        ("color(srgb 1 0 0 0 0)", "takes 3 components"),
+        ("color()", "takes a color space and three components"),
+        ("color(srgb 1 0 0 / 2)", "Alpha must be between 0 and 1"),
+    ],
+)
+def test_a_color_function_that_cannot_be_read_says_why(text, message):
+    """The four spaces in the specification that are not read say so by name,
+    rather than being reported as unknown -- they are real and this package
+    has not got to them."""
+    assert is_css(text)
+    with pytest.raises(InvalidColorError, match=message):
+        Color(text)
+
+
+def test_color_is_recognised_as_a_css_function():
+    assert is_css("color(srgb 1 0 0)")
+    assert is_css("COLOR(SRGB 1 0 0)")
+    assert "color" in CSS_FUNCTION_NAMES
+
+
+def test_a_misspelled_color_function_suggests_it():
+    """`color` is read here but is not in the component table, so the
+    suggestion has to draw on the wider list or it would never offer it."""
+    with pytest.raises(UnknownColorError, match="Did you mean") as raised:
+        Color("colr(srgb 1 0 0)")
+    assert "'color'" in str(raised.value)

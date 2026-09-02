@@ -495,6 +495,36 @@ spaces, and the `increasing` and `decreasing` hue methods; those raise rather
 than being quietly substituted. `lab` and `lch` here are D65 where CSS defines
 them against D50, which is the difference the conversions already carry.
 
+### `color()` and the predefined spaces
+
+```python
+Color("color(srgb 0.2 0.5 0.7)")  # <Color #337fb2>
+Color("color(display-p3 0.2 0.5 0.7)")  # <Color #0082b7>, converted
+Color("color(xyz 0.9504559270516716 1 1.0890577507598784)")  # <Color white>
+Color("color(srgb 1 0 0 / 50%)").alpha  # 0.5
+```
+
+Read: `srgb`, `srgb-linear`, `display-p3`, `xyz` and `xyz-d65`. Components may
+be numbers or percentages, with `100%` meaning 1 in all of them.
+
+**A wide-gamut color is converted, and clipped if it does not fit.**
+`display-p3` covers more than sRGB, and a `Color` holds sRGB, so a P3 value
+inside sRGB converts exactly while one outside it lands on the edge:
+
+```python
+Color("color(display-p3 1 0 0)") == Color("red")  # True — clipped
+```
+
+That is the same rule as every other out-of-gamut input here, and the reason
+`in_srgb_gamut` exists. It is worth knowing before treating a `color()` value
+as faithful, because clipping is the one case where this library returns a
+different color rather than raising — it is what CSS itself specifies for
+display.
+
+`a98-rgb`, `prophoto-rgb`, `rec2020` and `xyz-d50` raise, naming themselves.
+The first two need a transfer function each; the last two are relative to D50
+and need a chromatic adaptation this library does not have.
+
 ## Adjusting a Color
 
 Every one of these returns a new color and leaves the original alone, carrying

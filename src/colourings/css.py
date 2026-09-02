@@ -26,6 +26,9 @@ from collections.abc import Callable, Sequence
 ## `_cached` rather than lru_cache, so `clear_caches` reaches these too.
 from .conversions import (
     _cached,
+    _linear_to_srgb,
+    _matrix_apply,
+    _srgb_to_linear,
     hsl2oklch,
     hsl2rgb,
     lab2hsl,
@@ -354,6 +357,108 @@ def normalize_mix_percentages(
     return filled, leftover
 
 
+## The predefined color spaces `color()` can name. Every constant below comes
+## from the sample code in CSS Color 4 section 17, which gives them as exact
+## rationals rather than as decimals; the display-p3 matrix is the product of
+## that section's `lin_P3_to_XYZ` and `XYZ_to_lin_sRGB`, multiplied out in
+## exact arithmetic and rounded once at the end.
+##
+## Both were checked by sending white through them. display-p3, sRGB and XYZ
+## here are all D65, so (1, 1, 1) and D65 white must come back as exactly
+## (1, 1, 1) -- in rational arithmetic, before any rounding -- and they do.
+##
+## The package's own RGB_TO_XYZ_MATRIX is deliberately not used for this: it is
+## the familiar seven-digit one and differs from the specification's exact
+## values in the fifth decimal, so routing `color()` through it would mix two
+## slightly different definitions of XYZ.
+LINEAR_P3_TO_LINEAR_SRGB = (
+    (1.2249401762805598, -0.22494017628055996, 0.0),
+    (-0.042056954709688163, 1.0420569547096881, 0.0),
+    (-0.019637554590334432, -0.078636045550631889, 1.0982736001409663),
+)
+XYZ_D65_TO_LINEAR_SRGB = (
+    (3.2409699419045213, -1.5373831775700935, -0.49861076029300327),
+    (-0.96924363628087984, 1.8759675015077206, 0.041555057407175612),
+    (0.055630079696993608, -0.20397695888897657, 1.0569715142428786),
+)
+
+## Each space says how to get from its components to *linear* sRGB; the tail of
+## the conversion is shared. display-p3 uses sRGB's own transfer function,
+## which the specification states rather than leaves to be inferred.
+_PREDEFINED_SPACES: dict[str, Callable[[Sequence[float]], Sequence[float]]] = {
+    "srgb": lambda values: [_srgb_to_linear(value) for value in values],
+    "srgb-linear": list,
+    "display-p3": lambda values: _matrix_apply(
+        LINEAR_P3_TO_LINEAR_SRGB, [_srgb_to_linear(value) for value in values]
+    ),
+    "xyz": lambda values: _matrix_apply(XYZ_D65_TO_LINEAR_SRGB, values),
+    "xyz-d65": lambda values: _matrix_apply(XYZ_D65_TO_LINEAR_SRGB, values),
+}
+
+## The rest of the specification's list. `a98-rgb` and `rec2020` each need a
+## transfer function of their own; `prophoto-rgb` and `xyz-d50` are relative to
+## D50 and need a chromatic adaptation this package does not have. Named here
+## so that asking for one says what is missing rather than that the color
+## cannot be identified.
+_UNSUPPORTED_SPACES = ("a98-rgb", "prophoto-rgb", "rec2020", "xyz-d50")
+
+## Every function name this module reads. `color()` is not in `_CSS_FUNCTIONS`
+## because it takes a space keyword where the others take a first component, so
+## it is read separately -- but a caller asking "is this CSS?" should not have
+## to know that.
+CSS_FUNCTION_NAMES = frozenset(_CSS_FUNCTIONS) | {"color"}
+
+
+def _predefined_color(tokens: list[str], alpha: float) -> HSLA:
+    """Read a ``color()`` function's arguments.
+
+    Parameters
+    ----------
+    tokens : list[str]
+        The space keyword followed by its three components.
+    alpha : float
+        Alpha in ``[0, 1]``, already read.
+
+    Returns
+    -------
+    HSLA
+        HSLA tuple, with alpha on its own ``[0, 100]`` scale.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when the space is unknown or unsupported, or the components are
+        not three numbers or percentages.
+    """
+    if not tokens:
+        raise InvalidColorError("color() takes a color space and three components.")
+    space, components = tokens[0], tokens[1:]
+    if space in _UNSUPPORTED_SPACES:
+        raise InvalidColorError(
+            f"color() cannot read {space!r} yet. This package converts "
+            f"{', '.join(sorted(_PREDEFINED_SPACES))}."
+        )
+    if space not in _PREDEFINED_SPACES:
+        raise InvalidColorError(
+            f"{space!r} is not a predefined color space. color() takes "
+            f"{', '.join(sorted(_PREDEFINED_SPACES))}."
+        )
+    if len(components) != 3:
+        raise InvalidColorError(
+            f"color({space} ...) takes 3 components, but {len(components)} were given."
+        )
+
+    ## Numbers and percentages both, with 100% meaning 1 in every one of these
+    ## spaces -- which is the one thing CSS makes uniform here.
+    values = [_scaled(1.0)(component) for component in components]
+    linear = _PREDEFINED_SPACES[space](values)
+    ## Out of the sRGB gamut is clipped, as everywhere else in this package.
+    ## `in_srgb_gamut` is the way to ask before trusting the answer.
+    channels = [min(max(_linear_to_srgb(component), 0.0), 1.0) for component in linear]
+    hue, saturation, lightness = rgb2hsl([channel * 255.0 for channel in channels])
+    return HSLA(hue, saturation, lightness, alpha * 100.0)
+
+
 def is_css(color: object) -> bool:
     """Check whether a value is CSS color syntax this module can read.
 
@@ -385,7 +490,7 @@ def is_css(color: object) -> bool:
     if text == "transparent":
         return True
     match = CSS_FUNCTION.fullmatch(text)
-    return match is not None and match.group(1) in _CSS_FUNCTIONS
+    return match is not None and match.group(1) in CSS_FUNCTION_NAMES
 
 
 def _split_arguments(arguments: str) -> tuple[list[str], str | None]:
@@ -454,9 +559,17 @@ def css2hsla(css: str) -> HSLA:
         return HSLA(0.0, 0.0, 0.0, 0.0)
 
     match = CSS_FUNCTION.fullmatch(text)
-    if match is None or match.group(1) not in _CSS_FUNCTIONS:
+    if match is None or match.group(1) not in CSS_FUNCTION_NAMES:
         raise InvalidColorError(f"Not a CSS color function: {css!r}.")
     name, arguments = match.group(1), match.group(2)
+    if name == "color":
+        ## A keyword and three components rather than three components, so it
+        ## does not fit the table the others are read from.
+        tokens, alpha_token = _split_arguments(arguments)
+        alpha = 1.0 if alpha_token is None else _read_alpha(alpha_token)
+        if not 0.0 <= alpha <= 1.0:
+            raise InvalidColorError(f"Alpha must be between 0 and 1, not {alpha}.")
+        return _predefined_color(tokens, alpha)
     readers, to_hsl = _CSS_FUNCTIONS[name]
 
     tokens, alpha_token = _split_arguments(arguments)
