@@ -50,12 +50,19 @@ permissions:
 ## The docs job is the exception and stays on pip -- see its own comment.
 
 jobs:
-  ## Every supported Python on Linux, and the ends of that range on Windows
-  ## and macOS. The package is pure Python and nothing in it branches on
-  ## sys.platform or os.name, so the middle versions on the other two would
+  ## Every supported Python on Linux, and the ends of the *released* range on
+  ## Windows and macOS. The package is pure Python and nothing in it branches
+  ## on sys.platform or os.name, so the middle versions on the other two would
   ## only repeat what Linux already covers; the ends are where a stdlib or
-  ## syntax difference would show. Nine jobs rather than the fifteen a full
+  ## syntax difference would show. Ten jobs rather than the eighteen a full
   ## cross-product would cost.
+  ##
+  ## 3.15 is a release candidate, so it is carried on Linux only and Windows
+  ## and macOS stay on 3.14 -- keeping a stable colour at the top end, where
+  ## the last platform difference showed up. Move both to 3.15 when it ships.
+  ## It is a full job rather than an allowed failure: it passes today, and a
+  ## prerelease that starts failing is worth being told about loudly. Nothing
+  ## is blocked by it until it is added to the branch's required checks.
   ##
   ## Windows and macOS matter here despite the package being pure Python:
   ## development happens on Windows, preview() imports tkinter, which ships
@@ -69,7 +76,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14', '3.15']
         ## Each of these names an os the matrix does not already pair with
         ## that version, so it adds a combination rather than overwriting one.
         include:

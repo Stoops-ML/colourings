@@ -1,5 +1,6 @@
 import importlib.metadata
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -86,6 +87,7 @@ def test_the_public_surface_is_deliberate():
 
 PYPROJECT = pathlib.Path(__file__).resolve().parent.parent / "pyproject.toml"
 LICENSE = PYPROJECT.parent / "LICENSE.txt"
+WORKFLOW = PYPROJECT.parent / ".github" / "workflows" / "workflow.yml"
 
 
 @pytest.mark.skipif(not PYPROJECT.exists(), reason="running without the source tree")
@@ -107,3 +109,48 @@ def test_the_typed_classifier_and_the_marker_agree():
     classifier is only true if the marker actually ships."""
     assert '"Typing :: Typed"' in PYPROJECT.read_text(encoding="utf-8")
     assert (pathlib.Path(colourings.__file__).parent / "py.typed").exists()
+
+
+def _declared_versions():
+    """The Python versions pyproject.toml claims, from the classifiers."""
+    return set(
+        re.findall(
+            r'"Programming Language :: Python :: (\d+\.\d+)"',
+            PYPROJECT.read_text(encoding="utf-8"),
+        )
+    )
+
+
+def _tested_versions():
+    """The Python versions the test matrix actually runs.
+
+    Scoped to the ``test`` job's own block, since the other jobs pin a single
+    version of their own. Read with a regex rather than a YAML parser: this
+    package has no runtime dependencies and a test-only PyYAML would be the
+    first, for one list of strings.
+    """
+    text = WORKFLOW.read_text(encoding="utf-8")
+    block = text[text.index("\n  test:\n") : text.index("\n  quality:\n")]
+    return set(re.findall(r"'(\d+\.\d+)'", block))
+
+
+@pytest.mark.skipif(
+    not (PYPROJECT.exists() and WORKFLOW.exists()),
+    reason="running without the source tree",
+)
+def test_the_versions_tested_are_the_versions_claimed():
+    """Two lists that have to agree, and nothing else makes them.
+
+    A version in the classifiers but not the matrix is a promise to the index
+    that nothing checks. A version in the matrix but not the classifiers
+    installs fine and then tells pip it is unsupported. Both are silent, and
+    both have to be edited by hand, so they are pinned to each other here.
+    """
+    assert _declared_versions() == _tested_versions()
+
+
+@pytest.mark.skipif(not PYPROJECT.exists(), reason="running without the source tree")
+def test_requires_python_matches_the_oldest_version_claimed():
+    """The floor is written twice -- once as a bound, once as a classifier."""
+    oldest = min(_declared_versions(), key=lambda v: tuple(map(int, v.split("."))))
+    assert f'requires-python = ">={oldest}"' in PYPROJECT.read_text(encoding="utf-8")
