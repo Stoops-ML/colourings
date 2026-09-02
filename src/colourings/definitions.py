@@ -471,3 +471,62 @@ def linspace(
         ## its range check having none of the float tolerance `is_hsl` has.
         result[-1] = float(stop)
     return result
+
+
+## CSS's system colours, from CSS Color 4 section 6.2 and its Appendix A of
+## deprecated ones. They are real keywords, and this library deliberately
+## resolves none of them: every one is defined as whatever the user's platform,
+## browser and theme say it is, so any fixed value would be wrong for most
+## readers and right for nobody in particular. `Color("Canvas")` is white on
+## one machine and near-black on the next.
+##
+## Kept only so that asking for one gets that answer instead of "cannot
+## identify color", which reads as a typo.
+SYSTEM_COLORS = frozenset(
+    {
+        ## Current, CSS Color 4 section 6.2.
+        "accentcolor",
+        "accentcolortext",
+        "activetext",
+        "buttonborder",
+        "buttonface",
+        "buttontext",
+        "canvas",
+        "canvastext",
+        "field",
+        "fieldtext",
+        "graytext",
+        "highlight",
+        "highlighttext",
+        "linktext",
+        "mark",
+        "marktext",
+        "selecteditem",
+        "selecteditemtext",
+        "visitedtext",
+        ## Deprecated, kept in the specification for compatibility.
+        "activeborder",
+        "activecaption",
+        "appworkspace",
+        "background",
+        "buttonhighlight",
+        "buttonshadow",
+        "captiontext",
+        "inactiveborder",
+        "inactivecaption",
+        "inactivecaptiontext",
+        "infobackground",
+        "infotext",
+        "menu",
+        "menutext",
+        "scrollbar",
+        "threeddarkshadow",
+        "threedface",
+        "threedhighlight",
+        "threedlightshadow",
+        "threedshadow",
+        "window",
+        "windowframe",
+        "windowtext",
+    }
+)

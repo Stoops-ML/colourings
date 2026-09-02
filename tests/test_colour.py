@@ -33,6 +33,7 @@ from colourings.colour import (
     stable_key,
 )
 from colourings.conversions import hsl2rgb, rgb2relative_luminance
+from colourings.definitions import COLOR_NAME_TO_RGB, SYSTEM_COLORS
 from colourings.errors import (
     AmbiguousColorError,
     ColorError,
@@ -424,6 +425,46 @@ def test_bad_identify_color():
 def test_identify_color_refuses_what_it_cannot_place(value):
     with pytest.raises(UnknownColorError, match="Cannot identify color"):
         identify_color(value)
+
+
+## CSS system colours are real keywords that this library resolves to nothing,
+## because each is defined as whatever the reader's platform and theme make it.
+## Reporting them as unidentifiable read as a typo, so they say what they are.
+@pytest.mark.parametrize("name", sorted(SYSTEM_COLORS))
+def test_a_system_colour_says_what_it_is_rather_than_reading_as_a_typo(name):
+    with pytest.raises(UnknownColorError, match="is a CSS system color"):
+        Color(name)
+
+
+@pytest.mark.parametrize("written", ["Canvas", "CANVAS", "  canvas  ", "ButtonFace"])
+def test_a_system_colour_is_recognised_however_it_is_written(written):
+    """Case and surrounding space do not matter anywhere else in the parser."""
+    with pytest.raises(UnknownColorError, match="is a CSS system color"):
+        Color(written)
+
+
+def test_no_system_colour_is_also_a_named_web_colour():
+    """This is what makes the test above meaningful. A name in both tables
+    would be resolved by the web lookup, which runs first, and the system
+    colour message would be unreachable -- so the guard is on the data, not on
+    the code path."""
+    assert not SYSTEM_COLORS & set(COLOR_NAME_TO_RGB)
+
+
+def test_the_system_colour_list_is_the_specification_one():
+    """Guard the guard: an emptied set would leave every test above vacuous,
+    since a system colour would then fall through to "cannot identify"."""
+    assert len(SYSTEM_COLORS) == 42
+    ## One current, one deprecated, and one that is neither.
+    assert "canvas" in SYSTEM_COLORS
+    assert "threedshadow" in SYSTEM_COLORS
+    assert "chartreuse" not in SYSTEM_COLORS
+
+
+def test_something_that_is_not_a_colour_at_all_still_says_so():
+    """The other branch of the message, so neither is the only one taken."""
+    with pytest.raises(UnknownColorError, match="Cannot identify color"):
+        Color("definitely-not-a-colour")
 
 
 def test_RGB():

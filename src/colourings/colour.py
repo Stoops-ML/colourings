@@ -68,6 +68,7 @@ from .definitions import (
     OKLCH as OKLCHTuple,
     RGB as RGBTuple,
     RGBA as RGBATuple,
+    SYSTEM_COLORS,
     WCAG_CONTRAST_MINIMUMS,
     WCAG_LIGHT_DARK_CROSSOVER,
     XYZ as XYZTuple,
@@ -674,6 +675,34 @@ _SEQUENCE_FORMATS: tuple[
 )
 
 
+def _why_it_is_not_a_colour(color: object) -> str:
+    """Say why a value could not be read as a color.
+
+    A CSS system colour is named as one rather than reported as unidentifiable,
+    because it is a real keyword and the reason it has no value here is worth
+    stating -- see :data:`~colourings.definitions.SYSTEM_COLORS`. The name is
+    quoted as the specification spells it, in lower case, since that is the
+    form that reaches here.
+
+    Parameters
+    ----------
+    color : object
+        The value that could not be identified.
+
+    Returns
+    -------
+    str
+        The message to raise.
+    """
+    if isinstance(color, str) and color.strip().lower() in SYSTEM_COLORS:
+        return (
+            f"{color.strip().lower()!r} is a CSS system color, whose value is "
+            "whatever the reader's platform and theme make it, so there is no "
+            "fixed color to return. Name the color you mean instead."
+        )
+    return "Cannot identify color."
+
+
 def identify_color(
     color: str | Sequence[int | float] | Color,
 ) -> Callable[[Any], HSLTuple]:
@@ -721,7 +750,7 @@ def identify_color(
         for matches, convert in _SEQUENCE_FORMATS:
             if matches(color):
                 return convert
-    raise UnknownColorError("Cannot identify color.")
+    raise UnknownColorError(_why_it_is_not_a_colour(color))
 
 
 def _apply_property_keywords(color: Color, keywords: dict[str, Any]) -> None:

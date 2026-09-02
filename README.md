@@ -427,7 +427,7 @@ includes the alpha only when the color is not opaque. Every form round-trips
 exactly: reading back what `to_css` wrote gives the same 8-bit color, alpha
 included.
 
-Two things to know:
+Three things to know:
 
 - **Out of range is an error, not a clamp.** A browser reads `rgb(300 0 0)` as
   red; here it raises. Quietly turning one color into another is what this
@@ -449,6 +449,15 @@ Two things to know:
   So `oklch(0.5 50% 200)` is exactly `oklch(0.5 0.2 200)`. `100%` is the
   reference and not a maximum: a larger percentage is allowed by the syntax
   and then refused by the range check, exactly as the equivalent number is.
+
+- **System colors are recognised and deliberately not resolved.** `Canvas`,
+  `ButtonFace`, `LinkText` and the rest are defined by CSS as whatever the
+  reader's platform, browser and theme make them, so any fixed value would be
+  wrong for most readers and right for nobody. `Color("Canvas")` raises
+  `UnknownColorError`, saying that it *is* a system color and that there is no
+  fixed color to return, rather than reporting it as an unidentifiable typo.
+  The deprecated ones from the specification's appendix — `ThreeDShadow`,
+  `InfoBackground` and the rest — are recognised the same way.
 
 ## Adjusting a Color
 
