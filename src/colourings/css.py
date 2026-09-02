@@ -153,6 +153,207 @@ _CSS_FUNCTIONS: dict[
 _read_alpha = _scaled(1.0)
 
 
+## `color-mix()` is parsed apart from the functions in `_CSS_FUNCTIONS`, for
+## two reasons. It takes whole colours rather than components, so its arguments
+## nest and `CSS_FUNCTION`'s body pattern -- which excludes parentheses --
+## cannot describe them. And resolving those colours needs the whole of
+## `identify_color`, which lives a module above this one, so what is here is
+## the syntax and the arithmetic on the percentages, and nothing that turns a
+## string into a colour.
+COLOR_MIX = re.compile(r"color-mix\((?P<arguments>.*)\)", re.S)
+
+## The hue-interpolation methods CSS Color 4 section 13.5 defines. `shorter` is
+## the default when none is written.
+CSS_HUE_METHODS = ("shorter", "longer", "increasing", "decreasing")
+
+
+def _split_outside_parentheses(text: str, separators: str) -> list[str]:
+    """Split on separators that are not inside parentheses.
+
+    A naive split cannot be used on `color-mix()`: its arguments may be colour
+    functions, and `color-mix(in oklab, rgb(255 0 0) 40%, blue)` has commas and
+    spaces belonging to the inner function.
+
+    Parameters
+    ----------
+    text : str
+        The text to split.
+    separators : str
+        Characters to split on, each considered only at nesting depth zero.
+
+    Returns
+    -------
+    list[str]
+        The pieces, stripped, with empty ones dropped.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when the parentheses do not balance.
+    """
+    pieces, depth, start = [], 0, 0
+    for index, character in enumerate(text):
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth < 0:
+                raise InvalidColorError(f"Unbalanced parentheses in {text!r}.")
+        elif depth == 0 and character in separators:
+            pieces.append(text[start:index])
+            start = index + 1
+    if depth:
+        raise InvalidColorError(f"Unbalanced parentheses in {text!r}.")
+    pieces.append(text[start:])
+    return [piece.strip() for piece in pieces if piece.strip()]
+
+
+def is_color_mix(color: object) -> bool:
+    """Check whether a value is a ``color-mix()`` function.
+
+    Answers on the shape alone, like :func:`is_css`, so that a malformed one
+    reaches the parser and gets a specific complaint.
+
+    Parameters
+    ----------
+    color : object
+        Candidate value.
+
+    Returns
+    -------
+    bool
+        True when the value is a ``color-mix()`` call.
+
+    Examples
+    --------
+    >>> is_color_mix("color-mix(in oklab, red, blue)")
+    True
+    >>> is_color_mix("color-mixture(red, blue)")
+    False
+    """
+    if not isinstance(color, str):
+        return False
+    return COLOR_MIX.fullmatch(color.strip().lower()) is not None
+
+
+def read_mix_method(token: str) -> tuple[str, str] | None:
+    """Read a ``<color-interpolation-method>``, or say it is not one.
+
+    Parameters
+    ----------
+    token : str
+        The first comma-separated argument of ``color-mix()``, which is the
+        interpolation method when it begins with ``in``, and a colour
+        otherwise.
+
+    Returns
+    -------
+    tuple[str, str] | None
+        The space and the hue-interpolation method, or None when the token is
+        not an interpolation method at all.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when the token begins with ``in`` but is not a method this
+        module can read.
+    """
+    words = token.split()
+    if not words or words[0] != "in":
+        return None
+    if len(words) == 2:
+        return words[1], "shorter"
+    ## `in oklch longer hue` -- the trailing `hue` is part of the grammar.
+    if len(words) == 4 and words[3] == "hue" and words[2] in CSS_HUE_METHODS:
+        return words[1], words[2]
+    raise InvalidColorError(
+        f"Cannot read {token!r} as a color interpolation method. It takes "
+        f"'in <space>', optionally followed by one of "
+        f"{', '.join(CSS_HUE_METHODS)} and the word 'hue'."
+    )
+
+
+def read_mix_item(token: str) -> tuple[str, float | None]:
+    """Split one ``color-mix()`` argument into its colour and its percentage.
+
+    The grammar joins the two with ``&&``, so either order is allowed.
+
+    Parameters
+    ----------
+    token : str
+        One comma-separated argument.
+
+    Returns
+    -------
+    tuple[str, float | None]
+        The colour as written, and its percentage when one was given.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when the argument is not one colour with at most one
+        percentage, or the percentage is outside ``[0, 100]``.
+    """
+    percentages: list[tuple[str, float]] = []
+    colours: list[str] = []
+    for piece in _split_outside_parentheses(token, " 	"):
+        match = _PERCENT_TOKEN.fullmatch(piece)
+        if match:
+            percentages.append((piece, float(match.group(1))))
+        else:
+            colours.append(piece)
+    if len(colours) != 1 or len(percentages) > 1:
+        raise InvalidColorError(
+            f"{token!r} is not one color with an optional percentage."
+        )
+    if not percentages:
+        return colours[0], None
+    written, amount = percentages[0]
+    if not 0.0 <= amount <= 100.0:
+        raise InvalidColorError(
+            f"A color-mix() percentage must be between 0% and 100%, not {written!r}."
+        )
+    return colours[0], amount
+
+
+def normalize_mix_percentages(
+    percentages: Sequence[float | None],
+) -> tuple[list[float], float]:
+    """Fill in and rescale the percentages of a ``color-mix()``.
+
+    CSS Values 5's algorithm, with the "forced normalization" flag that
+    ``color-mix()`` sets. Reproduces every worked example in CSS Color 5
+    section 3.2, including the one the leftover rule exists for:
+    ``purple 30%, plum 30%`` is a half-and-half mix at alpha 0.6, while
+    ``purple 80%, plum 80%`` is the same mix left opaque.
+
+    Parameters
+    ----------
+    percentages : Sequence[float | None]
+        One per colour, ``None`` where none was written.
+
+    Returns
+    -------
+    tuple[list[float], float]
+        The weights, summing to 100 or to 0, and the leftover percentage. The
+        result's alpha is multiplied by ``1 - leftover / 100``.
+    """
+    given = [value for value in percentages if value is not None]
+    ## Clamped, so that `80%, 80%` leaves nothing over.
+    specified = min(sum(given), 100.0) if given else 0.0
+    omitted = len(percentages) - len(given)
+    share = (100.0 - specified) / omitted if omitted else 0.0
+    filled = [share if value is None else value for value in percentages]
+
+    ## The leftover is measured before rescaling, which is what makes
+    ## `30%, 30%` translucent and `80%, 80%` not.
+    total = sum(filled)
+    leftover = 100.0 - total if total < 100.0 else 0.0
+    if total > 0.0:
+        filled = [value * 100.0 / total for value in filled]
+    return filled, leftover
+
+
 def is_css(color: object) -> bool:
     """Check whether a value is CSS color syntax this module can read.
 

@@ -52,7 +52,20 @@ from .conversions import (
     xyz2hsl,
     yuv2hsl,
 )
-from .css import _CSS_FUNCTIONS, CSS_FUNCTION, css2hsl, css2hsla, hsla2css, is_css
+from .css import (
+    _CSS_FUNCTIONS,
+    COLOR_MIX,
+    CSS_FUNCTION,
+    _split_outside_parentheses,
+    css2hsl,
+    css2hsla,
+    hsla2css,
+    is_color_mix,
+    is_css,
+    normalize_mix_percentages,
+    read_mix_item,
+    read_mix_method,
+)
 
 ## The colour tuple types keep the ``*Tuple`` names, uniformly, so that nothing
 ## in this module is called ``HSL`` or ``RGB`` -- the names the accessors below
@@ -658,6 +671,223 @@ def _alpha_from(given: float | None, carried: float, format_name: str) -> float:
     return carried
 
 
+## The spaces `color-mix()` may interpolate in, mapped to the conversions that
+## reach them and come back, and where the hue channel sits. CSS also allows
+## `srgb`, `srgb-linear`, `hwb`, `xyz` and the predefined RGB spaces; those
+## raise rather than being silently substituted, which is the choice this
+## package makes everywhere a value cannot be produced exactly.
+_MIX_SPACES: dict[
+    str,
+    tuple[
+        Callable[[Sequence[float]], Sequence[float]],
+        Callable[[Sequence[float]], HSLTuple],
+        int | None,
+    ],
+] = {
+    "hsl": (lambda hsl: HSLTuple(*hsl), lambda values: HSLTuple(*values), 0),
+    "lab": (hsl2lab, lab2hsl, None),
+    "lch": (hsl2lch, lch2hsl, 2),
+    "oklab": (hsl2oklab, oklab2hsl, None),
+    "oklch": (hsl2oklch, oklch2hsl, 2),
+}
+
+## The two hue arcs this takes. `increasing` and `decreasing` are also in the
+## specification and are not implemented.
+_MIX_HUE_METHODS = ("shorter", "longer")
+
+
+def _shift_hue_for_arc(
+    first: list[float], second: list[float], index: int, method: str
+) -> None:
+    """Move one hue so that interpolating between them takes the wanted arc.
+
+    CSS Color 4 section 13.5, which adjusts an endpoint rather than the
+    difference. Verified against the specification's own worked example: from
+    hue 30 to hue 90, the midpoint is 60 the short way and 240 the long way.
+
+    Parameters
+    ----------
+    first : list[float]
+        Components of the colour being mixed from.
+    second : list[float]
+        Components of the colour being mixed to.
+    index : int
+        Position of the hue channel within those components.
+    method : str
+        Either ``"shorter"`` or ``"longer"``.
+
+    Returns
+    -------
+    None
+        Both lists are modified in place.
+    """
+    difference = second[index] - first[index]
+    if method == "shorter":
+        if difference > 180.0:
+            first[index] += 360.0
+        elif difference < -180.0:
+            second[index] += 360.0
+    elif 0.0 < difference < 180.0:
+        first[index] += 360.0
+    elif -180.0 < difference <= 0.0:
+        second[index] += 360.0
+
+
+def _mix_pair(
+    first: HSLATuple, second: HSLATuple, progress: float, space: str, hue_method: str
+) -> HSLATuple:
+    """Interpolate two colours in one space, with alpha premultiplied.
+
+    Premultiplication is CSS Color 4 section 13.3, and it is why this does not
+    call :func:`color_scale`: that interpolates alpha alongside the channels
+    rather than weighting the channels by it, which agrees for opaque colours
+    and disagrees for every other kind. Hue is never premultiplied, being an
+    angle rather than an amount.
+
+    Parameters
+    ----------
+    first : HSLATuple
+        The colour at ``progress`` 0.
+    second : HSLATuple
+        The colour at ``progress`` 1.
+    progress : float
+        How far to move from the first to the second.
+    space : str
+        A key of :data:`_MIX_SPACES`.
+    hue_method : str
+        Either ``"shorter"`` or ``"longer"``.
+
+    Returns
+    -------
+    HSLATuple
+        The mixed colour, with alpha on the ``[0, 100]`` scale.
+    """
+    to_space, from_space, hue = _MIX_SPACES[space]
+    left, right = list(to_space(first[:3])), list(to_space(second[:3]))
+    left_alpha, right_alpha = first[3] / 100.0, second[3] / 100.0
+    if hue is not None:
+        _shift_hue_for_arc(left, right, hue, hue_method)
+    for index in range(3):
+        if index != hue:
+            left[index] *= left_alpha
+            right[index] *= right_alpha
+
+    mixed = [
+        start + (end - start) * progress for start, end in zip(left, right, strict=True)
+    ]
+    alpha = left_alpha + (right_alpha - left_alpha) * progress
+    if alpha:
+        for index in range(3):
+            if index != hue:
+                mixed[index] /= alpha
+    if hue is not None:
+        mixed[hue] %= 360.0
+    return HSLATuple(*from_space(mixed), alpha * 100.0)
+
+
+def color_mix2hsla(css: str) -> HSLATuple:
+    """Convert a ``color-mix()`` function to HSL with an alpha.
+
+    CSS Color 5 section 3. The percentages are normalised, the colours are
+    folded together from the front, and the result's alpha is scaled by
+    whatever the percentages left over -- so ``color-mix(in lch, purple 30%,
+    plum 30%)`` is a half-and-half mix at alpha 0.6.
+
+    Mixing happens in this package's own spaces, which matters for two of
+    them: ``lab`` and ``lch`` here are relative to D65, where CSS defines them
+    against D50. Oklab and Oklch, including the default, are D65 in both. The
+    difference is the one the conversions already carry and is documented with
+    them; it is small for a mix but it is not nothing.
+
+    The result is an sRGB colour, so a mix whose midpoint lies outside that
+    gamut is clipped on the way back, as every other conversion here is.
+
+    Parameters
+    ----------
+    css : str
+        A ``color-mix()`` function. Each argument may be any color this package
+        reads, including another ``color-mix()``.
+
+    Returns
+    -------
+    HSLATuple
+        HSLA tuple, with alpha on its own ``[0, 100]`` scale.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when the function cannot be read, names no color, or asks for an
+        interpolation space or hue method this package does not have.
+
+    Examples
+    --------
+    >>> Color("color-mix(in oklab, red, red)") == Color("red")
+    True
+    >>> Color("color-mix(in hsl, red 100%, blue 0%)") == Color("red")
+    True
+    >>> round(color_mix2hsla("color-mix(in lch, red 30%, red 30%)")[3], 6)
+    60.0
+    """
+    match = COLOR_MIX.fullmatch(css.strip().lower())
+    if match is None:
+        raise InvalidColorError(f"Not a color-mix() function: {css!r}.")
+
+    arguments = _split_outside_parentheses(match.group("arguments"), ",")
+    space, hue_method = "oklab", "shorter"
+    if arguments:
+        method = read_mix_method(arguments[0])
+        if method is not None:
+            space, hue_method = method
+            arguments = arguments[1:]
+    if not arguments:
+        raise InvalidColorError(f"color-mix() needs at least one color: {css!r}.")
+    if space not in _MIX_SPACES:
+        raise InvalidColorError(
+            f"Cannot interpolate in {space!r}. This package mixes in "
+            f"{', '.join(sorted(_MIX_SPACES))}."
+        )
+    if hue_method not in _MIX_HUE_METHODS:
+        raise InvalidColorError(
+            f"Cannot interpolate hue by {hue_method!r}. This package takes "
+            f"{' and '.join(_MIX_HUE_METHODS)}."
+        )
+
+    items = [read_mix_item(argument) for argument in arguments]
+    weights, leftover = normalize_mix_percentages([amount for _, amount in items])
+    colours = []
+    for text, _ in items:
+        colour = Color(text)
+        colours.append(HSLATuple(*colour.hsl, colour.alpha * 100.0))
+
+    ## Fold from the front, each step weighted by what the pair carries between
+    ## them, so that the merged item keeps their combined share.
+    result, carried = colours[0], weights[0]
+    for colour_hsla, weight in zip(colours[1:], weights[1:], strict=True):
+        combined = carried + weight
+        ## Both at 0% is the one case with no ratio to take; the specification
+        ## says to treat it as an even mix.
+        progress = weight / combined if combined else 0.5
+        result = _mix_pair(result, colour_hsla, progress, space, hue_method)
+        carried = combined
+    return HSLATuple(*result[:3], result[3] * (1.0 - leftover / 100.0))
+
+
+def color_mix2hsl(css: str) -> HSLTuple:
+    """Convert a ``color-mix()`` function to HSL, dropping its alpha.
+
+    Parameters
+    ----------
+    css : str
+        A ``color-mix()`` function.
+
+    Returns
+    -------
+    HSLTuple
+        HSL values.
+    """
+    return HSLTuple(*color_mix2hsla(css)[:3])
+
+
 ## Tried in order: hex before web, since ``is_web`` accepts hex too, and CSS
 ## last, being the broadest.
 _STRING_FORMATS: tuple[tuple[Callable[[str], bool], Callable[[Any], HSLTuple]], ...] = (
@@ -665,6 +895,7 @@ _STRING_FORMATS: tuple[tuple[Callable[[str], bool], Callable[[Any], HSLTuple]], 
     (is_hex_alpha, hexa2hsl),
     (is_web, web2hsl),
     (is_css, css2hsl),
+    (is_color_mix, color_mix2hsl),
 )
 
 _SEQUENCE_FORMATS: tuple[
@@ -902,6 +1133,8 @@ def _carried_alpha(
             return "hex", hex2rgba(value)[3] / 255.0
         if func is css2hsl:
             return "css", css2hsla(value)[3] / 100.0
+        if func is color_mix2hsl:
+            return "color-mix", color_mix2hsla(value)[3] / 100.0
         return None
     if func is rgba2hsl:
         return "rgba", value[3] / 255.0

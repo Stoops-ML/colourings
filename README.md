@@ -459,6 +459,42 @@ Three things to know:
   The deprecated ones from the specification's appendix — `ThreeDShadow`,
   `InfoBackground` and the rest — are recognised the same way.
 
+### `color-mix()`
+
+```python
+Color("color-mix(in oklab, red, blue)")  # <Color #8c53a2>
+Color("color-mix(red, blue)")  # the same: oklab is the default space
+Color("color-mix(in oklab, red 30%, blue)")  # weighted
+Color("color-mix(in oklch longer hue, red, blue)")  # <Color #009300>
+```
+
+Any color this package reads can go in one, including another `color-mix()`,
+and more than two are allowed.
+
+Percentages follow CSS, which means shares adding up to less than 100% leave
+the rest as transparency. So these two are the same color, and only differ in
+being opaque:
+
+```python
+Color("color-mix(in lch, purple 30%, plum 30%)").alpha  # 0.6
+Color("color-mix(in lch, purple 80%, plum 80%)").alpha  # 1.0
+```
+
+Interpolation premultiplies by alpha, as CSS specifies, which is why mixing
+with `transparent` fades a color instead of darkening it — `transparent` is a
+transparent *black*, and unweighted channels would drag towards it:
+
+```python
+Color("color-mix(in oklab, red, transparent)")  # <Color red>
+Color("color-mix(in oklab, red, transparent)").alpha  # 0.5
+```
+
+Mixing works `in hsl`, `lab`, `lch`, `oklab` and `oklch`, with `shorter hue`
+or `longer hue`. CSS also allows `srgb`, `hwb`, `xyz` and the predefined RGB
+spaces, and the `increasing` and `decreasing` hue methods; those raise rather
+than being quietly substituted. `lab` and `lch` here are D65 where CSS defines
+them against D50, which is the difference the conversions already carry.
+
 ## Adjusting a Color
 
 Every one of these returns a new color and leaves the original alone, carrying
