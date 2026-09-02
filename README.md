@@ -733,12 +733,15 @@ spelling for an exact match. It always returns *something*, however far away —
 check `delta_e` against it before quoting it.
 
 > **On `ciede2000`:** its constants were written from the formula rather than
-> copied from a reference implementation. They are checked against properties
-> that hold by construction — exactly 0 for a color against itself, exactly 100
-> for black against white, symmetric in its arguments, and reducing to a
-> hand-computable expression for a pair differing only in lightness — but *not*
-> against the published Sharma-Wu-Dalal test set. Do that before relying on it
-> for compliance work.
+> copied from a reference implementation, so they are checked against the
+> published Sharma–Wu–Dalal supplementary test data — all 34 pairs, to the four
+> decimals that table gives.
+>
+> That check is worth more than it sounds. The properties this function is
+> otherwise tested against — exactly 0 against itself, exactly 100 for black
+> against white, symmetry, and the neutral lightness reduction — all still pass
+> with the hue-rotation peak moved from 275° to 257°, or with a weighting
+> constant mistyped. The published pairs catch every one of those.
 
 ## Compositing
 
