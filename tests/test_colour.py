@@ -3,6 +3,7 @@ import inspect
 import math
 import subprocess
 import sys
+from itertools import pairwise
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -45,7 +46,7 @@ def test_preview(mock_tk):
     mock_tk.assert_called_once()
     mock_root.geometry.assert_called_once_with(f"{x}x{y}")
     mock_root.config.assert_called_once_with(background=c.hex_l)
-    mock_root.title.assert_called_once_with(f"{str(c)} preview")
+    mock_root.title.assert_called_once_with(f"{c!s} preview")
     mock_root.mainloop.assert_called_once()
 
 
@@ -124,17 +125,17 @@ def test_colour_scale_with_exact_inputs():
 def test_colour_scale_with_fewer_inputs():
     with pytest.raises(
         ValueError,
-        match="Number of steps must be greater than or equal to the number of colors.",
+        match="Number of steps must be greater than or equal to the number of colors",
     ):
         colour_scale((Color("white"), Color("black")), 1)
     with pytest.raises(
         ValueError,
-        match="Number of steps must be greater than or equal to the number of colors.",
+        match="Number of steps must be greater than or equal to the number of colors",
     ):
         colour_scale((Color("blue"), Color("black")), 1)
     with pytest.raises(
         ValueError,
-        match="Number of steps must be greater than or equal to the number of colors.",
+        match="Number of steps must be greater than or equal to the number of colors",
     ):
         colour_scale((Color("blue"), Color("black"), Color("blue")), 2)
 
@@ -142,17 +143,17 @@ def test_colour_scale_with_fewer_inputs():
 def test_color_scale_with_fewer_inputs():
     with pytest.raises(
         ValueError,
-        match="Number of steps must be greater than or equal to the number of colors.",
+        match="Number of steps must be greater than or equal to the number of colors",
     ):
         color_scale((Color("white"), Color("black")), 1)
     with pytest.raises(
         ValueError,
-        match="Number of steps must be greater than or equal to the number of colors.",
+        match="Number of steps must be greater than or equal to the number of colors",
     ):
         color_scale((Color("blue"), Color("black")), 1)
     with pytest.raises(
         ValueError,
-        match="Number of steps must be greater than or equal to the number of colors.",
+        match="Number of steps must be greater than or equal to the number of colors",
     ):
         color_scale((Color("blue"), Color("black"), Color("blue")), 2)
 
@@ -175,25 +176,25 @@ def test_bad_color_change_HSL():
 
 def test_bad_color_change_alpha():
     c = Color("red")
-    with pytest.raises(ValueError, match="Alpha must be between 0 and 1."):
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1"):
         c.alpha = 2
-    with pytest.raises(ValueError, match="Alpha must be between 0 and 1."):
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1"):
         c.alpha = -0.5
 
 
 def test_bad_color_change_rgb():
     c = Color("red")
-    with pytest.raises(ValueError, match="Input is not an RGB type."):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         c.red = 300
-    with pytest.raises(ValueError, match="Input is not an RGB type."):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         c.red = -0.5
-    with pytest.raises(ValueError, match="Input is not an RGB type."):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         c.green = 300
-    with pytest.raises(ValueError, match="Input is not an RGB type."):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         c.green = -0.5
-    with pytest.raises(ValueError, match="Input is not an RGB type."):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         c.blue = 300
-    with pytest.raises(ValueError, match="Input is not an RGB type."):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         c.blue = -0.5
 
 
@@ -395,10 +396,10 @@ def test_copying_a_color_takes_the_alpha_keyword_over_the_original():
 
 
 def test_bad_identify_color():
-    with pytest.raises(TypeError, match="Cannot identify color."):
+    with pytest.raises(TypeError, match="Cannot identify color"):
         identify_color("a")
     with pytest.raises(
-        TypeError, match="Cannot determine whether color is RGBA or HSLA."
+        TypeError, match="Cannot determine whether color is RGBA or HSLA"
     ):
         identify_color((0, 0, 0, 0))
 
@@ -416,7 +417,7 @@ def test_bad_identify_color():
     ],
 )
 def test_identify_color_refuses_what_it_cannot_place(value):
-    with pytest.raises(UnknownColorError, match="Cannot identify color."):
+    with pytest.raises(UnknownColorError, match="Cannot identify color"):
         identify_color(value)
 
 
@@ -1194,7 +1195,7 @@ def test_equality_is_symmetric_across_strategies():
     b = Color("blue", lightness=0)
     assert (a == b) == (b == a)
 
-    def never_equal(c1, c2):
+    def never_equal(_c1, _c2):
         return False
 
     c = Color("red", equality=never_equal)
@@ -1386,7 +1387,7 @@ def test_color_scale_rejects_unknown_space():
         color_scale((Color("red"), Color("blue")), 5, space="srgb")
 
 
-@pytest.mark.parametrize("space", ("lab", "oklab"))
+@pytest.mark.parametrize("space", ["lab", "oklab"])
 def test_color_scale_rejects_longer_without_a_hue(space):
     with pytest.raises(ValueError, match="no hue channel"):
         color_scale((Color("red"), Color("blue")), 5, longer=True, space=space)
@@ -1412,7 +1413,7 @@ def _oklab_distance(c1, c2):
 
 def _step_evenness(scale):
     """Ratio of the largest to the smallest perceived step. 1.0 is perfect."""
-    steps = [_oklab_distance(a, b) for a, b in zip(scale[:-1], scale[1:], strict=True)]
+    steps = [_oklab_distance(a, b) for a, b in pairwise(scale)]
     return max(steps) / min(steps)
 
 
@@ -1439,16 +1440,16 @@ def test_hsl_brightness_is_not_monotonic_where_oklab_is():
     hsl = [c.oklab.lightness for c in color_scale(stops, 9)]
     oklab = [c.oklab.lightness for c in color_scale(stops, 9, space="oklab")]
 
-    assert not all(a <= b for a, b in zip(hsl[:-1], hsl[1:], strict=True))
+    assert not all(a <= b for a, b in pairwise(hsl))
     assert hsl[3] > hsl[4]  # the dip
-    assert all(a < b for a, b in zip(oklab[:-1], oklab[1:], strict=True))
+    assert all(a < b for a, b in pairwise(oklab))
 
 
 @pytest.mark.parametrize(("start", "end"), [("red", "cyan"), ("black", "white")])
 def test_oklab_steps_are_exactly_equal_inside_the_gamut(start, end):
     scale = color_scale((Color(start), Color(end)), 9, space="oklab")
     lightness = [c.oklab.lightness for c in scale]
-    deltas = [b - a for a, b in zip(lightness[:-1], lightness[1:], strict=True)]
+    deltas = [b - a for a, b in pairwise(lightness)]
     assert max(deltas) == pytest.approx(min(deltas), abs=1e-12)
 
 
@@ -1799,7 +1800,8 @@ def test_harmonies_return_new_colours_and_carry_alpha(call):
 
 def test_repr_html_draws_the_colour():
     html = Color("red")._repr_html_()
-    assert html.startswith("<div") and html.endswith("</div>")
+    assert html.startswith("<div")
+    assert html.endswith("</div>")
     assert "rgb(255 0 0)" in html
     assert ">red</span>" in html
     assert "linear-gradient" not in html
@@ -1961,7 +1963,8 @@ def test_every_blend_stays_in_range_and_leaves_its_operands_alone(mode):
     assert all(0.0 <= channel <= 1.0 for channel in result.rgbf)
     assert 0.0 <= result.alpha <= 1.0
     assert (source.hsl, source.alpha, backdrop.hsl, backdrop.alpha) == before
-    assert result is not source and result is not backdrop
+    assert result is not source
+    assert result is not backdrop
 
 
 ## `a` and `c` carry a strategy stricter than the hash, `b` a looser one, and
@@ -2075,7 +2078,7 @@ def test_pick_for_is_stable_across_processes(expression):
     used to break this is only re-rolled by a new interpreter."""
     first = _picked_in_a_fresh_process(expression)
     assert first == _picked_in_a_fresh_process(expression)
-    assert first == str(eval(expression))  # noqa: S307
+    assert first == str(eval(expression))
 
 
 def test_hash_or_str_is_still_per_process():
@@ -2173,3 +2176,21 @@ def test_an_unknown_module_attribute_still_raises():
 
     with pytest.raises(AttributeError, match="has no attribute 'nope'"):
         _ = colourings.colour.nope
+
+
+@pytest.mark.parametrize(
+    ("accessor", "expected"),
+    [(NAMED_HSL, "C_HSL"), (NAMED_RGB, "C_RGB"), (NAMED_HEX, "C_HEX")],
+)
+def test_each_accessor_names_itself_in_its_error(accessor, expected):
+    """`NAMED_RGB` and `NAMED_HEX` look their colours up through `NAMED_HSL`,
+    so all three used to report `C_HSL` — a typo on one was blamed on another.
+    The message also follows Python's own wording now."""
+    with pytest.raises(AttributeError, match=f"'{expected}' object has no attribute"):
+        getattr(accessor, "NOSUCHCOLOUR")  # noqa: B009
+
+
+@pytest.mark.parametrize("accessor", [NAMED_HSL, NAMED_RGB, NAMED_HEX])
+def test_the_accessors_are_case_insensitive(accessor):
+    assert getattr(accessor, "BLUE") == getattr(accessor, "blue")  # noqa: B009
+    assert getattr(accessor, "RebeccaPurple") == getattr(accessor, "rebeccapurple")  # noqa: B009

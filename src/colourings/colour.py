@@ -96,41 +96,112 @@ from .identify import (
 )
 
 
+def _no_such_colour(container: object, name: str) -> AttributeError:
+    """Build the error an accessor raises for a name that is not a colour.
+
+    Takes the container so that each accessor names itself. They used to share
+    ``C_HSL``'s error, because the other two look their colours up through it,
+    so a typo on ``NAMED_RGB`` reported ``C_HSL`` as the culprit.
+
+    Parameters
+    ----------
+    container : object
+        The accessor the lookup was made on.
+    name : str
+        The name that was not found.
+
+    Returns
+    -------
+    AttributeError
+        The error to raise.
+    """
+    return AttributeError(
+        f"{type(container).__name__!r} object has no attribute {name!r}"
+    )
+
+
 class C_HSL:
-    def __getattr__(self, value):
+    """Container exposing named colors as HSL tuples."""
+
+    def __getattr__(self, value: str) -> HSLTuple:
+        """Look up a named color.
+
+        Parameters
+        ----------
+        value : str
+            A color name, in any case.
+
+        Returns
+        -------
+        HSLTuple
+            HSL values for that name.
+
+        Raises
+        ------
+        AttributeError
+            Raised when the name is not a known color.
+        """
         label = value.lower()
         if label in COLOR_NAME_TO_RGB:
             return rgb2hsl(COLOR_NAME_TO_RGB[label])
-        raise AttributeError(f"{self.__class__} instance has no attribute {value}")
+        raise _no_such_colour(self, value)
 
 
 NAMED_HSL = C_HSL()
 
 
 class C_RGB:
-    """Container exposing named colors as RGB tuples.
+    """Container exposing named colors as RGB tuples."""
 
-    Returns
-    -------
-    tuple[float, float, float]
-        RGB values for a known color name.
-    """
+    def __getattr__(self, value: str) -> RGBTuple:
+        """Look up a named color.
 
-    def __getattr__(self, value):
-        return hsl2rgb(getattr(NAMED_HSL, value))
+        Parameters
+        ----------
+        value : str
+            A color name, in any case.
+
+        Returns
+        -------
+        RGBTuple
+            RGB values for that name.
+
+        Raises
+        ------
+        AttributeError
+            Raised when the name is not a known color.
+        """
+        try:
+            return hsl2rgb(getattr(NAMED_HSL, value))
+        except AttributeError:
+            raise _no_such_colour(self, value) from None
 
 
 class C_HEX:
-    """Container exposing named colors as hexadecimal strings.
+    """Container exposing named colors as hexadecimal strings."""
 
-    Returns
-    -------
-    str
-        Hexadecimal color value for a known color name.
-    """
+    def __getattr__(self, value: str) -> str:
+        """Look up a named color.
 
-    def __getattr__(self, value):
-        return rgb2hex(getattr(NAMED_RGB, value))
+        Parameters
+        ----------
+        value : str
+            A color name, in any case.
+
+        Returns
+        -------
+        str
+            Hexadecimal color value for that name.
+
+        Raises
+        ------
+        AttributeError
+            Raised when the name is not a known color.
+        """
+        try:
+            return rgb2hex(getattr(NAMED_RGB, value))
+        except AttributeError:
+            raise _no_such_colour(self, value) from None
 
 
 NAMED_RGB = C_RGB()
@@ -554,7 +625,7 @@ def HSL_equivalence(c1: Color, c2: Color) -> bool:
     return c1._hsl == c2._hsl
 
 
-def _alpha_from(given: float | None, carried: float, format: str) -> float:
+def _alpha_from(given: float | None, carried: float, format_name: str) -> float:
     """Reconcile an ``alpha`` argument with the alpha a color value carries.
 
     Parameters
@@ -563,7 +634,7 @@ def _alpha_from(given: float | None, carried: float, format: str) -> float:
         Value passed as the ``alpha`` keyword, if any.
     carried : float
         Alpha carried by the color value, already scaled to ``[0, 1]``.
-    format : str
+    format_name : str
         Name of the format the value was identified as, for the error message.
 
     Returns
@@ -578,7 +649,8 @@ def _alpha_from(given: float | None, carried: float, format: str) -> float:
     """
     if given is not None and given != carried:
         raise ValueError(
-            f"Alpha value defined twice and does not have the same value: alpha={given} and alpha of {format}={carried}"
+            f"Alpha value defined twice and does not have the same value: "
+            f"alpha={given} and alpha of {format_name}={carried}"
         )
     return carried
 
@@ -732,7 +804,7 @@ def _hard_light(backdrop: float, source: float) -> float:
 ## the source channel. The non-separable ones -- hue, saturation, color,
 ## luminosity -- work on all three channels at once and are not here.
 _BLEND_MODES: dict[str, Callable[[float, float], float]] = {
-    "normal": lambda backdrop, source: source,
+    "normal": lambda _backdrop, source: source,
     "multiply": lambda backdrop, source: backdrop * source,
     "screen": lambda backdrop, source: backdrop + source - backdrop * source,
     "overlay": lambda backdrop, source: _hard_light(source, backdrop),
@@ -2016,7 +2088,7 @@ class Color:
         root = tkinter.Tk()
         root.geometry(f"{size_x}x{size_y}")
         root.config(background=self.get_hex_l())
-        root.title(f"{str(self)} preview")
+        root.title(f"{self!s} preview")
         root.mainloop()
 
     def __str__(self) -> str:

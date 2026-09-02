@@ -473,12 +473,12 @@ SPACE_REFERENCES = [
 
 
 @pytest.mark.parametrize(("rgb", "xyz", "lab"), SPACE_REFERENCES)
-def test_rgb2xyz_reference_values(rgb, xyz, lab):
+def test_rgb2xyz_reference_values(rgb, xyz, lab):  # noqa: ARG001
     assert rgb2xyz(rgb) == pytest.approx(xyz, abs=1e-3)
 
 
 @pytest.mark.parametrize(("rgb", "xyz", "lab"), SPACE_REFERENCES)
-def test_rgb2lab_reference_values(rgb, xyz, lab):
+def test_rgb2lab_reference_values(rgb, xyz, lab):  # noqa: ARG001
     assert rgb2lab(rgb) == pytest.approx(lab, abs=1e-3)
 
 
@@ -810,7 +810,7 @@ def test_rgb2relative_luminance_is_monotonic_and_bounded():
 
 
 def test_rgb2relative_luminance_rejects_a_malformed_value():
-    with pytest.raises(InvalidColorError, match="Input is not an RGB type."):
+    with pytest.raises(InvalidColorError, match="Input is not an RGB type"):
         rgb2relative_luminance((256, 0, 0))
 
 

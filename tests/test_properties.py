@@ -20,6 +20,8 @@ time. That is the difference between this file taking seconds and taking
 minutes.
 """
 
+from itertools import pairwise
+
 import pytest
 
 from colourings import Color, color_scale
@@ -153,7 +155,7 @@ def test_scales_keep_their_endpoints_and_length():
     stops = [Color(rgb=rgb) for rgb in SAMPLE[::97]]
     assert len(stops) > 50
     for space in ("hsl", "lab", "lch", "oklab", "oklch"):
-        for start, end in zip(stops, stops[1:], strict=False):
+        for start, end in pairwise(stops):
             for steps in (2, 3, 7):
                 scale = color_scale((start, end), steps, space=space)
                 assert len(scale) == steps

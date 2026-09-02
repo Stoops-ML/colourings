@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 import re
 from collections.abc import Callable, Hashable, Sequence
@@ -852,7 +854,7 @@ def web2hex(web: str, force_long: bool = False) -> str:
     if web.startswith("#"):
         if LONG_HEX_COLOR.match(web) or (not force_long and SHORT_HEX_COLOR.match(web)):
             return web.lower()
-        elif SHORT_HEX_COLOR.match(web) and force_long:
+        if SHORT_HEX_COLOR.match(web) and force_long:
             return "#" + "".join([str(t) * 2 for t in web[1:]])
         raise InvalidColorError(f"{web} is not in web format. Need 3 or 6 hex digit.")
 

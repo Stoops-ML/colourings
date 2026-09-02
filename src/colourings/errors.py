@@ -6,6 +6,8 @@ scale with fewer than two colors -- remain plain ``ValueError`` or
 and are not.
 """
 
+from __future__ import annotations
+
 
 class ColorError(ValueError, TypeError):
     """Base class for every error raised about a color value.
