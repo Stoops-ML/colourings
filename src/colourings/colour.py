@@ -800,6 +800,49 @@ def _hard_light(backdrop: float, source: float) -> float:
     return backdrop + doubled - backdrop * doubled
 
 
+def _color_dodge(backdrop: float, source: float) -> float:
+    """The color-dodge separable blend, on one channel in ``[0, 1]``.
+
+    The two guards can both be true, for a black backdrop under a white
+    source, and the spec tests the backdrop first -- so black wins and the
+    result is 0. Ordering them the other way is invisible everywhere else.
+    """
+    if backdrop == 0.0:
+        return 0.0
+    if source == 1.0:
+        return 1.0
+    return min(1.0, backdrop / (1.0 - source))
+
+
+def _color_burn(backdrop: float, source: float) -> float:
+    """The color-burn separable blend, on one channel in ``[0, 1]``.
+
+    The mirror of :func:`_color_dodge`, including the order of the guards: a
+    white backdrop under a black source gives 1.
+    """
+    if backdrop == 1.0:
+        return 1.0
+    if source == 0.0:
+        return 0.0
+    return 1.0 - min(1.0, (1.0 - backdrop) / source)
+
+
+def _soft_light(backdrop: float, source: float) -> float:
+    """The soft-light separable blend, on one channel in ``[0, 1]``.
+
+    Piecewise in the source, and the upper half is piecewise in the backdrop
+    too, through the spec's ``D``. The cubic below a quarter exists to meet
+    ``sqrt`` exactly at 0.25: both give 0.5 there, so there is no seam.
+    """
+    if source <= 0.5:
+        return backdrop - (1.0 - 2.0 * source) * backdrop * (1.0 - backdrop)
+    if backdrop <= 0.25:
+        lightened = ((16.0 * backdrop - 12.0) * backdrop + 4.0) * backdrop
+    else:
+        lightened = math.sqrt(backdrop)
+    return backdrop + (2.0 * source - 1.0) * (lightened - backdrop)
+
+
 ## The separable blend modes CSS defines, each taking the backdrop channel and
 ## the source channel. The non-separable ones -- hue, saturation, color,
 ## luminosity -- work on all three channels at once and are not here.
@@ -810,7 +853,10 @@ _BLEND_MODES: dict[str, Callable[[float, float], float]] = {
     "overlay": lambda backdrop, source: _hard_light(source, backdrop),
     "darken": min,
     "lighten": max,
+    "color-dodge": _color_dodge,
+    "color-burn": _color_burn,
     "hard-light": _hard_light,
+    "soft-light": _soft_light,
     "difference": lambda backdrop, source: abs(backdrop - source),
     "exclusion": lambda backdrop, source: backdrop + source - 2.0 * backdrop * source,
 }
@@ -1840,7 +1886,8 @@ class Color:
         mode : str, default="normal"
             One of the separable CSS blend modes: ``"normal"``,
             ``"multiply"``, ``"screen"``, ``"overlay"``, ``"darken"``,
-            ``"lighten"``, ``"hard-light"``, ``"difference"`` or
+            ``"lighten"``, ``"color-dodge"``, ``"color-burn"``,
+            ``"hard-light"``, ``"soft-light"``, ``"difference"`` or
             ``"exclusion"``. An underscore reads the same as a hyphen.
         linear : bool, default=False
             Whether to composite in linear light rather than on the channels

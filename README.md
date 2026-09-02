@@ -767,14 +767,19 @@ Color("red", alpha=0.5).over("white").rgb
 # RGB(red=255.0, green=127.5, blue=127.5)
 ```
 
-`blend` does the same through one of the separable CSS blend modes —
-`normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `hard-light`,
-`difference`, `exclusion`:
+`blend` does the same through one of the twelve separable CSS blend modes —
+`normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `color-dodge`,
+`color-burn`, `hard-light`, `soft-light`, `difference`, `exclusion`:
 
 ```python
 Color("red").blend("cyan", "multiply")  # <Color black>
 Color("red").blend("cyan", "screen")  # <Color white>
+Color("black").blend("#3d7ab8", "color-dodge")  # <Color #3d7ab8>, unchanged
 ```
+
+The non-separable four — `hue`, `saturation`, `color` and `luminosity` — act on
+all three channels at once rather than one at a time, and are not implemented.
+Asking for one raises rather than doing something adjacent.
 
 This color is the source and the argument is the backdrop, the same way round
 as CSS, so the result is what a browser shows for an element of this color over

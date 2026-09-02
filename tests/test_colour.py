@@ -1926,6 +1926,108 @@ def test_overlay_is_hard_light_with_the_operands_swapped():
             assert a.blend(b, "overlay") == b.blend(a, "hard-light")
 
 
+## The three modes below come from https://www.w3.org/TR/compositing-1/. Each
+## test states a consequence of the published formula -- a closed form it
+## collapses to, an identity its prose asserts, or a branch its ordering
+## decides -- rather than recording what this implementation returns.
+_DODGE = _BLEND_MODES["color-dodge"]
+_BURN = _BLEND_MODES["color-burn"]
+_SOFT = _BLEND_MODES["soft-light"]
+_CHANNELS = [0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0]
+
+
+@pytest.mark.parametrize("backdrop", _CHANNELS)
+def test_dodging_with_black_changes_nothing(backdrop):
+    """The spec's own words. Exact, because the formula divides by 1.0."""
+    assert _DODGE(backdrop, 0.0) == backdrop
+
+
+@pytest.mark.parametrize("backdrop", _CHANNELS)
+def test_burning_with_white_changes_nothing(backdrop):
+    """Also the spec's own words, but only to a rounding error: the formula is
+    ``1 - min(1, (1 - Cb) / 1)``, and ``1 - (1 - 0.1)`` is not 0.1 in binary
+    floating point. One ulp, and not worth deviating from the spec to remove.
+    """
+    assert _BURN(backdrop, 1.0) == pytest.approx(backdrop, abs=1e-15)
+
+
+@pytest.mark.parametrize("backdrop", _CHANNELS)
+def test_soft_light_at_a_half_source_is_the_backdrop(backdrop):
+    """0.5 is the hinge between the two branches, and both reduce to Cb there,
+    so this pins that the halves meet as well as the value."""
+    assert _SOFT(backdrop, 0.5) == backdrop
+
+
+@pytest.mark.parametrize("backdrop", _CHANNELS)
+def test_soft_light_with_a_black_source_squares_the_backdrop(backdrop):
+    """Cs = 0 makes the lower branch ``Cb - Cb(1 - Cb)``, which is Cb squared."""
+    assert _SOFT(backdrop, 0.0) == pytest.approx(backdrop**2, abs=1e-15)
+
+
+@pytest.mark.parametrize("backdrop", [0.3, 0.5, 0.81, 1.0])
+def test_soft_light_with_a_white_source_is_the_spec_helper(backdrop):
+    """Cs = 1 makes the upper branch exactly D(Cb), which is sqrt above 0.25."""
+    assert _SOFT(backdrop, 1.0) == pytest.approx(math.sqrt(backdrop), abs=1e-15)
+
+
+def test_the_soft_light_helper_has_no_seam_where_it_changes_definition():
+    """D(Cb) is a cubic below 0.25 and sqrt above it, and the cubic's
+    coefficients exist to make the two meet at 0.5. A transcription error in
+    them would show as a step in the middle of a gradient."""
+    assert _SOFT(0.25, 1.0) == pytest.approx(0.5, abs=1e-15)
+    assert _SOFT(0.25 - 1e-9, 1.0) == pytest.approx(_SOFT(0.25 + 1e-9, 1.0), abs=1e-8)
+
+
+def test_dodge_and_burn_resolve_their_overlapping_guards_the_spec_way():
+    """Each has two guards that can be true at once, and the spec's ordering
+    decides which. Nothing else distinguishes the two orderings, which is why
+    these modes were left out until the spec could be read."""
+    ## Cb == 0 is tested before Cs == 1, so a black backdrop wins over a
+    ## white source and the answer is 0 rather than 1.
+    assert _DODGE(0.0, 1.0) == 0.0
+    ## Cb == 1 before Cs == 0: a white backdrop wins over a black source.
+    assert _BURN(1.0, 0.0) == 1.0
+
+
+def test_dodge_and_burn_clamp_instead_of_leaving_the_range():
+    """Both formulas can exceed the range before the spec's min clamps them."""
+    assert _DODGE(0.5, 0.75) == 1.0  ## 0.5 / 0.25 is 2
+    assert _BURN(0.25, 0.5) == 0.0  ## 1 - min(1, 1.5)
+
+
+@pytest.mark.parametrize("mode", ["color-dodge", "color-burn", "soft-light"])
+def test_the_new_modes_rise_with_the_source(mode):
+    """All three are non-decreasing in the source channel, which follows from
+    the formulas and is the property a swapped branch tends to break."""
+    blend = _BLEND_MODES[mode]
+    grid = [i / 64 for i in range(65)]
+    for backdrop in grid:
+        seen = [blend(backdrop, source) for source in grid]
+        assert seen == sorted(seen), f"{mode} falls back at backdrop {backdrop}"
+
+
+def test_the_new_modes_have_their_identities_through_the_public_api():
+    """The same identities as above, but reached the way a caller would --
+    which also checks the operands are the way round CSS says.
+
+    The soft-light source is built from ``rgbf`` rather than written as
+    ``#808080``: a hex grey is 128/255, not a half, and at that source the
+    channels come out 9.8e-4 away from the backdrop. ``==`` compares 8-bit
+    values and would call that equal, so the hex version passes whether or not
+    the formula is right.
+    """
+    half_grey = Color(rgbf=(0.5, 0.5, 0.5))
+    for name in ("red", "#3d7ab8", "yellow", "black", "white"):
+        color = Color(name)
+        assert Color("black").blend(color, "color-dodge") == color
+        assert Color("white").blend(color, "color-burn") == color
+        blended = half_grey.blend(color, "soft-light")
+        assert blended == color
+        ## Exactly, not merely to the nearest 8-bit value.
+        for got, want in zip(blended.rgbf, color.rgbf, strict=True):
+            assert got == want
+
+
 def test_a_blend_mode_may_be_spelled_with_an_underscore():
     a, b = Color("#3d7ab8"), Color("#c08040")
     assert a.blend(b, "hard_light") == a.blend(b, "hard-light")
@@ -1951,7 +2053,7 @@ def test_linear_compositing_is_a_different_answer_on_purpose():
 def test_blend_rejects_a_mode_it_does_not_have():
     """The non-separable modes are absent, and say so rather than silently
     doing something else."""
-    for mode in ("soft-light", "color-dodge", "hue", "luminosity", "nonsense"):
+    for mode in ("hue", "saturation", "color", "luminosity", "nonsense"):
         with pytest.raises(ValueError, match="Unknown blend mode"):
             Color("red").blend("blue", mode)
 
