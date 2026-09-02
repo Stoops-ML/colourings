@@ -111,6 +111,12 @@ jobs:
         run: python -m ruff format --diff
       - name: Build
         run: python -m build .
+      ## Runs here as well as in the release workflow, where it is the real
+      ## gate: at release time a metadata failure has already cost the version
+      ## number, so it is worth knowing on the pull request instead. Checks
+      ## both artefacts, where the script below only inspects the wheel.
+      - name: Check the metadata the index will see
+        run: python -m twine check --strict dist/*
       ## The build was being thrown away, which proved only that it did not
       ## crash. A wheel that does not import, a py.typed declared but not
       ## packaged, and a README missing from the metadata are all silent.

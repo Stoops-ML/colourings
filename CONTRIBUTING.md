@@ -33,6 +33,8 @@ python -m ruff format --diff           # formatting, without rewriting anything
 python -m ty check                     # types
 python -m sphinx -W -b html docs docs/_build/html   # docs, warnings fatal
 zizmor .github/                        # workflow and Dependabot audit
+python -m build .                      # build the wheel and the sdist
+python -m twine check --strict dist/*  # metadata, as the index will read it
 ```
 
 `python -m ruff format` (no `--diff`) applies the formatting rather than
