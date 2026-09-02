@@ -1,4 +1,4 @@
-name: Publish to PyPi
+name: Publish a release
 
 on:
   release:
@@ -14,6 +14,8 @@ jobs:
     name: Build distribution 📦
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
     ## The build runs arbitrary build-backend code; the token has no reason to
     ## be in .git/config while it does.
@@ -24,8 +26,8 @@ jobs:
       uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
       with:
         python-version: "3.12"
-    - name: Install pypa/build and twine
-      run: python3 -m pip install build twine
+    - name: Install pypa/build, twine and packaging
+      run: python3 -m pip install build twine packaging
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
     ## This is the last point at which a metadata mistake is still cheap. A
@@ -36,23 +38,48 @@ jobs:
     ## a warning, and it silently defaults to reStructuredText.
     - name: Check the metadata the index will see
       run: python3 -m twine check --strict dist/*
-    ## Nothing tied the release to the tree: the trigger publishes whatever
-    ## pyproject.toml says, under whatever tag fired. Compared against the
-    ## built wheel, since that is what gets uploaded.
-    - name: Check the tag matches the version being published
+    - name: Check the tag matches the version, and choose the index
+      id: version
       run: |
-        count=$(ls dist/*.whl | wc -l)
-        if [ "$count" -ne 1 ]; then
-          echo "::error::Expected exactly one wheel in dist/, found $count."
-          exit 1
-        fi
-        built=$(basename "$(ls dist/*.whl)" | cut -d- -f2)
-        tag=${GITHUB_REF_NAME#v}
-        if [ "$built" != "$tag" ]; then
-          echo "::error::Release tag $GITHUB_REF_NAME asks for version '$tag', but the build produced '$built'. Bump the version in pyproject.toml, or retag."
-          exit 1
-        fi
-        echo "Tag $GITHUB_REF_NAME matches the built version $built."
+        python3 - <<'PY'
+        import glob
+        import os
+        import pathlib
+
+        from packaging.utils import InvalidWheelFilename, parse_wheel_filename
+        from packaging.version import InvalidVersion, Version
+
+
+        def fail(message):
+            print(f"::error::{message}")
+            raise SystemExit(1)
+
+
+        wheels = sorted(glob.glob("dist/*.whl"))
+        if len(wheels) != 1:
+            fail(f"Expected exactly one wheel in dist/, found {len(wheels)}.")
+        try:
+            _, built, _, _ = parse_wheel_filename(pathlib.Path(wheels[0]).name)
+        except InvalidWheelFilename as exc:
+            fail(f"Cannot read a version from {wheels[0]}: {exc}")
+
+        tag = os.environ["GITHUB_REF_NAME"]
+        try:
+            asked = Version(tag.removeprefix("v"))
+        except InvalidVersion:
+            fail(f"Release tag {tag!r} is not a PEP 440 version, so it names no release.")
+
+        if asked != built:
+            fail(
+                f"Release tag {tag!r} asks for version {asked}, but the build produced "
+                f"{built}. Bump the version in pyproject.toml, or retag."
+            )
+
+        index = "TestPyPI" if built.is_prerelease else "PyPI"
+        print(f"Tag {tag} matches the built version {built}; publishing to {index}.")
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+            handle.write(f"prerelease={'true' if built.is_prerelease else 'false'}\n")
+        PY
     - name: Store the distribution packages
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
@@ -62,11 +89,36 @@ jobs:
         ## holding the credentials, with nothing to say about why.
         if-no-files-found: error
 
+  publish-to-testpypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to TestPyPI
+    needs:
+    - build
+    if: needs.build.outputs.prerelease == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/colourings
+    permissions:
+      id-token: write  # mandatory for trusted publishing
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution 📦 to TestPyPI
+      uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+      with:
+        repository-url: https://test.pypi.org/legacy/
+
   publish-to-pypi:
     name: >-
       Publish Python 🐍 distribution 📦 to PyPI
     needs:
     - build
+    if: needs.build.outputs.prerelease == 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:

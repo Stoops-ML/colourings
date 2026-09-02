@@ -115,6 +115,26 @@ Two pytest settings are worth knowing about, both in `pyproject.toml`:
 
 Say *why* in the commit message, not just what — the diff already says what.
 
+## Releasing
+
+`cz bump` derives the version from the conventional commits and writes both
+`pyproject.toml` and `uv.lock`. Tagging a release then runs
+`publish-to-pypi.yml`, which decides where to publish from the version it
+built rather than from the tag text:
+
+- a **pre-release** version — `2.0.0rc1`, `2.0.0b1`, `2.0.0.dev1` — goes to
+  TestPyPI, rehearsing the whole path against an index whose mistakes cost
+  nothing;
+- a **final** version goes to PyPI.
+
+Cut a pre-release first (`cz bump --prerelease rc`) when the release process
+itself has changed, or when the last release was long enough ago that nobody
+remembers whether it works.
+
+A version can be uploaded to an index exactly once, so the build refuses to
+proceed if the tag and the built version disagree, and `twine check --strict`
+runs before the credentials are anywhere near the job.
+
 ## Colour science, constants and correctness
 
 Much of this package is arithmetic against published standards, where a wrong
