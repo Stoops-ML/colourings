@@ -433,10 +433,23 @@ Two things to know:
 - **Out of range is an error, not a clamp.** A browser reads `rgb(300 0 0)` as
   red; here it raises. Quietly turning one color into another is what this
   library avoids elsewhere, and reading a stylesheet is not a reason to start.
-- **Chroma and the `a`/`b` axes take numbers only.** CSS also allows
-  percentages there, but the reference each one scales against differs per
-  function, and using the wrong one would misread a color rather than reject
-  it. `oklch(0.5 50% 200)` raises until that can be confirmed.
+- **Percentages scale against a different reference in each function**, which
+  is what CSS Color 4 specifies rather than anything this library chose:
+
+  | function | axis | `100%` |
+  | --- | --- | --- |
+  | `rgb()` | `r`, `g`, `b` | 255 |
+  | `hsl()` | `s`, `l` | 100 |
+  | `lab()`, `lch()` | `L` | 100 |
+  | `lab()` | `a`, `b` | ±125 |
+  | `lch()` | `C` | 150 |
+  | `oklab()`, `oklch()` | `L` | 1 |
+  | `oklab()` | `a`, `b` | ±0.4 |
+  | `oklch()` | `C` | 0.4 |
+
+  So `oklch(0.5 50% 200)` is exactly `oklch(0.5 0.2 200)`. `100%` is the
+  reference and not a maximum: a larger percentage is allowed by the syntax
+  and then refused by the range check, exactly as the equivalent number is.
 
 ## Adjusting a Color
 
