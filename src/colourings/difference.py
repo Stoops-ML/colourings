@@ -104,10 +104,12 @@ def delta_e_cie94(lab1: Sequence[float], lab2: Sequence[float]) -> float:
     Splits the L*a*b* distance into lightness, chroma and hue and weights
     each, which is most of what CIE76 gets wrong. Graphic-arts weighting.
 
-    Not symmetric: the first color is the reference, and the chroma and hue
-    terms are scaled by *its* chroma. Swapping the arguments gives a slightly
-    different answer, which is a known wart of CIE94 and the reason
-    :func:`delta_e_ciede2000` exists.
+    Not symmetric, and not slightly: the first color is the reference, and the
+    chroma and hue terms are divided by weights that grow with *its* chroma.
+    A dull reference down-weights nothing, so it reports the larger distance --
+    neutral grey against magenta is 115.7 where magenta against grey is 19.8.
+    Pass the two in the order you mean. It is a known wart of CIE94 and the
+    reason :func:`delta_e_ciede2000` exists.
 
     Parameters
     ----------

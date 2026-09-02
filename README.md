@@ -694,7 +694,7 @@ Four metrics, in the order they were standardised:
 | metric | what it is |
 | --- | --- |
 | `cie76` | Euclidean distance in CIE L\*a\*b\*. Fast, and overstates blues badly |
-| `cie94` | Weights lightness, chroma and hue separately. Not symmetric |
+| `cie94` | Weights lightness, chroma and hue separately. Not symmetric — see below |
 | `ciede2000` | What "delta E" means unqualified. The default |
 | `ok` | Euclidean distance in Oklab. Perceptual and cheap, on its own scale |
 
@@ -712,6 +712,20 @@ blue1, blue2 = (32.0, 79.0, -104.0), (32.0, 69.0, -100.0)
 delta_e_cie76(blue1, blue2)  # 10.77
 delta_e_ciede2000(blue1, blue2)  # 2.77
 ```
+
+> **On `cie94`:** it is asymmetric by construction, and by a lot rather than a
+> little. The chroma and hue terms are divided by weights that grow with the
+> *first* argument's chroma, so a dull reference down-weights nothing and
+> reports the larger distance:
+>
+> ```python
+> grey, magenta = Color("#808080"), Color("#ff00ff")
+> grey.delta_e(magenta, metric="cie94")     # 115.7
+> magenta.delta_e(grey, metric="cie94")     # 19.8
+> ```
+>
+> Pass the two in the order you mean, or use `ciede2000`, which exists partly
+> because of this.
 
 `nearest_name` searches all 152 named colors and defaults to `ok`, being the
 cheap perceptual one. It returns the lowercase name; `web` gives the canonical

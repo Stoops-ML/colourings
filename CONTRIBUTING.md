@@ -38,6 +38,18 @@ zizmor .github/                        # workflow and Dependabot audit
 `python -m ruff format` (no `--diff`) applies the formatting rather than
 reporting it.
 
+Property tests run under Hypothesis at its default hundred examples per test,
+which is what CI does and is a couple of seconds. Before a release, or after
+touching a conversion, run twenty times as many:
+
+```sh
+python -m pytest --hypothesis-profile=deep
+```
+
+A failure prints the shrunk input that reproduces it, and Hypothesis remembers
+that input in `.hypothesis/` — so once it has found a counter-example, the
+plain `pytest` run reproduces it too, until it passes.
+
 Two pytest settings are worth knowing about, both in `pyproject.toml`:
 
 - `filterwarnings = ["error"]` — a warning fails the suite. If a change makes
@@ -52,6 +64,14 @@ Two pytest settings are worth knowing about, both in `pyproject.toml`:
   100% of statements and branches, so an untested line will fail CI, but the
   gate is a floor rather than the goal: a test that only executes a line
   without asserting anything about it passes the gate and catches nothing.
+
+  There are three kinds of test here and they are not interchangeable.
+  `tests/test_*.py` pin specific behaviour. `tests/test_properties.py` sweeps a
+  sample chosen deliberately — the gamut surface, a coarse interior grid, and
+  every named colour — because that is where a whole class of bug was found
+  once. `tests/test_hypothesis.py` states properties over generated input and
+  lets Hypothesis look for the counter-example. A new invariant usually belongs
+  in the third; a specific colour that once went wrong belongs in the first.
 - **Docstrings in numpydoc style**, with `Parameters`, `Returns` and `Raises`
   sections. Sphinx is configured for numpydoc only
   (`napoleon_google_docstring = False`), so a Google-style docstring will be
