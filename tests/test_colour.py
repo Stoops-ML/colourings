@@ -9,9 +9,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from colourings.colour import (
+    _ALL_BLEND_MODES,
     _BLEND_MODES,
     _KEYWORD_ALPHA_SCALES,
     _KEYWORD_INPUTS,
+    _NONSEPARABLE_BLEND_MODES,
     NAMED_HEX,
     NAMED_HSL,
     NAMED_RGB,
@@ -20,6 +22,9 @@ from colourings.colour import (
     HSL_equivalence,
     RGB_color_picker,
     RGB_equivalence,
+    _blend_luma,
+    _blend_saturation,
+    _set_blend_saturation,
     color_scale,
     colour_scale,
     hash_or_str,
@@ -27,7 +32,7 @@ from colourings.colour import (
     make_color_factory,
     stable_key,
 )
-from colourings.conversions import hsl2rgb
+from colourings.conversions import hsl2rgb, rgb2relative_luminance
 from colourings.errors import (
     AmbiguousColorError,
     ColorError,
@@ -2028,6 +2033,191 @@ def test_the_new_modes_have_their_identities_through_the_public_api():
             assert got == want
 
 
+## The four non-separable modes, from https://www.w3.org/TR/compositing-1/
+## section 10.2. They are defined through Lum, Sat, SetLum and SetSat, and the
+## tests below state consequences of those definitions rather than recording
+## what this implementation returns.
+_HUE = _NONSEPARABLE_BLEND_MODES["hue"]
+_SATURATION = _NONSEPARABLE_BLEND_MODES["saturation"]
+_COLOR = _NONSEPARABLE_BLEND_MODES["color"]
+_LUMINOSITY = _NONSEPARABLE_BLEND_MODES["luminosity"]
+_TRIPLES = [
+    (0.0, 0.0, 0.0),
+    (1.0, 1.0, 1.0),
+    (1.0, 0.0, 0.0),
+    (0.0, 0.0, 1.0),
+    (0.24, 0.48, 0.72),
+    (0.9, 0.85, 0.1),
+    (0.5, 0.5, 0.5),
+]
+
+
+def test_the_blend_luma_is_not_wcag_relative_luminance():
+    """Two different weightings, and using the wrong one would darken or
+    lighten every non-separable blend by a plausible-looking amount rather
+    than raising. The spec's are 0.3/0.59/0.11 on the channels as they stand;
+    WCAG's are 0.2126/0.7152/0.0722 on linearised ones.
+    """
+    assert _blend_luma((1.0, 0.0, 0.0)) == 0.3
+    assert _blend_luma((0.0, 1.0, 0.0)) == 0.59
+    assert _blend_luma((0.0, 0.0, 1.0)) == 0.11
+    ## The weights summing to exactly 1.0 is what makes SetLum exact.
+    assert _blend_luma((1.0, 1.0, 1.0)) == 1.0
+    ## And they really are a different answer from the WCAG pair.
+    assert _blend_luma((0.0, 1.0, 0.0)) != rgb2relative_luminance((0.0, 255.0, 0.0))
+
+
+@pytest.mark.parametrize("triple", _TRIPLES)
+def test_a_non_separable_blend_with_itself_changes_nothing(triple):
+    """Each mode takes some of hue, saturation and luma from one operand and
+    the rest from the other, so with one colour on both sides every part comes
+    from the same place and the colour has to survive. Exact to a rounding
+    error, because the luma weights sum to 1."""
+    for blend in (_HUE, _SATURATION, _COLOR, _LUMINOSITY):
+        for got, want in zip(blend(triple, triple), triple, strict=True):
+            assert got == pytest.approx(want, abs=1e-15)
+
+
+@pytest.mark.parametrize("backdrop", _TRIPLES)
+@pytest.mark.parametrize("source", _TRIPLES)
+def test_the_non_separable_modes_keep_the_luma_they_claim_to(backdrop, source):
+    """Three of the four are defined to keep the backdrop's luma and the
+    fourth to take the source's. SetLum makes that exact, and ClipColor is
+    built to preserve it too -- which is the whole reason it scales about the
+    luma instead of clamping each channel."""
+    for blend in (_HUE, _SATURATION, _COLOR):
+        assert _blend_luma(blend(backdrop, source)) == pytest.approx(
+            _blend_luma(backdrop), abs=1e-15
+        )
+    assert _blend_luma(_LUMINOSITY(backdrop, source)) == pytest.approx(
+        _blend_luma(source), abs=1e-15
+    )
+
+
+@pytest.mark.parametrize("backdrop", _TRIPLES)
+@pytest.mark.parametrize("source", _TRIPLES)
+def test_luminosity_is_color_with_the_operands_swapped(backdrop, source):
+    """The spec calls luminosity "an inverse effect to that of the Color
+    mode"; the formulas say precisely this. Exact, not approximate, since both
+    reduce to the same SetLum call."""
+    assert _LUMINOSITY(backdrop, source) == _COLOR(source, backdrop)
+
+
+@pytest.mark.parametrize("grey", [0.0, 0.2, 0.5, 0.8, 1.0])
+@pytest.mark.parametrize("source", _TRIPLES)
+def test_saturation_over_a_grey_backdrop_changes_nothing(grey, source):
+    """The spec's own words: "Painting with this mode in an area of the
+    backdrop that is a pure gray (no saturation) produces no change." It falls
+    out of SetSat, which sends a colour with no spread to black, and the SetLum
+    that follows lifting it back."""
+    backdrop = (grey, grey, grey)
+    for got in _SATURATION(backdrop, source):
+        assert got == pytest.approx(grey, abs=1e-15)
+
+
+@pytest.mark.parametrize("backdrop", _TRIPLES)
+@pytest.mark.parametrize("grey", [0.0, 0.3, 1.0])
+def test_hue_from_a_grey_source_is_grey(backdrop, grey):
+    """A grey has no hue to borrow. SetSat gives black, so the result is the
+    backdrop's luma with nothing else -- grey at that lightness."""
+    result = _HUE(backdrop, (grey, grey, grey))
+    assert result[0] == pytest.approx(result[1], abs=1e-15)
+    assert result[1] == pytest.approx(result[2], abs=1e-15)
+    assert _blend_luma(result) == pytest.approx(_blend_luma(backdrop), abs=1e-15)
+
+
+## Pairs where the two operands have different saturations and nothing needs
+## clipping, so "whose saturation is it" has an observable answer.
+_DIFFERENT_SATURATIONS = [
+    ((0.24, 0.48, 0.72), (0.35, 0.6, 0.45)),
+    ((0.4, 0.5, 0.6), (0.2, 0.8, 0.5)),
+    ((0.9, 0.85, 0.8), (0.55, 0.75, 0.65)),
+]
+
+
+@pytest.mark.parametrize(("backdrop", "source"), _DIFFERENT_SATURATIONS)
+def test_hue_keeps_the_backdrop_saturation_not_the_source_one(backdrop, source):
+    """``SetSat(Cs, Sat(Cb))`` -- the source contributes its hue and the
+    backdrop its saturation. Reading Sat from the wrong operand passes every
+    other test here, including the luma and self-blend ones, because it only
+    changes how far the result sits from grey."""
+    assert _blend_saturation(backdrop) != pytest.approx(_blend_saturation(source))
+    result = _HUE(backdrop, source)
+    assert _blend_saturation(result) == pytest.approx(
+        _blend_saturation(backdrop), abs=1e-15
+    )
+
+
+@pytest.mark.parametrize(("backdrop", "source"), _DIFFERENT_SATURATIONS)
+def test_saturation_mode_takes_the_source_saturation(backdrop, source):
+    """The mirror of the above: ``SetSat(Cb, Sat(Cs))``."""
+    result = _SATURATION(backdrop, source)
+    assert _blend_saturation(result) == pytest.approx(
+        _blend_saturation(source), abs=1e-15
+    )
+
+
+@pytest.mark.parametrize("requested", [0.0, 0.3, 1.0])
+def test_setting_the_saturation_of_a_flat_colour_gives_black(requested):
+    """The spec sets all three channels to zero when there is no spread to
+    rescale, whatever saturation was asked for.
+
+    Tested here rather than through a blend mode because it cannot be seen
+    from there: every use of SetSat is followed by a SetLum, which shifts all
+    three channels equally, so returning the input unchanged instead of zero
+    produces exactly the same colour. This pins the spec's literal behaviour.
+    """
+    assert _set_blend_saturation((0.4, 0.4, 0.4), requested) == (0.0, 0.0, 0.0)
+    assert _set_blend_saturation((0.0, 0.0, 0.0), requested) == (0.0, 0.0, 0.0)
+
+
+def test_clipping_scales_about_the_luma_rather_than_clamping():
+    """ClipColor's job. Clamping each channel would move the luma, which is
+    what the mode promised not to do, so it scales the spread about the luma
+    instead -- costing saturation and keeping lightness.
+
+    Both branches are reached: a bright source under a dark backdrop pushes
+    channels below zero, and a dark source under a bright one pushes them
+    above one.
+    """
+    vivid = (0.0, 0.0, 1.0)
+    dark, bright = (0.02, 0.02, 0.02), (0.98, 0.98, 0.98)
+
+    low = _COLOR(dark, vivid)
+    assert min(low) >= 0.0
+    assert _blend_luma(low) == pytest.approx(_blend_luma(dark), abs=1e-15)
+    assert _blend_saturation(low) < _blend_saturation(vivid)
+
+    high = _COLOR(bright, vivid)
+    assert max(high) <= 1.0
+    assert _blend_luma(high) == pytest.approx(_blend_luma(bright), abs=1e-15)
+    assert _blend_saturation(high) < _blend_saturation(vivid)
+
+
+def test_an_in_range_blend_needs_no_clipping():
+    """The other side of both branches, so neither is only ever taken."""
+    unclipped = _COLOR((0.5, 0.5, 0.5), (0.4, 0.5, 0.6))
+    assert min(unclipped) >= 0.0
+    assert max(unclipped) <= 1.0
+    assert _blend_saturation(unclipped) == pytest.approx(
+        _blend_saturation((0.4, 0.5, 0.6)), abs=1e-15
+    )
+
+
+def test_the_non_separable_modes_work_through_the_public_api():
+    """Reached the way a caller would, which also checks the operands are the
+    way round CSS says: this colour is the source, the argument the backdrop.
+    """
+    for first in ("#3d7ab8", "red", "#202020", "#e0e0e0"):
+        for second in ("#c08040", "cyan", "white", "black"):
+            source, backdrop = Color(first), Color(second)
+            assert source.blend(backdrop, "luminosity") == backdrop.blend(
+                source, "color"
+            )
+        assert Color(first).blend(first, "hue") == Color(first)
+        assert Color(first).blend(first, "luminosity") == Color(first)
+
+
 def test_a_blend_mode_may_be_spelled_with_an_underscore():
     a, b = Color("#3d7ab8"), Color("#c08040")
     assert a.blend(b, "hard_light") == a.blend(b, "hard-light")
@@ -2051,14 +2241,37 @@ def test_linear_compositing_is_a_different_answer_on_purpose():
 
 
 def test_blend_rejects_a_mode_it_does_not_have():
-    """The non-separable modes are absent, and say so rather than silently
-    doing something else."""
-    for mode in ("hue", "saturation", "color", "luminosity", "nonsense"):
+    """CSS has sixteen and this has all sixteen, so what is left to reject is
+    everything else -- including the names of things that sound like modes."""
+    for mode in ("nonsense", "plus-lighter", "dissolve", "divide", "", "hue "):
         with pytest.raises(ValueError, match="Unknown blend mode"):
             Color("red").blend("blue", mode)
 
 
-@pytest.mark.parametrize("mode", sorted(_BLEND_MODES))
+def test_every_css_blend_mode_is_present():
+    """Guard the guard: the rejection test above only means something if the
+    sixteen really are all here."""
+    assert {
+        "normal",
+        "multiply",
+        "screen",
+        "overlay",
+        "darken",
+        "lighten",
+        "color-dodge",
+        "color-burn",
+        "hard-light",
+        "soft-light",
+        "difference",
+        "exclusion",
+        "hue",
+        "saturation",
+        "color",
+        "luminosity",
+    } == _ALL_BLEND_MODES
+
+
+@pytest.mark.parametrize("mode", sorted(_ALL_BLEND_MODES))
 def test_every_blend_stays_in_range_and_leaves_its_operands_alone(mode):
     source = Color("#3d7ab8", alpha=0.4)
     backdrop = Color("#c08040", alpha=0.7)

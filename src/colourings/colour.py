@@ -862,6 +862,103 @@ _BLEND_MODES: dict[str, Callable[[float, float], float]] = {
 }
 
 
+## The non-separable modes are built from four helpers the spec defines for
+## them. `Lum` is deliberately not `rgb2relative_luminance`: the coefficients
+## here are 0.3, 0.59 and 0.11 on the channels as they stand, where WCAG uses
+## 0.2126, 0.7152 and 0.0722 on linearised ones. Substituting one for the other
+## produces plausible output that is simply wrong, so they stay apart. The
+## three weights sum to exactly 1.0 in binary floating point, which is what
+## makes the identities below exact rather than approximate.
+_BLEND_LUMA_WEIGHTS = (0.3, 0.59, 0.11)
+
+
+def _blend_luma(colour: Sequence[float]) -> float:
+    """The spec's ``Lum``. Not WCAG relative luminance -- see above."""
+    return sum(
+        weight * channel
+        for weight, channel in zip(_BLEND_LUMA_WEIGHTS, colour, strict=True)
+    )
+
+
+def _blend_saturation(colour: Sequence[float]) -> float:
+    """The spec's ``Sat``: the spread between the channels, not HSL's S."""
+    return max(colour) - min(colour)
+
+
+def _clip_colour(colour: Sequence[float]) -> RGBfTuple:
+    """The spec's ``ClipColor``: pull a colour back into range about its own
+    luma, so that going out of range costs saturation rather than lightness.
+
+    Both conditionals read the minimum and maximum measured on entry, as the
+    pseudocode does. They cannot both fire for an input whose channels started
+    in range: that needs a spread above 1, and nothing here produces one.
+    """
+    luma = _blend_luma(colour)
+    lowest, highest = min(colour), max(colour)
+    channels = list(colour)
+    if lowest < 0.0:
+        channels = [
+            luma + (channel - luma) * luma / (luma - lowest) for channel in channels
+        ]
+    if highest > 1.0:
+        channels = [
+            luma + (channel - luma) * (1.0 - luma) / (highest - luma)
+            for channel in channels
+        ]
+    return RGBfTuple(*channels)
+
+
+def _set_blend_luma(colour: Sequence[float], luma: float) -> RGBfTuple:
+    """The spec's ``SetLum``: shift every channel equally, then clip.
+
+    Shifting all three by the same amount moves the luma by that amount too,
+    because the weights sum to 1, so the result's luma is exactly the one
+    asked for.
+    """
+    shift = luma - _blend_luma(colour)
+    return _clip_colour([channel + shift for channel in colour])
+
+
+def _set_blend_saturation(colour: Sequence[float], saturation: float) -> RGBfTuple:
+    """The spec's ``SetSat``: rescale the spread to ``saturation``.
+
+    The pseudocode addresses the channels by rank -- the largest becomes the
+    saturation, the smallest becomes zero, the middle one keeps its relative
+    position. All three are the same affine map, so one expression covers them
+    and no sorting is needed.
+    """
+    lowest, highest = min(colour), max(colour)
+    if highest <= lowest:
+        ## No spread to rescale. The spec sets all three channels to zero, and
+        ## the SetLum that follows lifts them back to the right lightness.
+        return RGBfTuple(0.0, 0.0, 0.0)
+    scale = saturation / (highest - lowest)
+    return RGBfTuple(*((channel - lowest) * scale for channel in colour))
+
+
+## The four non-separable modes, which take whole colours rather than single
+## channels: each reads two of hue, saturation and luma from one operand and
+## the rest from the other, which cannot be done a channel at a time.
+_NONSEPARABLE_BLEND_MODES: dict[
+    str, Callable[[Sequence[float], Sequence[float]], RGBfTuple]
+] = {
+    "hue": lambda backdrop, source: _set_blend_luma(
+        _set_blend_saturation(source, _blend_saturation(backdrop)),
+        _blend_luma(backdrop),
+    ),
+    "saturation": lambda backdrop, source: _set_blend_luma(
+        _set_blend_saturation(backdrop, _blend_saturation(source)),
+        _blend_luma(backdrop),
+    ),
+    "color": lambda backdrop, source: _set_blend_luma(source, _blend_luma(backdrop)),
+    "luminosity": lambda backdrop, source: _set_blend_luma(
+        backdrop, _blend_luma(source)
+    ),
+}
+
+_ALL_BLEND_MODES = frozenset(_BLEND_MODES) | frozenset(_NONSEPARABLE_BLEND_MODES)
+
+
 ## The keyword colour inputs, each with the conversion that takes it to HSL.
 ## `color` and `pick_for` are not here: one is identified rather than named,
 ## and the other needs the picker arguments.
@@ -1888,7 +1985,10 @@ class Color:
             ``"multiply"``, ``"screen"``, ``"overlay"``, ``"darken"``,
             ``"lighten"``, ``"color-dodge"``, ``"color-burn"``,
             ``"hard-light"``, ``"soft-light"``, ``"difference"`` or
-            ``"exclusion"``. An underscore reads the same as a hyphen.
+            ``"exclusion"``; or one of the four non-separable modes,
+            ``"hue"``, ``"saturation"``, ``"color"`` or ``"luminosity"``,
+            which read whole colours rather than single channels. An
+            underscore reads the same as a hyphen.
         linear : bool, default=False
             Whether to composite in linear light rather than on the channels
             as encoded.
@@ -1902,7 +2002,7 @@ class Color:
         Raises
         ------
         ValueError
-            Raised when ``mode`` is not a separable blend mode.
+            Raised when ``mode`` is not one of CSS's blend modes.
 
         Examples
         --------
@@ -1911,11 +2011,11 @@ class Color:
         >>> Color("red").blend("cyan", "multiply").hex_l
         '#000000'
         """
-        blend = _BLEND_MODES.get(mode.replace("_", "-").lower())
-        if blend is None:
+        name = mode.replace("_", "-").lower()
+        if name not in _ALL_BLEND_MODES:
             raise ValueError(
                 f"Unknown blend mode {mode!r}. Choose one of: "
-                f"{', '.join(sorted(_BLEND_MODES))}."
+                f"{', '.join(sorted(_ALL_BLEND_MODES))}."
             )
         backdrop = Color(backdrop)
         source_alpha, backdrop_alpha = self._alpha, backdrop._alpha
@@ -1928,15 +2028,31 @@ class Color:
 
         encode = _linear_to_srgb if linear else lambda channel: channel
         decode = _srgb_to_linear if linear else lambda channel: channel
+        source_rgb = [decode(channel) for channel in self.rgbf]
+        backdrop_rgb = [decode(channel) for channel in backdrop.rgbf]
+
+        ## The blend itself, which is where the two kinds part company: a
+        ## separable mode is applied to each channel independently, while a
+        ## non-separable one reads all three at once.
+        if name in _NONSEPARABLE_BLEND_MODES:
+            blended_rgb: Sequence[float] = _NONSEPARABLE_BLEND_MODES[name](
+                backdrop_rgb, source_rgb
+            )
+        else:
+            channel_blend = _BLEND_MODES[name]
+            blended_rgb = [
+                channel_blend(back, source)
+                for back, source in zip(backdrop_rgb, source_rgb, strict=True)
+            ]
+
         channels = []
-        for source, back in zip(self.rgbf, backdrop.rgbf, strict=True):
-            source, back = decode(source), decode(back)
+        for source, back, blended_channel in zip(
+            source_rgb, backdrop_rgb, blended_rgb, strict=True
+        ):
             ## The backdrop shows through the blend in proportion to how
             ## opaque it is: with nothing behind, there is nothing to blend
             ## with and the source passes through unchanged.
-            blended = (1.0 - backdrop_alpha) * source + backdrop_alpha * blend(
-                back, source
-            )
+            blended = (1.0 - backdrop_alpha) * source + backdrop_alpha * blended_channel
             mixed = blended * source_alpha + back * backdrop_alpha * (
                 1.0 - source_alpha
             )

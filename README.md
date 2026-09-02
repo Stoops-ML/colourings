@@ -767,9 +767,11 @@ Color("red", alpha=0.5).over("white").rgb
 # RGB(red=255.0, green=127.5, blue=127.5)
 ```
 
-`blend` does the same through one of the twelve separable CSS blend modes —
+`blend` does the same through any of CSS's sixteen blend modes.
+
+Twelve are **separable** — each channel is blended on its own:
 `normal`, `multiply`, `screen`, `overlay`, `darken`, `lighten`, `color-dodge`,
-`color-burn`, `hard-light`, `soft-light`, `difference`, `exclusion`:
+`color-burn`, `hard-light`, `soft-light`, `difference`, `exclusion`.
 
 ```python
 Color("red").blend("cyan", "multiply")  # <Color black>
@@ -777,9 +779,30 @@ Color("red").blend("cyan", "screen")  # <Color white>
 Color("black").blend("#3d7ab8", "color-dodge")  # <Color #3d7ab8>, unchanged
 ```
 
-The non-separable four — `hue`, `saturation`, `color` and `luminosity` — act on
-all three channels at once rather than one at a time, and are not implemented.
-Asking for one raises rather than doing something adjacent.
+Four are **non-separable**: they read all three channels together, taking some
+of hue, saturation and luma from each operand.
+
+| mode | takes from the source | takes from the backdrop |
+| --- | --- | --- |
+| `hue` | hue | saturation and luma |
+| `saturation` | saturation | hue and luma |
+| `color` | hue and saturation | luma |
+| `luminosity` | luma | hue and saturation |
+
+```python
+# Tint a grey with a colour's hue, keeping the grey's lightness.
+Color("#3d7ab8").blend("#808080", "color")  # <Color #4e8bc9>
+
+# luminosity is color with the operands swapped, exactly.
+Color("red").blend("cyan", "luminosity") == Color("cyan").blend("red", "color")
+# True
+```
+
+Their *luma* is the spec's `Lum` — `0.3R + 0.59G + 0.11B` on the channels as
+they stand — and **not** the WCAG relative luminance that
+[`luminance`](#contrast-and-luminance) reports, which uses different
+coefficients on linearised channels. The two are not interchangeable, and only
+one of them is what a browser blends with.
 
 This color is the source and the argument is the backdrop, the same way round
 as CSS, so the result is what a browser shows for an element of this color over
