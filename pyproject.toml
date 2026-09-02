@@ -38,6 +38,7 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.10",
     "ty>=0.0.75",
+    "zizmor>=1.30.0",
 ]
 
 [project.urls]
@@ -71,6 +72,7 @@ select = [
     "PT",
     "RET",
     "RUF",
+    "S",
     "SIM",
     "TID",
     "UP",
@@ -79,6 +81,12 @@ select = [
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["hex", "copyright"]
+
+[tool.ruff.lint.per-file-ignores]
+## flake8-bandit's S101 is `assert`, which is what a test is made of. The rest
+## of S stays live in the tests: the three real hits there carry a noqa each,
+## with the reason.
+"tests/**" = ["S101"]
 
 [tool.pytest.ini_options]
 testpaths = ["src", "tests"]

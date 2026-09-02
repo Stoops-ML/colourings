@@ -2048,7 +2048,9 @@ def test_a_strategy_looser_than_the_hash_does_break_the_contract():
 
 def _picked_in_a_fresh_process(expression):
     """Pick a colour in a separate interpreter, so hash salting is re-rolled."""
-    result = subprocess.run(
+    ## No shell, and the argv is built here out of sys.executable and
+    ## literals from the parametrize list.
+    result = subprocess.run(  # noqa: S603
         [
             sys.executable,
             "-c",
@@ -2078,7 +2080,9 @@ def test_pick_for_is_stable_across_processes(expression):
     used to break this is only re-rolled by a new interpreter."""
     first = _picked_in_a_fresh_process(expression)
     assert first == _picked_in_a_fresh_process(expression)
-    assert first == str(eval(expression))
+    ## The expression comes from the parametrize list a few lines up, and
+    ## calls into colourings, so literal_eval cannot evaluate it.
+    assert first == str(eval(expression))  # noqa: S307
 
 
 def test_hash_or_str_is_still_per_process():

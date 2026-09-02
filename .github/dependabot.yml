@@ -27,6 +27,17 @@ updates:
         update-types:
           - minor
           - patch
+    ## Dependabot opens a pull request the moment a release appears, which is
+    ## also when a compromised or broken release is still unnoticed. A week is
+    ## long enough for a yanked version to be gone before it is proposed here,
+    ## and it is what zizmor's dependabot-cooldown audit asks for.
+    cooldown:
+      default-days: 7
+    ## The default is 5 per ecosystem, so these three could hold fifteen open
+    ## pull requests between them. Grouping already collapses minor and patch
+    ## bumps into one PR per ecosystem, so anything beyond a couple here is a
+    ## major bump, which wants reading rather than queueing.
+    open-pull-requests-limit: 3
 
   ## The dev tooling in [dependency-groups]. The package itself has no runtime
   ## dependencies, so nothing here reaches an installed copy of colourings --
@@ -50,6 +61,17 @@ updates:
         update-types:
           - minor
           - patch
+    ## Dependabot opens a pull request the moment a release appears, which is
+    ## also when a compromised or broken release is still unnoticed. A week is
+    ## long enough for a yanked version to be gone before it is proposed here,
+    ## and it is what zizmor's dependabot-cooldown audit asks for.
+    cooldown:
+      default-days: 7
+    ## The default is 5 per ecosystem, so these three could hold fifteen open
+    ## pull requests between them. Grouping already collapses minor and patch
+    ## bumps into one PR per ecosystem, so anything beyond a couple here is a
+    ## major bump, which wants reading rather than queueing.
+    open-pull-requests-limit: 3
 
   ## The docs toolchain, which Read the Docs installs from
   ## docs/requirements.txt rather than from pyproject.
@@ -67,3 +89,14 @@ updates:
         update-types:
           - minor
           - patch
+    ## Dependabot opens a pull request the moment a release appears, which is
+    ## also when a compromised or broken release is still unnoticed. A week is
+    ## long enough for a yanked version to be gone before it is proposed here,
+    ## and it is what zizmor's dependabot-cooldown audit asks for.
+    cooldown:
+      default-days: 7
+    ## The default is 5 per ecosystem, so these three could hold fifteen open
+    ## pull requests between them. Grouping already collapses minor and patch
+    ## bumps into one PR per ecosystem, so anything beyond a couple here is a
+    ## major bump, which wants reading rather than queueing.
+    open-pull-requests-limit: 3

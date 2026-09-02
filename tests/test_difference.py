@@ -52,7 +52,7 @@ def test_a_colour_is_no_distance_from_itself(metric):
 def test_ciede2000_is_symmetric():
     """It is symmetric by construction, and the hue wrapping rules are what
     make it so -- getting one of them wrong shows up here and nowhere else."""
-    generator = random.Random(20260901)
+    generator = random.Random(20260901)  # noqa: S311 -- a seeded sweep, not a secret
     for _ in range(2000):
         first = (
             generator.uniform(0, 100),
