@@ -1,43 +1,313 @@
 name: Run checks
 
-on: [pull_request]
+## Runs on pull requests and on pushes to main. Without the push trigger the
+## matrix and the quality gate only ever saw proposed changes, so anything
+## that landed and then broke -- a merge of two individually green branches,
+## or a new Python release -- went unnoticed on main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+## One run per branch. Cancelling is right for a pull request and wrong for
+## main, where each commit's result records whether that commit was green, so
+## it is conditioned on the event.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+## Actions are pinned to commit SHAs, not tags. A tag is a mutable ref: both
+## `@main` and `@v5` can be repointed at new code by whoever owns the action,
+## which is the whole of the supply-chain exposure. The trailing comment names
+## the release each SHA belongs to, so `git ls-remote --tags <repo>` is enough
+## to check or bump one.
+
+## None of these jobs write to the repository. Codecov authenticates with its
+## own token, so read access to the contents is all any of them needs.
+permissions:
+  contents: read
+
+## Every checkout passes `persist-credentials: false`: by default the action
+## leaves the job's token in .git/config for every later step to read, and
+## nothing here uses git after the checkout. Every job carries a timeout, the
+## default being six hours.
+
+## Installs go through `uv sync --locked`, which is the whole point of
+## committing uv.lock. Dependabot's uv ecosystem kept the lock current while
+## every job installed with pip and ignored it, so the lock was maintained and
+## exercised by nothing; now a run that does not match it fails.
+##
+## `--locked` rather than `--frozen`: frozen installs the lock as it stands,
+## so a pyproject.toml change without a matching `uv lock` would pass
+## unnoticed, which is the same drift in a new place. `--locked` refuses.
+##
+## Every command then runs under `uv run --no-sync`, which is not merely
+## faster. A bare `uv run` re-resolves when it judges the lock stale and
+## rewrites uv.lock to do it, so a job could quietly test something other than
+## what the lock says. `--no-sync` uses the environment the sync step built and
+## nothing else.
+##
+## The docs job is the exception and stays on pip -- see its own comment.
 
 jobs:
-  tox-checks:
-    runs-on: ubuntu-latest
+  ## Every supported Python on Linux, and the ends of the *released* range on
+  ## Windows and macOS. The package is pure Python and nothing in it branches
+  ## on sys.platform or os.name, so the middle versions on the other two would
+  ## only repeat what Linux already covers; the ends are where a stdlib or
+  ## syntax difference would show. Ten jobs rather than the eighteen a full
+  ## cross-product would cost.
+  ##
+  ## 3.15 is a release candidate, so it is carried on Linux only and Windows
+  ## and macOS stay on 3.14 -- keeping a stable colour at the top end, where
+  ## the last platform difference showed up. Move both to 3.15 when it ships.
+  ## It is a full job rather than an allowed failure: it passes today, and a
+  ## prerelease that starts failing is worth being told about loudly. Nothing
+  ## is blocked by it until it is added to the branch's required checks.
+  ##
+  ## Windows and macOS matter here despite the package being pure Python:
+  ## development happens on Windows, preview() imports tkinter, which ships
+  ## with Python on those two and is packaged separately on Linux, and float
+  ## and hex formatting have differed by platform before.
+  test:
+    name: test (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        os: [ubuntu-latest]
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14', '3.15']
+        ## Each of these names an os the matrix does not already pair with
+        ## that version, so it adds a combination rather than overwriting one.
+        include:
+          - os: windows-latest
+            python-version: '3.10'
+          - os: windows-latest
+            python-version: '3.14'
+          - os: macos-latest
+            python-version: '3.10'
+          - os: macos-latest
+            python-version: '3.14'
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install tox tox-gh-actions
-    - name: Test with tox
-      run: tox
-        
-  codecov-of-PR:
-    name: codecov of PR
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Set up uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --locked
+      - name: Test
+        run: uv run --no-sync python -m pytest src tests -vv
+
+  quality:
+    name: quality
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Set up uv and Python "3.12"
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           python-version: "3.12"
+          enable-cache: true
       - name: Install dependencies
+        run: uv sync --locked
+      - name: Type check
+        run: uv run --no-sync python -m ty check
+      - name: Lint
+        run: uv run --no-sync python -m ruff check
+      - name: Format
+        run: uv run --no-sync python -m ruff format --diff
+      - name: Build
+        run: uv run --no-sync python -m build .
+      ## Runs here as well as in the release workflow, where it is the real
+      ## gate: at release time a metadata failure has already cost the version
+      ## number, so it is worth knowing on the pull request instead. Checks
+      ## both artefacts, where the script below only inspects the wheel.
+      - name: Check the metadata the index will see
+        run: uv run --no-sync python -m twine check --strict dist/*
+      ## The build was being thrown away, which proved only that it did not
+      ## crash. A wheel that does not import, a py.typed declared but not
+      ## packaged, and a README missing from the metadata are all silent.
+      ##
+      ## The wheel goes into a venv of its own rather than being reinstalled
+      ## over the project's, so the only thing on the path is what the wheel
+      ## brought. There are no runtime dependencies to miss today; declaring
+      ## one and forgetting to package it is what this would catch. Run from
+      ## the temp directory as well, so the import cannot reach the source.
+      - name: Check the built wheel
+        working-directory: ${{ runner.temp }}
+        run: |
+          uv venv wheel-only
+          uv pip install --python wheel-only/bin/python "$GITHUB_WORKSPACE"/dist/*.whl
+          wheel-only/bin/python - <<'PY'
+          import pathlib
+          from importlib.metadata import metadata
+
+          import colourings
+
+          print("version:", colourings.__version__)
+
+          marker = pathlib.Path(colourings.__file__).parent / "py.typed"
+          assert marker.exists(), "py.typed is declared in pyproject but not in the wheel"
+
+          meta = metadata("colourings")
+          content_type = meta["Description-Content-Type"]
+          assert content_type == "text/markdown", f"long description is {content_type!r}"
+          description = meta.get_payload() or meta["Description"] or ""
+          assert len(description) > 1000, f"long description is {len(description)} characters"
+
+          ## Only here is there a fresh build to check setuptools understood
+          ## what pyproject.toml declares.
+          licence = meta["License-Expression"]
+          assert licence == "BSD-3-Clause", f"licence expression is {licence!r}"
+          classifiers = meta.get_all("Classifier") or []
+          assert "Typing :: Typed" in classifiers, classifiers
+          assert not [c for c in classifiers if c.startswith("License ::")], (
+              "PEP 639 forbids a License classifier beside the expression"
+          )
+
+          print("wheel imports, is typed, and carries the README and its licence")
+          PY
+
+  ## zizmor audits the workflows and the Dependabot config themselves, which
+  ## nothing else here looks at: ruff and ty see the package, and the workflow
+  ## files are the part with the credentials in them.
+  ##
+  ## ruff's flake8-bandit (`S`) rules cover the package and are selected in
+  ## pyproject, so the `quality` job's lint step already runs them -- they are
+  ## not repeated here.
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      ## uv.lock records the index every package came from, and a lock resolved
+      ## through a private mirror pins that mirror's URLs. Two things go wrong
+      ## then: a public repository publishes internal infrastructure, and every
+      ## job fails, because a runner cannot reach the host.
+      ##
+      ## It happens by accident rather than intent. On a machine whose default
+      ## index is a mirror, `uv lock`, `uv add` and even a bare `uv run` will
+      ## silently rewrite all of them, so noticing is not a strategy.
+      ##
+      ## An allowlist rather than a denylist: it catches any index and names
+      ## none, so this check leaks nothing itself. Runs before the sync, since
+      ## a bad lock makes that fail with a network error instead of a reason.
+      ## Uses the runner's own python3, so it needs nothing installed.
+      - name: Check the lock resolves against PyPI only
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          from urllib.parse import urlsplit
+
+          ALLOWED = {"pypi.org", "files.pythonhosted.org"}
+
+          lock = pathlib.Path("uv.lock").read_text(encoding="utf-8")
+          urls = re.findall(r'"(https?://[^"]+)"', lock)
+          ## Guard the guard: no URLs at all would otherwise pass silently.
+          if not urls:
+              print("::error::No URLs found in uv.lock. Has the format changed?")
+              raise SystemExit(1)
+
+          hosts = sorted({urlsplit(url).hostname or "" for url in urls})
+          unexpected = [host for host in hosts if host not in ALLOWED]
+          if unexpected:
+              print(
+                  f"::error file=uv.lock::uv.lock resolves against "
+                  f"{', '.join(unexpected)}. Only {', '.join(sorted(ALLOWED))} "
+                  f"are expected: re-lock with "
+                  f"UV_DEFAULT_INDEX=https://pypi.org/simple and commit that."
+              )
+              raise SystemExit(1)
+
+          print(f"{len(urls)} URLs in uv.lock, all from {', '.join(hosts)}")
+          PY
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --locked
+      ## No `--offline`: the online audits are the ones that cannot be replaced
+      ## by reading the file, since they check the pinned action SHAs against
+      ## the advisory database and against the refs that still exist upstream.
+      ## The token is the job's own read-only GITHUB_TOKEN.
+      ##
+      ## zizmor installs a console script rather than a module, so this is not
+      ## `python -m` like the other tools. `--format=github` turns findings
+      ## into annotations on the file and line.
+      - name: Audit the workflows and the Dependabot config
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run --no-sync zizmor --format=github .github/
+
+  ## Sphinx reports almost everything wrong as a warning and exits 0, so `-W`
+  ## is what makes a docs job worth having. Not `-n`: nitpicky mode also fails
+  ## on references to undocumented objects, and the docstrings point at private
+  ## helpers on purpose. `--keep-going` is left off, being deprecated in Sphinx
+  ## 8, which keeps going anyway.
+  ## The one job still on pip, deliberately. Its dependencies come from
+  ## docs/requirements.txt, which uv.lock does not cover and should not:
+  ## .readthedocs.yml installs that same file with pip, and this job exists to
+  ## fail on what a Read the Docs build would fail on. Locking it here would
+  ## make the two diverge, which is the opposite of the point.
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          ## Matching .readthedocs.yml, so this fails on what that would.
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            docs/requirements.txt
+      - name: Install dependencies
+        ## autodoc imports the package, so it has to be installed.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install .[dev]
+          python -m pip install . -r docs/requirements.txt
+      - name: Build the documentation
+        run: python -m sphinx -W -b html docs docs/_build/html
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --locked
       - name: Generate coverage report
-        run: python -m pytest --cov colourings
+        run: uv run --no-sync python -m pytest --cov colourings --cov-report=xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@main
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
+          fail_ci_if_error: true
           verbose: true

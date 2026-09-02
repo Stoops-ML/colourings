@@ -1,0 +1,52 @@
+name: CodeQL
+
+## CodeQL's own queries are updated independently of this repository, so the
+## schedule is the part that earns its keep: it is what finds a new query's
+## first hit on code that has not changed in months. Push and pull_request
+## keep the default branch's alert set current in between.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    ## Weekly, off the hour and off Monday, so it does not land in the same
+    ## minute as the Dependabot runs.
+    - cron: '19 4 * * 2'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze (python)
+    runs-on: ubuntu-latest
+    ## Longer than the other jobs: this one builds and queries a database
+    ## rather than running a linter.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      ## The whole point -- without it the analysis runs and the results are
+      ## discarded rather than reaching the Security tab.
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      ## `build-mode: none` is the correct mode for an interpreted language:
+      ## CodeQL reads the source rather than watching a compiler.
+      ##
+      ## The query suite is left at the default, which is the security suite.
+      ## `security-and-quality` would add maintainability queries that ruff
+      ## and ty already cover, and every one of those becomes an alert in the
+      ## Security tab that somebody has to triage or dismiss.
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          languages: python
+          build-mode: none
+      - name: Analyse
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9

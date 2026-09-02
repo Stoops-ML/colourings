@@ -1,24 +1,42 @@
-Quick Start
+Quick start
 ===========
 
-Basic usage
------------
+A ten-minute tour. Each section links to the page that covers it properly.
+
+One object, many formats
+------------------------
+
+A ``Color`` stores one colour and exposes every format as a property. Reading
+one converts; assigning one converts back.
 
 .. code-block:: python
 
    from colourings import Color
 
    blue = Color("blue")
-   print(blue)          # blue
-   print(blue.hex)      # #00f
-   print(blue.hex_l)    # #0000ff
-   print(blue.rgb)      # (0.0, 0.0, 255.0)
-   print(blue.hsl)      # (240.0, 100.0, 50.0)
+   print(blue)        # blue
+   print(blue.hex)    # #00f
+   print(blue.hex_l)  # #0000ff
+   print(blue.rgb)    # RGB(red=0.0, green=0.0, blue=255.0)
+   print(blue.hsl)    # HSL(hue=240.0, saturation=100.0, lightness=50.0)
 
-Create colors from different inputs
------------------------------------
+   blue.red = 255
+   print(blue.web)    # magenta
 
-All of the following produce equivalent red colors:
+The tuple properties are named tuples, so components can be read by name and
+still behave as plain tuples:
+
+.. code-block:: python
+
+   c = Color("red")
+   c.rgb.red      # 255.0
+   c.hsl.hue      # 0.0
+   c.rgbaf.alpha  # 1.0
+
+Build one from anything
+-----------------------
+
+All of these are the same red:
 
 .. code-block:: python
 
@@ -26,149 +44,120 @@ All of the following produce equivalent red colors:
 
    Color("red")
    Color("#f00")
-   Color("#ff0000")
-   Color(hsl=(0, 100, 50))
-   Color(hsla=(0, 100, 50, 100))
    Color(rgb=(255, 0, 0))
-   Color(rgba=(255, 0, 0, 255))
-   Color(rgbf=(1, 0, 0))
-   Color(rgbaf=(1, 0, 0, 1))
-   Color(Color("red"))
+   Color(hsl=(0, 100, 50))
+   Color(oklch=(0.62796, 0.25768, 29.2339))
+   Color("rgb(255 0 0)")
+   Color("color-mix(in oklab, red, red)")
 
-Read and update channels
-------------------------
+Fifteen input formats, CSS syntax, and a keyword to set a property as you
+build. See :doc:`colors`.
+
+.. code-block:: python
+
+   Color("red", lightness=0).hsl  # HSL(hue=0.0, saturation=100.0, lightness=0.0)
+
+Adjust it
+---------
+
+Every adjustment returns a new colour and leaves the original alone:
 
 .. code-block:: python
 
    from colourings import Color
 
-   c = Color("blue")
+   c = Color("#3d7ab8")
 
-   # Read individual channels
-   print(c.hue, c.saturation, c.lightness)
-   print(c.red, c.green, c.blue)
-   print(c.alpha)
-   print(c.hsla)  # (240.0, 100.0, 50.0, 100.0)
+   c.lighten(0.2).hex_l   # '#6095ca'
+   c.rotate_hue(180)      # <Color #b87b3d>
+   c.mix("white", 0.3)    # <Color #78a2cf>
+   c.grayscale().hex_l    # '#777777'
 
-   # Update
-   c.hue = 0
-   c.saturation = 50
-   c.lightness = 75
-   c.alpha = 0.5
+See :doc:`adjusting`.
 
-   print(c.hsla)   # (0.0, 50.0, 75.0, 50.0)
-   print(c.rgbaf)  # (0.875, 0.625, 0.625, 0.5)
-
-Interpolate between colors
---------------------------
-
-.. code-block:: python
-
-   from colourings import Color
-
-   red = Color("red")
-   blue = Color("blue")
-
-   # Shortest hue path.
-   print(list(red.range_to(blue, 5)))
-   # [<Color red>, <Color #ff007f>, <Color magenta>, <Color #7f00ff>, <Color blue>]
-
-   # Longer hue path around the wheel.
-   print(list(red.range_to(blue, 5, longer=True)))
-   # [<Color red>, <Color yellow>, <Color lime>, <Color cyan>, <Color blue>]
-
-Build a multi-stop color scale
-------------------------------
+Make a gradient
+---------------
 
 .. code-block:: python
 
    from colourings import Color, color_scale
 
-   palette = color_scale((Color("black"), Color("orange"), Color("white")), 6)
-   for swatch in palette:
-       print(swatch)
+   red = Color("red")
+   print(list(red.range_to("cyan", 5, space="oklab")))
+   # [<Color red>, <Color #ee745b>, <Color #d2a993>, <Color #a3d6c9>, <Color cyan>]
 
-   # Multi-stop scale with four anchor colors:
    stops = (Color("black"), Color("orange"), Color("blue"), Color("white"))
-   palette = color_scale(stops, 10)
-   for color in palette:
+   for color in color_scale(stops, 10):
        print(color)
    # black #39221c #8e4d1c orange #ff003c #e100ff blue #bd71e3 #e3c6d9 white
 
-Use conversion helpers directly
-------------------------------
+Pick the interpolation ``space`` deliberately -- ``oklab`` is usually the right
+answer and ``hsl`` is the default only for backwards compatibility. See
+:doc:`gradients`.
+
+Measure it
+----------
 
 .. code-block:: python
 
-   from colourings.conversions import hsl2web, rgb2hex, rgb2hsl, web2rgb
+   from colourings import Color
 
-   print(rgb2hex((255, 0, 0)))      # #f00
-   print(rgb2hsl((255, 0, 0)))      # (0.0, 100.0, 50.0)
-   print(web2rgb("rebeccapurple"))  # (102.0, 51.0, 153.0)
-   print(hsl2web((0, 0, 50.2)))     # gray
+   Color("black").contrast_ratio("white")  # 21.0
+   Color("#767676").is_readable("white")   # True
+   Color("navy").best_text_color()         # <Color white>
+   Color("black").delta_e("white")         # 100.0
+   Color("#123456").nearest_name()         # 'midnightblue'
 
-Equality behavior
------------------
+WCAG contrast is in :doc:`contrast`; perceptual distance and the four delta-E
+metrics are in :doc:`difference`.
 
-By default, ``Color`` equality compares the hex-rendered color:
-
-.. code-block:: python
-
-   from colourings.colour import Color
-
-   assert Color("red") == Color("#f00")
-
-You can plug in a custom comparison function:
+Read and write CSS
+------------------
 
 .. code-block:: python
 
-   from colourings.colour import Color, HSL_equivalence
+   from colourings import Color
 
-   c1 = Color("red", lightness=0, equality=HSL_equivalence)
-   c2 = Color("blue", lightness=0, equality=HSL_equivalence)
+   Color("rgb(255 0 0 / 50%)").alpha       # 0.5
+   Color("color-mix(in oklab, red, blue)") # <Color #8c53a2>
+   Color("color(display-p3 0.4 0.5 0.6)")  # <Color #5f809c>
 
-   print(c1 == c2)  # False
+   Color("red", alpha=0.5).to_css("rgb")   # 'rgb(255 0 0 / 0.5)'
+   Color("red").to_css("oklch")            # 'oklch(0.62796 0.25768 29.23389)'
 
-Deterministic color picking
----------------------------
+See :doc:`css`.
 
-Use ``pick_for`` to map Python objects to stable colors:
+Handle a bad value
+------------------
 
-.. code-block:: python
-
-   from colourings.colour import Color
-
-   print(Color(pick_for="user:123").web)  # #010000
-   print(Color(pick_for="user:123") == Color(pick_for="user:123"))  # True
-
-You can override the picking strategy with:
-
-- ``picker``: callable that returns a color-like value
-- ``pick_key``: callable that maps objects to comparable keys
-
-Convenience objects and aliases
--------------------------------
+Everything caused by a value that is not a usable colour derives from
+``ColorError``, and a near miss says what it was near:
 
 .. code-block:: python
 
-   from colourings.colour import HEX, HSL, RGB, Colour
+   from colourings import Color, ColorError
 
-   print(HSL.BLUE)   # (240.0, 100.0, 50.0)
-   print(RGB.BLUE)   # (0.0, 0.0, 255.0)
-   print(HEX.BLUE)   # #00f
+   try:
+       Color("chartruese")
+   except ColorError as e:
+       print(f"not a color: {e}")
+   # not a color: Cannot identify color 'chartruese'. Did you mean 'chartreuse'?
 
-   assert Colour("red") == Colour("#f00")
+See :doc:`errors`.
 
-``Colour`` is an alias subclass of ``Color`` for British spelling preference.
-
-Notes on value ranges
+The one thing to know
 ---------------------
 
-The library uses explicit ranges for each representation:
+A ``Color`` holds sRGB. ``lab``, ``lch``, ``oklab``, ``oklch``, ``xyz`` and
+``yuv`` can each name a colour that sRGB cannot show, and such a value is
+**clipped** on the way in -- quietly, and often. Afterwards it is
+indistinguishable from a colour that always fitted, so ask first:
 
-* ``rgb`` / ``rgba`` channels are in ``[0, 255]``
-* ``rgbf`` / ``rgbaf`` channels are in ``[0, 1]``
-* ``hsl`` uses ``hue in [0, 360]`` and saturation/lightness in ``[0, 100]``
-* ``hsla`` is the same as ``hsl`` with alpha in ``[0, 100]``
-* ``hslf`` / ``hslaf`` channels are in ``[0, 1]``
-* ``Color.alpha`` is always in ``[0, 1]``
+.. code-block:: python
+
+   from colourings import in_srgb_gamut
+
+   in_srgb_gamut((53.2408, 80.0925, 67.2032), "lab")  # True, this is red
+   in_srgb_gamut((100, 120, -120), "lab")             # False, would be clipped
+
+:doc:`ranges` covers this in full, and it is worth the five minutes.

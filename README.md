@@ -3,207 +3,76 @@
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/colourings)
 [![PyPI Downloads](https://static.pepy.tech/personalized-badge/colourings?period=total&units=INTERNATIONAL_SYSTEM&left_color=GREY&right_color=BRIGHTGREEN&left_text=downloads)](https://pepy.tech/projects/colourings)
 [![codecov](https://codecov.io/github/Stoops-ML/colourings/graph/badge.svg?token=NQUPC3NY6S)](https://codecov.io/github/Stoops-ML/colourings)
+[![Documentation](https://img.shields.io/readthedocs/colourings)](https://colourings.readthedocs.io/en/latest/)
 
-`colourings` is a lightweight Python library for creating, converting, comparing, and interpolating colors.
+A lightweight Python library for creating, converting, comparing and interpolating colours. No runtime dependencies, typed throughout.
 
-It provides:
-- A high-level `Color` object with rich read/write properties.
-- Function-based conversions when you want minimal overhead.
-- Support for RGB/RGBA, HSL/HSLA, HEX, and named web colors.
-- Deterministic color picking for arbitrary Python objects.
+**📖 [Read the documentation](https://colourings.readthedocs.io/en/latest/)**
 
 This project is a modernized fork of [vaab/colour](https://github.com/vaab/colour/) with additional formats, typing, revised channel ranges, and updated packaging.
 
-## Installation
+## Install
 
 ```bash
 pip install colourings
 ```
 
-## Quick Start
+## A taste
 
 ```python
 from colourings import Color
 
-blue = Color("blue")
-print(blue)          # blue
-print(blue.hex)      # #00f
-print(blue.hex_l)    # #0000ff
-print(blue.rgb)      # (0.0, 0.0, 255.0)
-print(blue.hsl)      # (240.0, 100.0, 50.0)
+c = Color("#3d7ab8")
 
-blue.red = 255
-print(blue.web)      # magenta
+c.hsl  # HSL(hue=210.24..., saturation=50.20..., lightness=48.03...)
+c.oklch  # OKLCH(lightness=0.5677..., chroma=0.1153..., hue=250.8861...)
+c.mix("white", 0.3).hex_l  # '#78a2cf'
+c.contrast_ratio("white")  # 4.4925...
+c.best_text_color()  # <Color black>
+c.nearest_name()  # 'steelblue'
 ```
 
-## Value Ranges
+## What it does
 
-The library uses explicit numeric ranges (not mixed 0..1 + 0..255 conventions):
+| | | |
+| --- | --- | --- |
+| **15 formats** | `rgb` `hsl` `hsv` `hex` `web` `xyz` `lab` `lch` `oklab` `oklch` `cmyk` `yuv` and alpha variants, each readable and writable | [Creating colours](https://colourings.readthedocs.io/en/latest/colors.html) |
+| **CSS Color 4 & 5** | `rgb()` `hsl()` `lab()` `lch()` `oklab()` `oklch()`, `color-mix()`, `color()` with `display-p3` / `a98-rgb` / `rec2020`, plus `to_css()` output | [CSS syntax](https://colourings.readthedocs.io/en/latest/css.html) |
+| **Gradients** | `range_to` and `color_scale`, interpolating in `hsl` `lab` `lch` `oklab` `oklch`, either way round the hue circle, alpha included | [Gradients](https://colourings.readthedocs.io/en/latest/gradients.html) |
+| **Adjustment** | `lighten` `darken` `saturate` `desaturate` with absolute or relative steps, `grayscale` `invert` `rotate_hue` `mix`, and the hue harmonies | [Adjusting](https://colourings.readthedocs.io/en/latest/adjusting.html) |
+| **WCAG contrast** | `contrast_ratio` `relative_luminance` `is_readable` `best_text_color` `is_dark` | [Contrast](https://colourings.readthedocs.io/en/latest/contrast.html) |
+| **Perceptual distance** | `delta_e` over CIE76, CIE94, CIEDE2000 and Oklab, and `nearest_name` | [Difference](https://colourings.readthedocs.io/en/latest/difference.html) |
+| **Compositing** | `over` and `blend` through all sixteen CSS blend modes, encoded or linear | [Compositing](https://colourings.readthedocs.io/en/latest/compositing.html) |
+| **Gamut checking** | `in_srgb_gamut`, to ask before a value gets clipped | [Ranges and gamut](https://colourings.readthedocs.io/en/latest/ranges.html) |
+| **Stable picking** | `pick_for`, mapping any object to the same colour in every process | [Equality and picking](https://colourings.readthedocs.io/en/latest/equality.html) |
 
-- `rgb`: channels in `[0, 255]`
-- `rgba`: channels in `[0, 255]` (including alpha)
-- `rgbf`: channels in `[0, 1]`
-- `rgbaf`: channels in `[0, 1]`
-- `hsl`: `(hue, saturation, lightness)` as `hue in [0, 360]`, `saturation/lightness in [0, 100]`
-- `hsla`: same as `hsl`, with alpha in `[0, 100]`
-- `hslf` / `hslaf`: channels in `[0, 1]`
-- `Color.alpha`: always `[0, 1]`
+## The one thing worth knowing up front
 
-## Constructing Colors
-
-All of these produce equivalent red colors:
+A `Color` holds sRGB. `lab`, `lch`, `oklab`, `oklch`, `xyz` and `yuv` can each name a colour that sRGB cannot show, and such a value is **clipped** on the way in — quietly, and often. Afterwards it is indistinguishable from a colour that always fitted, so ask first:
 
 ```python
-from colourings import Color
+from colourings import in_srgb_gamut
 
-Color("red")
-Color("#f00")
-Color("#ff0000")
-Color(hsl=(0, 100, 50))
-Color(hsla=(0, 100, 50, 100))
-Color(rgb=(255, 0, 0))
-Color(rgba=(255, 0, 0, 255))
-Color(rgbf=(1, 0, 0))
-Color(rgbaf=(1, 0, 0, 1))
-Color(Color("red"))
+in_srgb_gamut((53.2408, 80.0925, 67.2032), "lab")  # True, this is red
+in_srgb_gamut((100, 120, -120), "lab")  # False, would be clipped
 ```
 
-Only one color input source is allowed per constructor call.
+[Ranges and the sRGB gamut](https://colourings.readthedocs.io/en/latest/ranges.html) covers this properly, and it is the page to read before choosing a space to work in.
 
-## Reading and Updating Channels
+## Correctness
 
-```python
-from colourings import Color
+Most of this library is arithmetic on published constants, and a wrong constant there does not raise — it returns a plausible colour that is simply wrong. So every constant is either quoted from a citable source or derived in exact arithmetic, and anything whose constants could not be confirmed raises instead of guessing.
 
-c = Color("blue")
+CIEDE2000 is checked against all 34 pairs of the published Sharma–Wu–Dalal test data. The CSS wide-gamut matrices are each derived twice, independently. Coverage is 100% of statements and branches, and every example in the README and the docs is executed by the test suite with its claimed output checked.
 
-# Read
-print(c.hue, c.saturation, c.lightness)
-print(c.red, c.green, c.blue)
-print(c.alpha)
+## Contributing
 
-# Update
-c.hue = 0
-c.saturation = 50
-c.lightness = 75
-c.alpha = 0.5
+Bug reports, colour-science corrections and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) describes the checks CI runs, all of which you can run locally, and what a change needs before it can be merged.
 
-print(c.hsla)   # (0.0, 50.0, 75.0, 50.0)
-print(c.rgbaf)  # (0.875, 0.625, 0.625, 0.5)
-```
+## Security
 
-## Gradients and Color Scales
+To report a vulnerability, use [GitHub's private reporting](https://github.com/Stoops-ML/colourings/security/advisories/new) rather than a public issue. [SECURITY.md](SECURITY.md) sets out what is in scope — the short version is that `colourings` performs no I/O, opens no network connections and has no runtime dependencies, which leaves crafted inputs and the release process itself.
 
-### Between Two Colors
+## License
 
-```python
-from colourings import Color
-
-red = Color("red")
-blue = Color("blue")
-
-print(list(red.range_to(blue, 5)))
-# [<Color red>, <Color #ff007f>, <Color magenta>, <Color #7f00ff>, <Color blue>]
-
-print(list(red.range_to(blue, 5, longer=True)))
-# Takes the longer hue path around the color wheel.
-# [<Color red>, <Color yellow>, <Color lime>, <Color cyan>, <Color blue>]
-```
-
-### Multi-Stop Scales
-
-```python
-from colourings import Color, color_scale
-
-stops = (Color("black"), Color("orange"), Color("blue"), Color("white"))
-palette = color_scale(stops, 10)
-
-for color in palette:
-	print(color)
-# black #39221c #8e4d1c orange #ff003c #e100ff blue #bd71e3 #e3c6d9
-white
-```
-
-`color_scale` requires at least two colors, and `num_steps >= len(colors)`.
-
-## Equality Behavior
-
-By default, `Color` equality compares RGB-equivalent rendered color (`hex_l`).
-
-```python
-from colourings.colour import Color
-
-assert Color("red") == Color("#f00")
-```
-
-You can plug in a custom comparison function:
-
-```python
-from colourings.colour import Color, HSL_equivalence
-
-c1 = Color("red", lightness=0, equality=HSL_equivalence)
-c2 = Color("blue", lightness=0, equality=HSL_equivalence)
-
-print(c1 == c2)  # False
-```
-
-## Deterministic Color Picking for Objects
-
-Use `pick_for` to map Python objects to stable colors:
-
-```python
-from colourings.colour import Color
-
-print(Color(pick_for="user:123").web)  # #010000
-print(Color(pick_for="user:123") == Color(pick_for="user:123"))  # True
-```
-
-You can override the picking strategy with:
-- `picker`: callable that returns a color-like value
-- `pick_key`: callable that maps objects to comparable keys
-
-## Convenience Objects and Aliases
-
-```python
-from colourings.colour import HEX, HSL, RGB, Colour
-
-print(HSL.BLUE)   # (240.0, 100.0, 50.0)
-print(RGB.BLUE)   # (0.0, 0.0, 255.0)
-print(HEX.BLUE)   # #00f
-
-assert Colour("red") == Colour("#f00")
-```
-
-`Colour` is an alias subclass of `Color` for British spelling preference.
-
-## Function-Based Conversions
-
-Use direct conversion helpers when you do not need the class API:
-
-```python
-from colourings.conversions import rgb2hex, rgb2hsl, web2rgb, hsl2web
-
-print(rgb2hex((255, 0, 0)))       # #f00
-print(rgb2hsl((255, 0, 0)))       # (0.0, 100.0, 50.0)
-print(web2rgb("rebeccapurple"))   # (102.0, 51.0, 153.0)
-print(hsl2web((0, 0, 50.2)))      # gray
-```
-
-Available helpers include conversion paths across:
-- `rgb`, `rgba`, `rgbf`, `rgbaf`
-- `hsl`, `hsla`, `hslf`, `hslaf`
-- `hex` and `web`
-
-## API Surface
-
-Top-level exports:
-
-```python
-from colourings import Color, Colour, color_scale, colour_scale
-```
-
-Additional APIs are available from submodules:
-
-- `colourings.colour`: `HSL_equivalence`, `RGB_equivalence`, `RGB_color_picker`, `make_color_factory`, `identify_color`, `HSL`, `RGB`, `HEX`
-- `colourings.conversions`: conversion utilities
-- `colourings.identify`: type/shape predicates like `is_rgb`, `is_hsl`, `is_web`
+BSD-3-Clause. See [LICENSE](LICENSE).

@@ -1,0 +1,114 @@
+version: 2
+
+## Three manifests are worth watching, and they are watched separately because
+## a bump to each carries a different risk.
+##
+## Commit prefixes are conventional-commit types on purpose. commitizen builds
+## the changelog from them (update_changelog_on_bump), so a Dependabot commit
+## with an unrecognised prefix would be dropped from it silently.
+updates:
+  ## The action pins. Every `uses:` in .github/workflows is a commit SHA, which
+  ## is what makes this entry necessary rather than merely tidy: a SHA never
+  ## moves, so without something bumping it the pins rot in place. Dependabot
+  ## rewrites both the SHA and the trailing version comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    ## Minor and patch bumps arrive as one PR; majors come separately, since
+    ## those change inputs and defaults and want reading.
+    groups:
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ## Dependabot already applies an implicit 3-day cooldown to version
+    ## updates; this raises it to a week, which is what zizmor's
+    ## dependabot-cooldown audit asks for and long enough for a yanked or
+    ## compromised release to be gone before it is proposed here.
+    ##
+    ## Version updates only. `cooldown` is documented as not applying to
+    ## security updates, so a fix for a known vulnerability is never delayed
+    ## by this.
+    cooldown:
+      default-days: 7
+    ## The default is 5 per ecosystem, so these three could hold fifteen open
+    ## pull requests between them. Grouping already collapses minor and patch
+    ## bumps into one PR per ecosystem, so anything beyond a couple here is a
+    ## major bump, which wants reading rather than queueing.
+    open-pull-requests-limit: 3
+
+  ## The dev tooling in [dependency-groups]. The package itself has no runtime
+  ## dependencies, so nothing here reaches an installed copy of colourings --
+  ## the blast radius of a bad bump is a red CI run.
+  ##
+  ## `uv`, not `pip`, because uv.lock is committed. Both ecosystems read
+  ## [dependency-groups] out of pyproject.toml, but the pip one does not know
+  ## uv.lock exists, so it would bump the manifest and leave the lock behind
+  ## it. The uv ecosystem updates the pair together.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: build
+    groups:
+      dev-tooling:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ## Dependabot already applies an implicit 3-day cooldown to version
+    ## updates; this raises it to a week, which is what zizmor's
+    ## dependabot-cooldown audit asks for and long enough for a yanked or
+    ## compromised release to be gone before it is proposed here.
+    ##
+    ## Version updates only. `cooldown` is documented as not applying to
+    ## security updates, so a fix for a known vulnerability is never delayed
+    ## by this.
+    cooldown:
+      default-days: 7
+    ## The default is 5 per ecosystem, so these three could hold fifteen open
+    ## pull requests between them. Grouping already collapses minor and patch
+    ## bumps into one PR per ecosystem, so anything beyond a couple here is a
+    ## major bump, which wants reading rather than queueing.
+    open-pull-requests-limit: 3
+
+  ## The docs toolchain, which Read the Docs installs from
+  ## docs/requirements.txt rather than from pyproject.
+  - package-ecosystem: pip
+    directory: /docs
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: docs
+    groups:
+      docs-toolchain:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ## Dependabot already applies an implicit 3-day cooldown to version
+    ## updates; this raises it to a week, which is what zizmor's
+    ## dependabot-cooldown audit asks for and long enough for a yanked or
+    ## compromised release to be gone before it is proposed here.
+    ##
+    ## Version updates only. `cooldown` is documented as not applying to
+    ## security updates, so a fix for a known vulnerability is never delayed
+    ## by this.
+    cooldown:
+      default-days: 7
+    ## The default is 5 per ecosystem, so these three could hold fifteen open
+    ## pull requests between them. Grouping already collapses minor and patch
+    ## bumps into one PR per ecosystem, so anything beyond a couple here is a
+    ## major bump, which wants reading rather than queueing.
+    open-pull-requests-limit: 3

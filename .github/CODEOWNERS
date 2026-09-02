@@ -1,0 +1,15 @@
+## Requests a review from the owner on every pull request that touches a
+## matching path. On its own this is a notification, not a rule: it only
+## becomes a requirement with "Require review from Code Owners" enabled in
+## the branch protection rule for main.
+
+## Everything, by default.
+*                       @Stoops-ML
+
+## Listed separately because these are the paths where a change is not visible
+## in the package's behaviour and cannot be caught by a test: the workflows and
+## their pinned action SHAs, the dependency and release metadata, and the
+## security policy itself.
+/.github/               @Stoops-ML
+/pyproject.toml         @Stoops-ML
+/SECURITY.md            @Stoops-ML

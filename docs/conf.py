@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from importlib import metadata
 
 project = "colourings"
 author = "Daniel Stoops"
 
-try:
-    from colourings import __version__ as release
-except ImportError:
-    release = "0.0.0"
-
+## Read from the installed distribution rather than falling back to a
+## placeholder. The fallback silently published "colourings 0.0.0" for as long
+## as the version was unreadable; autodoc needs the package installed anyway,
+## so a build that cannot find it should fail rather than mislabel itself.
+release = metadata.version("colourings")
 version = ".".join(release.split(".")[:2])
 
 extensions = [
