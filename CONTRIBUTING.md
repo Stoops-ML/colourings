@@ -96,6 +96,16 @@ Two pytest settings are worth knowing about, both in `pyproject.toml`:
   rendered as a paragraph of prose.
 - **Documentation, when the change is visible from outside.** `README.md` is
   the reference for behaviour; `docs/` is generated from the docstrings.
+
+  The README's examples are executed by `tests/test_readme.py`, in order and in
+  one shared namespace, so a block may use what an earlier one imported but all
+  of them must run. In a `python` block a **trailing comment that begins like a
+  value is checked as the output** of that line — exactly, or with `...` for
+  elided digits, or as a number rounded to the places it shows, optionally
+  followed by a comma or a dash and a remark. A trailing comment that begins
+  like prose is read as a label on the input and is not checked, and whole-line
+  comments are never checked. So write the output you mean, and put anything
+  that is not output on its own line.
 - **A conventional-commit message.** `feat:`, `fix:`, `docs:`, `ci:`,
   `build:`, `style:`, `refactor:`, `test:`, `perf:` or `chore:`, with a `!`
   or a `BREAKING CHANGE:` trailer for anything that breaks. This is not

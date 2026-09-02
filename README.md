@@ -167,7 +167,7 @@ Any remaining keyword sets a writable property once the color is built, which
 is how you say "this color, but darker" in one call:
 
 ```python
-Color("red", lightness=0)  # HSL(hue=0.0, saturation=100.0, lightness=0.0)
+Color("red", lightness=0).hsl  # HSL(hue=0.0, saturation=100.0, lightness=0.0)
 ```
 
 Each goes through its own setter, so it is validated the same way an
@@ -226,8 +226,7 @@ palette = color_scale(stops, 10)
 
 for color in palette:
     print(color)
-# black #39221c #8e4d1c orange #ff003c #e100ff blue #bd71e3 #e3c6d9
-white
+# black #39221c #8e4d1c orange #ff003c #e100ff blue #bd71e3 #e3c6d9 white
 ```
 
 `color_scale` requires at least two colors, and `num_steps >= len(colors)`.
@@ -408,7 +407,7 @@ Color("rgb(255, 0, 0)")  # legacy commas
 Color("rgb(255 0 0 / 50%)")  # CSS Color 4, alpha after a slash
 Color("hsl(0deg 100% 50%)")  # deg, grad, rad and turn all work
 Color("oklch(0.62796 0.25768 29.23389)")
-Color("#ff000080")  # 8-digit hex, and #RGBA
+Color("#ff000080")  # an 8-digit hex, and #RGBA
 Color("transparent")  # black with no alpha
 ```
 
@@ -463,7 +462,7 @@ c = Color("#3d7ab8")
 
 c.lighten(0.2)  # and darken, saturate, desaturate
 c.rotate_hue(180)
-c.grayscale()  # greyscale() is the same method
+c.grayscale()  # the same method as greyscale()
 c.invert()
 c.mix("white", 0.3)
 ```
@@ -639,7 +638,8 @@ from colourings.conversions import clear_caches, rgb2hsl
 
 assert rgb2hsl((255, 0, 0)) is rgb2hsl((255, 0, 0))
 
-clear_caches()  # release cached results; never needed for correctness
+# Releases the cached results. Never needed for correctness.
+clear_caches()
 ```
 
 Comparing against anything that is not a color is `False` rather than an error,
@@ -864,8 +864,10 @@ In a notebook, a `Color` displays as a swatch — no toolkit, nothing to close:
 ```python
 from colourings import Color
 
-Color("rebeccapurple")  # renders as a colored square with its name
-Color("red", alpha=0.5)  # drawn over a checkerboard, so the alpha is visible
+# Each of these renders as a colored square with its name. A translucent
+# one is drawn over a checkerboard, so its alpha is visible.
+Color("rebeccapurple")
+Color("red", alpha=0.5)
 ```
 
 
@@ -875,7 +877,8 @@ Color("red", alpha=0.5)  # drawn over a checkerboard, so the alpha is visible
 ```python
 from colourings import Color
 
-Color("rebeccapurple").preview()  # 200x200 by default
+# The size is in pixels, and defaults to 200x200.
+Color("rebeccapurple").preview()
 Color("rebeccapurple").preview(400, 100)
 ```
 
@@ -902,10 +905,13 @@ Every failure caused by a value that is not a usable color derives from
 ```python
 from colourings import Color, ColorError
 
+user_input = "chartruese"  # a misspelling of chartreuse
+
 try:
     Color(user_input)
 except ColorError as e:
     print(f"not a color: {e}")
+# not a color: Cannot identify color.
 ```
 
 The subclasses say what went wrong:
