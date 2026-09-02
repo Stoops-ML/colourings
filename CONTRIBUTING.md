@@ -83,6 +83,15 @@ Two pytest settings are worth knowing about, both in `pyproject.toml`:
   in the test itself. A distinctive fragment of the message is enough; drop a
   trailing full stop rather than escaping it.
 
+  **Match our wording, never CPython's.** The interpreter rewords its own
+  errors between versions, and the package supports five. `can't set
+  attribute` became `has no setter` in 3.11, and the `__slots__`
+  `AttributeError` gained a clause in 3.12 — so match on the attribute name,
+  which every version carries. The same rule covers arithmetic: `sum()` gained
+  compensated summation in 3.12, which silently changed a float equality
+  three releases after the test was written. Assert the property, and reach for
+  `math.fsum` where exactness is the point.
+
   There are three kinds of test here and they are not interchangeable.
   `tests/test_*.py` pin specific behaviour. `tests/test_properties.py` sweeps a
   sample chosen deliberately — the gamut surface, a coarse interior grid, and

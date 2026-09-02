@@ -102,9 +102,12 @@ becoming one:
 
    try:
        Color("red", lightnes=50)  # a typo
-   except AttributeError as e:
-       print(e)
-   # 'Color' object has no attribute 'lightnes' and no __dict__ for setting new attributes
+   except AttributeError:
+       print("rejected, rather than silently becoming an attribute")
+   # rejected, rather than silently becoming an attribute
+
+The message is CPython's own, and its wording has changed twice across
+supported versions, so it is not quoted here.
 
 A subclass that does not redeclare ``__slots__`` has a ``__dict__``, and does
 accept any name.

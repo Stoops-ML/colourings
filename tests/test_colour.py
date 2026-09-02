@@ -1146,9 +1146,12 @@ def test_keyword_arguments_are_validated_by_the_property_they_set():
 def test_keyword_arguments_are_not_arbitrary_attributes():
     """``__slots__`` is what makes a mistyped name an error rather than a
     silent new attribute, and that applies to the constructor too."""
-    with pytest.raises(AttributeError, match="no attribute 'foo'"):
+    with pytest.raises(AttributeError, match="foo"):
         Color("red", foo=1)
-    with pytest.raises(AttributeError, match="has no setter"):
+    ## The attribute name, not the wording around it: CPython said "can't set
+    ## attribute" until 3.11 and "has no setter" after, and the slots message
+    ## grew a clause in 3.12. Only the name is ours to rely on.
+    with pytest.raises(AttributeError, match="luminance"):
         Color("red", luminance=0.5)
 
 
@@ -2212,7 +2215,9 @@ def test_the_blend_luma_is_not_wcag_relative_luminance():
     assert _blend_luma((1.0, 0.0, 0.0)) == 0.3
     assert _blend_luma((0.0, 1.0, 0.0)) == 0.59
     assert _blend_luma((0.0, 0.0, 1.0)) == 0.11
-    ## The weights summing to exactly 1.0 is what makes SetLum exact.
+    ## Exactly 1.0, which is what makes SetLum exact. True on every version
+    ## only because _blend_luma sums with fsum; plain sum() is a ulp short
+    ## before CPython 3.12.
     assert _blend_luma((1.0, 1.0, 1.0)) == 1.0
     assert _blend_luma((0.0, 1.0, 0.0)) != rgb2relative_luminance((0.0, 255.0, 0.0))
 

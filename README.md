@@ -24,12 +24,12 @@ from colourings import Color
 
 c = Color("#3d7ab8")
 
-c.hsl                      # HSL(hue=210.24..., saturation=50.20..., lightness=48.03...)
-c.oklch                    # OKLCH(lightness=0.5677..., chroma=0.1153..., hue=250.8861...)
+c.hsl  # HSL(hue=210.24..., saturation=50.20..., lightness=48.03...)
+c.oklch  # OKLCH(lightness=0.5677..., chroma=0.1153..., hue=250.8861...)
 c.mix("white", 0.3).hex_l  # '#78a2cf'
 c.contrast_ratio("white")  # 4.4925...
-c.best_text_color()        # <Color black>
-c.nearest_name()           # 'steelblue'
+c.best_text_color()  # <Color black>
+c.nearest_name()  # 'steelblue'
 ```
 
 ## What it does
@@ -54,7 +54,7 @@ A `Color` holds sRGB. `lab`, `lch`, `oklab`, `oklch`, `xyz` and `yuv` can each n
 from colourings import in_srgb_gamut
 
 in_srgb_gamut((53.2408, 80.0925, 67.2032), "lab")  # True, this is red
-in_srgb_gamut((100, 120, -120), "lab")             # False, would be clipped
+in_srgb_gamut((100, 120, -120), "lab")  # False, would be clipped
 ```
 
 [Ranges and the sRGB gamut](https://colourings.readthedocs.io/en/latest/ranges.html) covers this properly, and it is the page to read before choosing a space to work in.

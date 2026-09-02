@@ -1183,14 +1183,19 @@ _BLEND_MODES: dict[str, Callable[[float, float], float]] = {
 ## The spec's `Lum`, deliberately not `rgb2relative_luminance`: these weights
 ## apply to the channels as they stand, where WCAG's 0.2126/0.7152/0.0722
 ## apply to linearised ones, and swapping them gives plausible output that is
-## wrong. They sum to exactly 1.0 in binary float, which is what makes the
-## identities below exact.
+## wrong. Summed correctly they come to exactly 1.0, which is what makes the
+## identities below exact -- see `_blend_luma` for why that needs fsum.
 _BLEND_LUMA_WEIGHTS = (0.3, 0.59, 0.11)
 
 
 def _blend_luma(colour: Sequence[float]) -> float:
     """The spec's ``Lum``. Not WCAG relative luminance -- see above."""
-    return sum(
+    ## fsum, not sum: the exact sum for white sits 4.2e-17 below 1.0, inside
+    ## half a ulp, so only a correctly-rounded accumulation reaches exactly
+    ## 1.0. Plain sum() left it a ulp short until CPython 3.12 gave it
+    ## compensated summation -- which made the identities below exact on 3.12
+    ## and inexact under it.
+    return math.fsum(
         weight * channel
         for weight, channel in zip(_BLEND_LUMA_WEIGHTS, colour, strict=True)
     )
@@ -2523,6 +2528,14 @@ class Color:
         TypeError
             Raised when either dimension is not a number.
         """
+        ## Before the import: a mistyped size is the caller's bug either way,
+        ## and reporting a missing toolkit instead would send them after the
+        ## wrong thing on a machine that happens not to have it.
+        if not isinstance(size_x, int | float):
+            raise TypeError("`size_x` must be of integer or float type")
+        if not isinstance(size_y, int | float):
+            raise TypeError("`size_y` must be of integer or float type")
+
         try:
             import tkinter
         except ImportError as error:
@@ -2534,10 +2547,6 @@ class Color:
                 "Nothing else in colourings needs it."
             ) from error
 
-        if not isinstance(size_x, int | float):
-            raise TypeError("`size_x` must be of integer or float type")
-        if not isinstance(size_y, int | float):
-            raise TypeError("`size_y` must be of integer or float type")
         if self._alpha != 1:
             warnings.warn(
                 f"Alpha set to {self._alpha}, but is not displayed in the window.",
