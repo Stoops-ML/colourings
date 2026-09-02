@@ -1,0 +1,40 @@
+name: Feature request
+description: A colour space, format, metric or operation that is missing
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: >-
+        The problem, rather than the function you have in mind for it. There
+        may already be a way to do it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: What it would be called, and what calling it would look like.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: reference
+    attributes:
+      label: The standard or reference behind it
+      description: >-
+        This is the part that decides whether a feature can be added. Colour
+        arithmetic with a wrong constant produces plausible output rather than
+        an error, so anything with published constants — a colour space, a
+        difference metric, a blend mode, a transfer function — needs a source
+        that can be checked: the specification, the paper, or a test set with
+        expected values in it.
+
+        Several features are deliberately absent for exactly this reason, and
+        raise rather than guessing. If you are not sure, say so and open the
+        issue anyway.
+    validations:
+      required: false

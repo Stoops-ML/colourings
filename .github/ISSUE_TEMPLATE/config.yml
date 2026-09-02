@@ -1,0 +1,10 @@
+## Both templates below are forms, so a blank issue would be the one route that
+## collects nothing.
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Stoops-ML/colourings/security/advisories/new
+    about: Report privately. Please do not open a public issue for a vulnerability.
+  - name: Question about using colourings
+    url: https://github.com/Stoops-ML/colourings#readme
+    about: The README documents every public function, with examples.

@@ -1,0 +1,61 @@
+name: Bug report
+description: A colour comes out wrong, or something raises when it should not
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please do not report a security vulnerability here — see
+        [SECURITY.md](https://github.com/Stoops-ML/colourings/blob/main/SECURITY.md).
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: What reproduces it
+      description: >-
+        The smallest snippet that shows the problem. It will be run as written,
+        so please include the imports.
+      render: python
+      placeholder: |
+        from colourings import Color
+
+        print(Color("#336699").lab)
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The output or the traceback, copied rather than described.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      description: >-
+        For a wrong colour value, please say where the expected value comes
+        from — a standard, another library, a calculator. "It looks wrong" is
+        hard to act on; a number with a source behind it is not.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: colourings version
+      description: "`python -c \"import colourings; print(colourings.__version__)\"`"
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Python version and platform
+      description: "`python -c \"import platform, sys; print(sys.version, platform.platform())\"`"
+      placeholder: "3.12.7 Windows-11-10.0.26200-SP0"
+    validations:
+      required: true

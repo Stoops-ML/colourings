@@ -898,3 +898,23 @@ importing the package should not put eighty names within reach of a typo.
 - `colourings.css`: `css2hsl`, `css2hsla`, `hsla2css`, `is_css`
 - `colourings.difference`: `delta_e_cie76`, `delta_e_cie94`, `delta_e_ciede2000`, `delta_e_ok`, `hsl_difference`, `nearest_named_hsl`
 - `colourings.identify`: type/shape predicates like `is_rgb`, `is_hsl`, `is_web`
+
+## Contributing
+
+Bug reports, colour-science corrections and pull requests are welcome.
+[CONTRIBUTING.md](CONTRIBUTING.md) describes the checks CI runs, all of which
+you can run locally, and what a change needs before it can be merged.
+
+One rule is worth repeating here, because it is what most of this package is:
+a wrong constant in colour arithmetic produces plausible output rather than an
+error. Anything with published constants needs a citable source, and features
+whose constants could not be confirmed raise rather than guessing.
+
+## Security
+
+To report a vulnerability, use
+[GitHub's private reporting](https://github.com/Stoops-ML/colourings/security/advisories/new)
+rather than a public issue. [SECURITY.md](SECURITY.md) sets out what is in
+scope — the short version is that `colourings` performs no I/O, opens no
+network connections and has no runtime dependencies, which leaves crafted
+inputs and the release process itself.
