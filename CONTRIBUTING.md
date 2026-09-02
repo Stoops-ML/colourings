@@ -67,6 +67,12 @@ Two pytest settings are worth knowing about, both in `pyproject.toml`:
   gate is a floor rather than the goal: a test that only executes a line
   without asserting anything about it passes the gate and catches nothing.
 
+  `pytest.raises` needs a `match=`, and ruff's `PT011` enforces it. Every
+  error this package raises derives from `ValueError`, so a bare
+  `pytest.raises(ValueError)` also passes on a `ValueError` raised by a typo
+  in the test itself. A distinctive fragment of the message is enough; drop a
+  trailing full stop rather than escaping it.
+
   There are three kinds of test here and they are not interchangeable.
   `tests/test_*.py` pin specific behaviour. `tests/test_properties.py` sweeps a
   sample chosen deliberately — the gamut surface, a coarse interior grid, and

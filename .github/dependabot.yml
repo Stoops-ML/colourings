@@ -27,10 +27,14 @@ updates:
         update-types:
           - minor
           - patch
-    ## Dependabot opens a pull request the moment a release appears, which is
-    ## also when a compromised or broken release is still unnoticed. A week is
-    ## long enough for a yanked version to be gone before it is proposed here,
-    ## and it is what zizmor's dependabot-cooldown audit asks for.
+    ## Dependabot already applies an implicit 3-day cooldown to version
+    ## updates; this raises it to a week, which is what zizmor's
+    ## dependabot-cooldown audit asks for and long enough for a yanked or
+    ## compromised release to be gone before it is proposed here.
+    ##
+    ## Version updates only. `cooldown` is documented as not applying to
+    ## security updates, so a fix for a known vulnerability is never delayed
+    ## by this.
     cooldown:
       default-days: 7
     ## The default is 5 per ecosystem, so these three could hold fifteen open
@@ -61,10 +65,14 @@ updates:
         update-types:
           - minor
           - patch
-    ## Dependabot opens a pull request the moment a release appears, which is
-    ## also when a compromised or broken release is still unnoticed. A week is
-    ## long enough for a yanked version to be gone before it is proposed here,
-    ## and it is what zizmor's dependabot-cooldown audit asks for.
+    ## Dependabot already applies an implicit 3-day cooldown to version
+    ## updates; this raises it to a week, which is what zizmor's
+    ## dependabot-cooldown audit asks for and long enough for a yanked or
+    ## compromised release to be gone before it is proposed here.
+    ##
+    ## Version updates only. `cooldown` is documented as not applying to
+    ## security updates, so a fix for a known vulnerability is never delayed
+    ## by this.
     cooldown:
       default-days: 7
     ## The default is 5 per ecosystem, so these three could hold fifteen open
@@ -89,10 +97,14 @@ updates:
         update-types:
           - minor
           - patch
-    ## Dependabot opens a pull request the moment a release appears, which is
-    ## also when a compromised or broken release is still unnoticed. A week is
-    ## long enough for a yanked version to be gone before it is proposed here,
-    ## and it is what zizmor's dependabot-cooldown audit asks for.
+    ## Dependabot already applies an implicit 3-day cooldown to version
+    ## updates; this raises it to a week, which is what zizmor's
+    ## dependabot-cooldown audit asks for and long enough for a yanked or
+    ## compromised release to be gone before it is proposed here.
+    ##
+    ## Version updates only. `cooldown` is documented as not applying to
+    ## security updates, so a fix for a known vulnerability is never delayed
+    ## by this.
     cooldown:
       default-days: 7
     ## The default is 5 per ecosystem, so these three could hold fifteen open

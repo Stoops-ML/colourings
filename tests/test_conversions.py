@@ -106,59 +106,59 @@ def test_web2hex():
 
 
 def test_bad_rgbaf2hsl():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBAf type"):
         rgbaf2hsl("a")  # type: ignore
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBAf type"):
         rgbaf2hsl((2, 0, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBAf type"):
         rgbaf2hsl((0, 2, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBAf type"):
         rgbaf2hsl((0, 0, 2, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBAf type"):
         rgbaf2hsl((0, 0, 0, 2))
 
 
 def test_bad_rgba2hsl():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBA type"):
         rgba2hsl("a")  # type: ignore
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBA type"):
         rgba2hsl((256, 0, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBA type"):
         rgba2hsl((0, 256, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBA type"):
         rgba2hsl((0, 0, 256, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBA type"):
         rgba2hsl((0, 0, 0, 256))
 
 
 def test_bad_rgbf2hsl():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBf type"):
         rgbf2hsl("a")  # type: ignore
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBf type"):
         rgbf2hsl((1.1, 0, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBf type"):
         rgbf2hsl((0, 1.1, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBf type"):
         rgbf2hsl((0, 0, 1.1, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGBf type"):
         rgbf2hsl((0, 0, 0, 1.1))
 
 
 def test_bad_hsla2hsl():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSLA type"):
         hsla2hsl("a")  # type: ignore
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSLA type"):
         hsla2hsl((370, 0, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSLA type"):
         hsla2hsl((0, 200, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSLA type"):
         hsla2hsl((0, 0, 200, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSLA type"):
         hsla2hsl((0, 0, 0, 200))
 
 
 def test_bad_hex2web():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of hex type"):
         hex2web("black")
 
 
@@ -172,90 +172,90 @@ def test_bad_web2hex():
 
 
 def test_bad_web2rgb():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of web type"):
         web2rgb("#1234")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of web type"):
         web2rgb("123")
 
 
 def test_bad_web2hsl():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an web type"):
         web2hsl("#1234")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an web type"):
         web2hsl("123")
 
 
 def test_bad_hsl2web():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2web("a")  # type: ignore
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2web((0, 0, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2web((361, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2web((0, 110, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2web((0, 0, 110))
 
 
 def test_bad_hsl2hex():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of hsl type"):
         hsl2hex("a")  # type: ignore
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of hsl type"):
         hsl2hex((0, 0, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of hsl type"):
         hsl2hex((361, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2web((0, 110, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2web((0, 0, 110))
 
 
 def test_bad_hex2hsl():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of hex type"):
         hex2hsl("black")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of hex type"):
         hex2hsl("#black")
 
 
 def test_bad_rgb2web():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2web("a")  # type: ignore
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2web((1, 0, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2web((-1, 0, 0))
 
 
 def test_bad_hsl2rgb():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2rgb((0, 102, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2rgb((0, 0, 102))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2rgb((0, 0, -1))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2rgb((0, -1, 0))
 
 
 def test_bad_rgb2hex():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of RGB type"):
         rgb2hex((-1, 0, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of RGB type"):
         rgb2hex((260, 0, 0))
 
 
 def test_bad_rgb2hsl():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2hsl((0, 0, -1))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2hsl((0, -1, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2hsl((-1, 0, 0))
 
 
 def test_bad_hex2rgb():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not of hex type"):
         hex2rgb("#00ff000")
 
 
@@ -278,22 +278,22 @@ def test_rgb2hsl_normalizes_hue_above_one_branch():
 
 
 def test_bad_hsl2hsla():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2hsla((-1, 0, 0), 1)
 
 
 def test_bad_hsl2hslaf():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2hslaf((-1, 0, 0), 1)
 
 
 def test_bad_hslf2hsl():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSLf type"):
         hslf2hsl((-1, 0, 0))
 
 
 def test_bad_hsl2hslf():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSLf type"):
         hsl2hslf((-1, 0, 0))
 
 
@@ -332,15 +332,15 @@ def test_clear_caches_forces_recomputation():
 
 def test_cache_does_not_mask_validation_errors():
     """Invalid input raises the conversion's own error, not a cache error."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2hsl((300, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2hsl((300, 0, 0))
 
 
 def test_unhashable_non_sequence_raises_conversion_error():
     """A set is unhashable and not a sequence: the conversion still rejects it."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an RGB type"):
         rgb2hsl({255, 0, 1})  # type: ignore
 
 
@@ -350,11 +350,11 @@ def test_rgbf2rgb():
 
 
 def test_bad_hsl2rgbf():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2rgbf((361, 0, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2rgbf((0, 110, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2rgbf("a")  # type: ignore
 
 

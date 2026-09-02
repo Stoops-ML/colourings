@@ -129,9 +129,10 @@ def _hsl_components(values: Sequence[float]) -> HSL:
     return HSL(*values)
 
 
-## Chroma and the a/b axes take a number only: CSS gives them percentage
-## reference ranges that differ per function, and a wrong one would misread a
-## colour rather than reject it.
+## The reference each percentage stands for, taken from the tables in CSS
+## Color 4 -- they differ per function, which is why these are spelled out here
+## rather than shared. `_scaled` handles the negative end for free, since
+## -100% is -100 / 100 * reference.
 _CSS_FUNCTIONS: dict[
     str,
     tuple[
@@ -143,10 +144,10 @@ _CSS_FUNCTIONS: dict[
     "rgba": ((_scaled(255.0), _scaled(255.0), _scaled(255.0)), rgb2hsl),
     "hsl": ((_angle, _scaled(100.0), _scaled(100.0)), _hsl_components),
     "hsla": ((_angle, _scaled(100.0), _scaled(100.0)), _hsl_components),
-    "lab": ((_scaled(100.0), _number, _number), lab2hsl),
-    "lch": ((_scaled(100.0), _number, _angle), lch2hsl),
-    "oklab": ((_scaled(1.0), _number, _number), oklab2hsl),
-    "oklch": ((_scaled(1.0), _number, _angle), oklch2hsl),
+    "lab": ((_scaled(100.0), _scaled(125.0), _scaled(125.0)), lab2hsl),
+    "lch": ((_scaled(100.0), _scaled(150.0), _angle), lch2hsl),
+    "oklab": ((_scaled(1.0), _scaled(0.4), _scaled(0.4)), oklab2hsl),
+    "oklch": ((_scaled(1.0), _scaled(0.4), _angle), oklch2hsl),
 }
 
 _read_alpha = _scaled(1.0)
@@ -219,6 +220,13 @@ def css2hsla(css: str) -> HSLA:
         or the keyword ``transparent``. Case and surrounding space do not
         matter.
 
+        Percentages are accepted wherever CSS Color 4 gives the component a
+        reference, and scale against that function's own reference rather than
+        a shared one: ``100%`` is 125 for ``lab()``'s a and b, 150 for
+        ``lch()``'s chroma, and 0.4 for both of the Oklab pair. ``100%`` is the
+        reference and not a maximum, so a larger percentage parses and is then
+        refused by the range check, exactly as the equivalent number is.
+
     Returns
     -------
     HSLA
@@ -237,6 +245,8 @@ def css2hsla(css: str) -> HSLA:
     HSLA(hue=0.0, saturation=100.0, lightness=50.0, alpha=100.0)
     >>> css2hsla("transparent")
     HSLA(hue=0.0, saturation=0.0, lightness=0.0, alpha=0.0)
+    >>> css2hsla("oklch(0.6 25% 200)") == css2hsla("oklch(0.6 0.1 200)")
+    True
     """
     text = css.strip().lower()
     if text == "transparent":

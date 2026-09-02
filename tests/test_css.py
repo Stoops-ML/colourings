@@ -79,7 +79,6 @@ def test_transparent_is_black_with_no_alpha():
         ("rgb(a b c)", "Expected a number"),
         ("hsl(zzz 100% 50%)", "Expected an angle"),
         ("hsl(0 100% 50% / 2)", "Alpha must be between 0 and 1"),
-        ("oklch(0.5 50% 200)", "Expected a number"),
     ],
 )
 def test_a_css_function_that_cannot_be_read_says_why(text, message):
@@ -99,13 +98,48 @@ def test_out_of_range_is_refused_rather_than_clamped():
         Color("rgb(-1 0 0)")
 
 
-def test_a_percentage_is_refused_where_the_reference_is_not_settled():
-    """Chroma and the a/b axes take numbers only, on purpose: CSS gives them
-    percentage references that differ per function, and a wrong one would
-    misread the colour rather than reject it."""
-    for text in ("oklch(0.5 50% 200)", "lch(50 50% 200)", "lab(50 50% 20)"):
-        with pytest.raises(InvalidColorError, match="Expected a number"):
-            Color(text)
+## CSS Color 4 gives each of these axes its own percentage reference, so a
+## percentage is only meaningful against the right one. Each pair is a
+## percentage and the number it stands for, and every value is inside the sRGB
+## gamut on purpose: out of gamut both sides clip, and a wrong reference would
+## be hidden by the two of them landing on the same gamut boundary.
+PERCENTAGE_EQUIVALENTS = [
+    ("lab(50 20% 0)", "lab(50 25 0)"),  ## a: 100% = 125
+    ("lab(50 -20% 0)", "lab(50 -25 0)"),  ## and -100% = -125
+    ("lab(50 0 20%)", "lab(50 0 25)"),  ## b: the same reference as a
+    ("lch(50 20% 200)", "lch(50 30 200)"),  ## C: 100% = 150
+    ("oklab(0.5 25% 0)", "oklab(0.5 0.1 0)"),  ## a: 100% = 0.4
+    ("oklab(0.5 0 25%)", "oklab(0.5 0 0.1)"),  ## b: the same reference as a
+    ("oklch(0.6 25% 200)", "oklch(0.6 0.1 200)"),  ## C: 100% = 0.4
+]
+
+
+@pytest.mark.parametrize(("percentage", "number"), PERCENTAGE_EQUIVALENTS)
+def test_a_percentage_means_the_number_the_spec_says_it_does(percentage, number):
+    """A wrong reference misreads a colour rather than rejecting it, which is
+    why these axes took numbers only until the references could be read from
+    the specification."""
+    assert Color(percentage) == Color(number)
+
+
+@pytest.mark.parametrize(
+    ("percentage", "number"),
+    [
+        ("oklch(0.5 150% 200)", "oklch(0.5 0.6 200)"),
+        ("lab(50 200% 0)", "lab(50 250 0)"),
+        ("lch(50 120% 200)", "lch(50 180 200)"),
+    ],
+)
+def test_a_percentage_over_one_hundred_is_refused_like_its_number(percentage, number):
+    """100% is the reference, not a maximum, so the percentage is pure
+    notation: past the axis's declared range it is refused exactly as the
+    number is. Refused rather than clipped, for the same reason
+    ``rgb(300 0 0)`` is."""
+    with pytest.raises(InvalidColorError) as from_percentage:
+        Color(percentage)
+    with pytest.raises(InvalidColorError) as from_number:
+        Color(number)
+    assert str(from_percentage.value) == str(from_number.value)
 
 
 def test_is_css_matches_only_what_this_module_reads():

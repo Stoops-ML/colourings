@@ -56,11 +56,7 @@ where = ["src"]
 "colourings" = ["py.typed"]
 
 [tool.ruff.lint]
-## PT011 wants a `match=` on every `pytest.raises` of a broad exception. Every
-## error this package raises derives from ValueError or TypeError, so it fires
-## 75 times. Worth doing -- a bare `raises(ValueError)` passes on a ValueError
-## from a typo -- but as its own change, not buried in a ruleset bump.
-ignore = ["E501", "PT011"]
+ignore = ["E501"]
 select = [
     "A",
     "ARG",

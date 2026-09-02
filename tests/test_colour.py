@@ -90,7 +90,7 @@ def test_preview_alpha_warning(mock_warn):
 
 
 def test_bad_colour_scale():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="At least two colours are required"):
         colour_scale((Color("white"),), 2)
 
 
@@ -199,7 +199,7 @@ def test_bad_color_change_rgb():
 
 
 def test_bad_color_scale():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="At least two colours are required"):
         color_scale((Color("white"),), 2)
 
 
@@ -284,19 +284,19 @@ def test_range_to_interpolates_alpha():
 
 
 def test_bad_alpha():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1"):
         Color(rgb=(1, 1, 1), alpha=-1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1"):
         Color(rgb=(1, 1, 1), alpha=1.1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha value defined twice"):
         Color(rgba=(1, 1, 1, 1), alpha=0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha value defined twice"):
         Color(rgba=(1, 1, 1, 1), alpha=1)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha value defined twice"):
         Color(rgbaf=(1, 1, 1, 1), alpha=0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha value defined twice"):
         Color(hsla=(1, 1, 1, 1), alpha=0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha value defined twice"):
         Color(hslaf=(1, 1, 1, 1), alpha=0)
 
 
@@ -607,7 +607,7 @@ def test_colour():
 
 
 def test_only_one_input():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Only one of 'color'"):
         Color(color="red", pick_for="foo")
 
 
@@ -944,9 +944,9 @@ def test_alpha():
     assert c.hsla == (0, 100, 50, 50)
     assert c.hslf == (0, 1.0, 0.5)
     assert c.hslaf == (0, 1, 0.5, 0.5)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1"):
         c.alpha = -0.1
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Alpha must be between 0 and 1"):
         c.alpha = 1.1
 
 
@@ -1144,19 +1144,21 @@ def test_errors_stay_catchable_as_before():
     assert issubclass(ColorError, TypeError)
     for error in (InvalidColorError, AmbiguousColorError, UnknownColorError):
         assert issubclass(error, ColorError)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input is not an HSL type"):
         hsl2rgb((0, 102, 0))
     with pytest.raises(TypeError):
         Color((0, 0, 0))
     with pytest.raises(TypeError):
         Color("red").set_hsl((0, 102, 0))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot identify color"):
         Color("nope")
 
 
 def test_usage_errors_are_not_color_errors():
     """Calling a helper wrongly is not a bad colour, and stays a plain error."""
-    with pytest.raises(ValueError) as excinfo:
+    with pytest.raises(
+        ValueError, match="At least two colours are required"
+    ) as excinfo:
         color_scale((Color("red"),), 5)
     assert not isinstance(excinfo.value, ColorError)
     with pytest.raises(TypeError) as excinfo:

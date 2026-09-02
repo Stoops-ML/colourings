@@ -433,10 +433,23 @@ Two things to know:
 - **Out of range is an error, not a clamp.** A browser reads `rgb(300 0 0)` as
   red; here it raises. Quietly turning one color into another is what this
   library avoids elsewhere, and reading a stylesheet is not a reason to start.
-- **Chroma and the `a`/`b` axes take numbers only.** CSS also allows
-  percentages there, but the reference each one scales against differs per
-  function, and using the wrong one would misread a color rather than reject
-  it. `oklch(0.5 50% 200)` raises until that can be confirmed.
+- **Percentages scale against a different reference in each function**, which
+  is what CSS Color 4 specifies rather than anything this library chose:
+
+  | function | axis | `100%` |
+  | --- | --- | --- |
+  | `rgb()` | `r`, `g`, `b` | 255 |
+  | `hsl()` | `s`, `l` | 100 |
+  | `lab()`, `lch()` | `L` | 100 |
+  | `lab()` | `a`, `b` | ±125 |
+  | `lch()` | `C` | 150 |
+  | `oklab()`, `oklch()` | `L` | 1 |
+  | `oklab()` | `a`, `b` | ±0.4 |
+  | `oklch()` | `C` | 0.4 |
+
+  So `oklch(0.5 50% 200)` is exactly `oklch(0.5 0.2 200)`. `100%` is the
+  reference and not a maximum: a larger percentage is allowed by the syntax
+  and then refused by the range check, exactly as the equivalent number is.
 
 ## Adjusting a Color
 
@@ -733,12 +746,15 @@ spelling for an exact match. It always returns *something*, however far away —
 check `delta_e` against it before quoting it.
 
 > **On `ciede2000`:** its constants were written from the formula rather than
-> copied from a reference implementation. They are checked against properties
-> that hold by construction — exactly 0 for a color against itself, exactly 100
-> for black against white, symmetric in its arguments, and reducing to a
-> hand-computable expression for a pair differing only in lightness — but *not*
-> against the published Sharma-Wu-Dalal test set. Do that before relying on it
-> for compliance work.
+> copied from a reference implementation, so they are checked against the
+> published Sharma–Wu–Dalal supplementary test data — all 34 pairs, to the four
+> decimals that table gives.
+>
+> That check is worth more than it sounds. The properties this function is
+> otherwise tested against — exactly 0 against itself, exactly 100 for black
+> against white, symmetry, and the neutral lightness reduction — all still pass
+> with the hue-rotation peak moved from 275° to 257°, or with a weighting
+> constant mistyped. The published pairs catch every one of those.
 
 ## Compositing
 

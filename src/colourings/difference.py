@@ -22,13 +22,16 @@ The scales are not comparable between metrics. Roughly, on the L*a*b* three:
 noticeable, and above 5 they read as different colors.
 
 The ``ciede2000`` constants here were written from the formula rather than
-copied from a reference implementation, and are checked against properties
-that hold by construction -- it returns exactly 0 for a color against itself,
-exactly 100 for black against white, is symmetric in its arguments, and
-reduces to a hand-computable expression for a pair differing only in
-lightness. They have **not** been checked against the published
-Sharma-Wu-Dalal test set, which is the thing to do before relying on this for
-compliance work.
+copied from a reference implementation, so they are checked against the
+published Sharma-Wu-Dalal supplementary test data: all 34 pairs agree to the
+four decimals that table gives, and against a line-for-line port of Sharma's
+own reference implementation the agreement is 3e-14.
+
+That check earns its place. The properties this function is otherwise tested
+against -- exactly 0 for a color against itself, exactly 100 for black against
+white, symmetry in its arguments, and reducing to a hand-computable expression
+for a pair differing only in lightness -- all still hold with the hue-rotation
+peak or one of the weighting constants mistyped. The published pairs do not.
 """
 
 from __future__ import annotations
