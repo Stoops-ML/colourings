@@ -19,8 +19,9 @@
 - [ ] `python -m pytest --cov colourings` passes, still at 100%
 - [ ] `python -m ruff check` and `python -m ruff format --diff` are clean
 - [ ] `python -m ty check` is clean
-- [ ] Docstrings are numpydoc style, and `README.md` is updated if the change
-      is visible from outside
+- [ ] Docstrings are numpydoc style, and `docs/` is updated if the change is
+      visible from outside
+- [ ] Any documented example was run, not written from expectation
 - [ ] Commits are conventional commits, with `!` or `BREAKING CHANGE:` if this
       breaks anything
 

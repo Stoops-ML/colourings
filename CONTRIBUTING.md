@@ -94,18 +94,30 @@ Two pytest settings are worth knowing about, both in `pyproject.toml`:
   sections. Sphinx is configured for numpydoc only
   (`napoleon_google_docstring = False`), so a Google-style docstring will be
   rendered as a paragraph of prose.
-- **Documentation, when the change is visible from outside.** `README.md` is
-  the reference for behaviour; `docs/` is generated from the docstrings.
+- **Documentation, when the change is visible from outside.** `docs/` is the
+  reference for behaviour, one page per topic, and `docs/api.rst` pulls the
+  rest from the docstrings. `README.md` is deliberately short: badges, a
+  taste, and a table pointing into the docs. New behaviour belongs on the
+  relevant `docs/` page — put it in the README only if someone choosing
+  whether to install the package needs it.
 
-  The README's examples are executed by `tests/test_readme.py`, in order and in
-  one shared namespace, so a block may use what an earlier one imported but all
-  of them must run. In a `python` block a **trailing comment that begins like a
-  value is checked as the output** of that line — exactly, or with `...` for
-  elided digits, or as a number rounded to the places it shows, optionally
-  followed by a comma or a dash and a remark. A trailing comment that begins
-  like prose is read as a label on the input and is not checked, and whole-line
-  comments are never checked. So write the output you mean, and put anything
-  that is not output on its own line.
+  Every example in `README.md` and in `docs/*.rst` is executed by
+  `tests/test_docs.py`, in order and in one namespace per file, so a block may
+  use what an earlier one on the same page imported but all of them must run.
+  A **trailing comment that begins like a value is checked as the output** of
+  that line — exactly, or with `...` for elided digits, or as a number rounded
+  to the places it shows, optionally followed by a comma or a dash and a
+  remark. A trailing comment that begins like prose is read as a label on the
+  input and is not checked. Whole-line comments after a statement are checked
+  against what it printed, either as one comment holding the whole output or as
+  one comment per line of it.
+
+  So write the output you mean, and put anything that is not output on its own
+  line above the code. Do not write an expected value from expectation: run it.
+  That test was added because two README examples were wrong, and it caught
+  twenty-two more the first time the docs came under it.
+
+  `docs/` must also build clean under `sphinx-build -W`, which CI enforces.
 - **A conventional-commit message.** `feat:`, `fix:`, `docs:`, `ci:`,
   `build:`, `style:`, `refactor:`, `test:`, `perf:` or `chore:`, with a `!`
   or a `BREAKING CHANGE:` trailer for anything that breaks. This is not

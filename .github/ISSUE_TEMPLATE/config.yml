@@ -6,5 +6,5 @@ contact_links:
     url: https://github.com/Stoops-ML/colourings/security/advisories/new
     about: Report privately. Please do not open a public issue for a vulnerability.
   - name: Question about using colourings
-    url: https://github.com/Stoops-ML/colourings#readme
-    about: The README documents every public function, with examples.
+    url: https://colourings.readthedocs.io/en/latest/
+    about: The documentation covers every public function, with examples.
