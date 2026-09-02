@@ -183,6 +183,48 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+      ## uv.lock records the index every package came from, and a lock resolved
+      ## through a private mirror pins that mirror's URLs. Two things go wrong
+      ## then: a public repository publishes internal infrastructure, and every
+      ## job fails, because a runner cannot reach the host.
+      ##
+      ## It happens by accident rather than intent. On a machine whose default
+      ## index is a mirror, `uv lock`, `uv add` and even a bare `uv run` will
+      ## silently rewrite all of them, so noticing is not a strategy.
+      ##
+      ## An allowlist rather than a denylist: it catches any index and names
+      ## none, so this check leaks nothing itself. Runs before the sync, since
+      ## a bad lock makes that fail with a network error instead of a reason.
+      ## Uses the runner's own python3, so it needs nothing installed.
+      - name: Check the lock resolves against PyPI only
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          from urllib.parse import urlsplit
+
+          ALLOWED = {"pypi.org", "files.pythonhosted.org"}
+
+          lock = pathlib.Path("uv.lock").read_text(encoding="utf-8")
+          urls = re.findall(r'"(https?://[^"]+)"', lock)
+          ## Guard the guard: no URLs at all would otherwise pass silently.
+          if not urls:
+              print("::error::No URLs found in uv.lock. Has the format changed?")
+              raise SystemExit(1)
+
+          hosts = sorted({urlsplit(url).hostname or "" for url in urls})
+          unexpected = [host for host in hosts if host not in ALLOWED]
+          if unexpected:
+              print(
+                  f"::error file=uv.lock::uv.lock resolves against "
+                  f"{', '.join(unexpected)}. Only {', '.join(sorted(ALLOWED))} "
+                  f"are expected: re-lock with "
+                  f"UV_DEFAULT_INDEX=https://pypi.org/simple and commit that."
+              )
+              raise SystemExit(1)
+
+          print(f"{len(urls)} URLs in uv.lock, all from {', '.join(hosts)}")
+          PY
       - name: Set up uv and Python
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
