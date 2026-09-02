@@ -3,15 +3,13 @@ from hypothesis import settings
 
 from colourings.conversions import clear_caches
 
-## No per-example deadline. Conversions are memoized, so the first example of
-## a test pays for every cache miss and the rest pay for none: the first can be
-## an order of magnitude slower than the median, which is exactly the shape
-## Hypothesis's default 200ms deadline reports as a flaky failure. The suite is
-## still bounded, by the example count rather than by a stopwatch.
+## No deadline. Conversions are memoized, so the first example pays for every
+## cache miss and can be an order of magnitude slower than the median -- the
+## shape Hypothesis's 200ms default reports as flaky. The example count still
+## bounds the suite.
 settings.register_profile("colourings", deadline=None)
-## A deliberate deep run, for before a release or after touching a conversion:
-## `pytest --hypothesis-profile=deep`. Twenty times the examples, which is
-## minutes rather than seconds, so it is not what CI runs.
+## `pytest --hypothesis-profile=deep`, for before a release or after touching
+## a conversion. Twenty times the examples, so minutes rather than seconds.
 settings.register_profile("deep", deadline=None, max_examples=2000)
 settings.load_profile("colourings")
 

@@ -56,7 +56,6 @@ _NUMBER_TOKEN = re.compile(rf"{_NUMBER}")
 _PERCENT_TOKEN = re.compile(rf"({_NUMBER})%")
 _ANGLE_TOKEN = re.compile(rf"({_NUMBER})(deg|grad|rad|turn)?")
 
-## One turn in each unit CSS accepts for an angle.
 _ANGLE_TURN = {"deg": 360.0, "grad": 400.0, "rad": 2.0 * math.pi, "turn": 1.0}
 
 
@@ -138,10 +137,8 @@ def _hsl_components(values: Sequence[float]) -> HSL:
     return HSL(*values)
 
 
-## The reference each percentage stands for, taken from the tables in CSS
-## Color 4 -- they differ per function, which is why these are spelled out here
-## rather than shared. `_scaled` handles the negative end for free, since
-## -100% is -100 / 100 * reference.
+## What each percentage stands for, from the tables in CSS Color 4. They
+## differ per function, which is why they are spelled out rather than shared.
 _CSS_FUNCTIONS: dict[
     str,
     tuple[
@@ -162,17 +159,13 @@ _CSS_FUNCTIONS: dict[
 _read_alpha = _scaled(1.0)
 
 
-## `color-mix()` is parsed apart from the functions in `_CSS_FUNCTIONS`, for
-## two reasons. It takes whole colours rather than components, so its arguments
-## nest and `CSS_FUNCTION`'s body pattern -- which excludes parentheses --
-## cannot describe them. And resolving those colours needs the whole of
-## `identify_color`, which lives a module above this one, so what is here is
-## the syntax and the arithmetic on the percentages, and nothing that turns a
-## string into a colour.
+## Parsed apart from `_CSS_FUNCTIONS`: its arguments are whole colours, so
+## they nest where `CSS_FUNCTION`'s body pattern excludes parentheses, and
+## resolving them needs `identify_color` from the module above. Only syntax
+## and percentage arithmetic here.
 COLOR_MIX = re.compile(r"color-mix\((?P<arguments>.*)\)", re.S)
 
-## The hue-interpolation methods CSS Color 4 section 13.5 defines. `shorter` is
-## the default when none is written.
+## CSS Color 4 section 13.5. `shorter` is the default when none is written.
 CSS_HUE_METHODS = ("shorter", "longer", "increasing", "decreasing")
 
 
@@ -364,8 +357,7 @@ def normalize_mix_percentages(
 
 
 ## How each `color()` space reaches linear sRGB. The matrices and transfer
-## functions live with the other conversions; what is here is only which
-## keyword means which of them.
+## functions themselves live with the other conversions.
 _PREDEFINED_SPACES: dict[str, Callable[[Sequence[float]], Sequence[float]]] = {
     "srgb": lambda values: [_srgb_to_linear(value) for value in values],
     "srgb-linear": list,
@@ -382,16 +374,13 @@ _PREDEFINED_SPACES: dict[str, Callable[[Sequence[float]], Sequence[float]]] = {
     "xyz-d65": lambda values: _matrix_apply(XYZ_D65_TO_LINEAR_SRGB, values),
 }
 
-## What is left of the specification's list. Both are relative to D50, so
-## reading them needs a chromatic adaptation this package does not have --
-## new machinery rather than another constant. Named here so that asking for
-## one says what is missing rather than that the color cannot be identified.
+## The rest of the specification's list. Both are D50, so reading them needs
+## a chromatic adaptation this package has not got. Named so that asking says
+## what is missing rather than that the colour cannot be identified.
 _UNSUPPORTED_SPACES = ("prophoto-rgb", "xyz-d50")
 
-## Every function name this module reads. `color()` is not in `_CSS_FUNCTIONS`
-## because it takes a space keyword where the others take a first component, so
-## it is read separately -- but a caller asking "is this CSS?" should not have
-## to know that.
+## `color()` is read separately, taking a space keyword where the others take
+## a first component -- but a caller asking "is this CSS?" needn't know that.
 CSS_FUNCTION_NAMES = frozenset(_CSS_FUNCTIONS) | {"color"}
 
 
@@ -434,12 +423,10 @@ def _predefined_color(tokens: list[str], alpha: float) -> HSLA:
             f"color({space} ...) takes 3 components, but {len(components)} were given."
         )
 
-    ## Numbers and percentages both, with 100% meaning 1 in every one of these
-    ## spaces -- which is the one thing CSS makes uniform here.
+    ## 100% means 1 in every one of these spaces, uniquely for CSS.
     values = [_scaled(1.0)(component) for component in components]
     linear = _PREDEFINED_SPACES[space](values)
-    ## Out of the sRGB gamut is clipped, as everywhere else in this package.
-    ## `in_srgb_gamut` is the way to ask before trusting the answer.
+    ## Clipped, as everywhere else here; `in_srgb_gamut` asks in advance.
     channels = [min(max(_linear_to_srgb(component), 0.0), 1.0) for component in linear]
     hue, saturation, lightness = rgb2hsl([channel * 255.0 for channel in channels])
     return HSLA(hue, saturation, lightness, alpha * 100.0)
@@ -549,8 +536,7 @@ def css2hsla(css: str) -> HSLA:
         raise InvalidColorError(f"Not a CSS color function: {css!r}.")
     name, arguments = match.group(1), match.group(2)
     if name == "color":
-        ## A keyword and three components rather than three components, so it
-        ## does not fit the table the others are read from.
+        ## A space keyword first, so it does not fit the table above.
         tokens, alpha_token = _split_arguments(arguments)
         alpha = 1.0 if alpha_token is None else _read_alpha(alpha_token)
         if not 0.0 <= alpha <= 1.0:
@@ -662,9 +648,8 @@ def hsla2css(
         body = f"{_trim(hue, 2)} {_trim(saturation, 2)}% {_trim(lightness, 2)}%"
     else:
         lightness, chroma, hue = hsl2oklch(hsl)
-        ## Five places, not the usual three: oklch chroma spans only 0 to 0.4,
-        ## so three is coarser than an 8-bit channel, and four still loses the
-        ## colours sitting on the gamut boundary.
+        ## Five places, not three: oklch chroma spans only 0 to 0.4, so three
+        ## is coarser than an 8-bit channel and four loses the gamut boundary.
         body = f"{_trim(lightness, 5)} {_trim(chroma, 5)} {_trim(hue, 5)}"
     tail = "" if opaque else f" / {_trim(alpha, 4)}"
     return f"{form}({body}{tail})"

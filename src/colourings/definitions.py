@@ -4,14 +4,11 @@ import math
 import re
 from typing import NamedTuple
 
-## Soften inequalities and some rounding issue based on float
 FLOAT_ERROR = 0.0000005
 
 
-## Colour representations. Each is a tuple subclass, so it stays interchangeable
-## with the plain tuples previously returned by the conversion functions while
-## naming its components and distinguishing the 0-255/0-360 scales from the
-## normalised ``f`` variants.
+## Tuple subclasses, so they stay interchangeable with the plain tuples the
+## conversions returned before 2.0.
 
 
 class RGB(NamedTuple):
@@ -147,8 +144,7 @@ class HSLAf(NamedTuple):
     alpha: float
 
 
-## Source data, written as integers to keep the table readable. The public
-## mappings below expose it with float components.
+## Integers here for readability; the public mappings below expose floats.
 _NAMED_RGB: dict[tuple[int, int, int], list[str]] = {
     (0, 0, 0): ["Black"],
     (0, 0, 128): ["Navy", "NavyBlue"],
@@ -330,21 +326,13 @@ def _invert_3x3(
     )
 
 
-## Derived rather than quoted, for the same reason as the white point below:
-## the published inverse is rounded to seven digits and is not the exact
-## inverse of the matrix above, which costs about 4e-4 of a channel on an
-## RGB -> XYZ -> RGB round trip. Deriving it brings that down to float noise.
+## Derived, not quoted: the published inverse is rounded to seven digits and
+## costs ~4e-4 of a channel per RGB -> XYZ -> RGB round trip.
 XYZ_TO_RGB_MATRIX = _invert_3x3(RGB_TO_XYZ_MATRIX)
 
-## Reference white for the CIE conversions. sRGB is defined against D65, so
-## that is the illuminant used throughout; values are not interchangeable with
-## a library that uses D50.
-##
-## Derived from the matrix rather than quoted, because the published
-## coefficients are rounded and their green row sums to 1.0000001. Quoting the
-## nominal (95.047, 100.0, 108.883) would put white at L* 100.0000039, just
-## outside the range L* is defined over. Deriving it makes white land exactly
-## on the white point, so L* of white is exactly 100.
+## D65 throughout, so values are not interchangeable with a D50 library.
+## Derived rather than quoted: the nominal (95.047, 100.0, 108.883) puts white
+## at L* 100.0000039, outside the range L* is defined over.
 D65_WHITE_POINT: tuple[float, float, float] = (
     sum(RGB_TO_XYZ_MATRIX[0]) * 100.0,
     sum(RGB_TO_XYZ_MATRIX[1]) * 100.0,
@@ -354,16 +342,14 @@ D65_WHITE_POINT: tuple[float, float, float] = (
 ## Breakpoint of the L*a*b* transfer function, delta = 6/29.
 LAB_DELTA = 6.0 / 29.0
 
-## WCAG 2.x relative luminance weights, and the flare term that makes black
-## against white come to exactly 21. Not the BT.601 coefficients below: those
-## are for other primaries and apply to the channels as encoded.
+## WCAG 2.x, whose flare term makes black against white exactly 21. Not the
+## BT.601 weights below, which are for other primaries and unlinearised.
 WCAG_LUMINANCE_COEFFICIENTS = (0.2126, 0.7152, 0.0722)
 WCAG_CONTRAST_FLARE = 0.05
 
-## Where contrast against white equals contrast against black, so exactly
-## where the better text colour changes. Solving
+## Where contrast against white equals contrast against black, so where the
+## better text colour changes. The root of
 ##     (1 + flare) / (L + flare) == (L + flare) / flare
-## for L gives the root below, 0.1791...
 WCAG_LIGHT_DARK_CROSSOVER = (
     math.sqrt((1.0 + WCAG_CONTRAST_FLARE) * WCAG_CONTRAST_FLARE) - WCAG_CONTRAST_FLARE
 )
@@ -376,44 +362,33 @@ WCAG_CONTRAST_MINIMUMS: dict[tuple[str, str], float] = {
     ("AAA", "large"): 4.5,
 }
 
-## BT.601 luma coefficients, with the scale factors that turn the B-Y and R-Y
-## differences into U and V. Working from the differences rather than a rounded
-## 3x3 matrix keeps a grey at exactly U = V = 0; the published matrix leaves
-## white at U = 1e-5.
+## BT.601, scaled to turn B-Y and R-Y into U and V. Working from the
+## differences keeps a grey at exactly U = V = 0; the published 3x3 matrix
+## leaves white at U = 1e-5.
 YUV_LUMA_COEFFICIENTS = (0.299, 0.587, 0.114)
 YUV_U_SCALE = 0.492
 YUV_V_SCALE = 0.877
 
-## Oklab (Ottosson, 2020). Linear sRGB to the cone-response space, then
-## the cube-rooted cone responses to Oklab.
-##
-## Both are quoted rather than derived, which is the opposite of the choice
-## made for XYZ above, because here the published coefficients are the
-## self-consistent ones: the rows of the first matrix sum to 1 to within 1e-10,
-## so white reaches (1, 1, 1). Building it instead from the published
-## XYZ-to-cone matrix and the seven-digit RGB_TO_XYZ_MATRIX would put white at
-## (0.99993, 1.00002, 1.00034), a 3.4e-4 error that gives every grey a faint
-## cast. Oklab therefore hangs off sRGB directly and does not pass through XYZ.
+## Oklab (Ottosson, 2020), hanging off sRGB directly rather than through XYZ.
+## Quoted rather than derived -- the opposite of the choice above -- because
+## these rows sum to 1 to within 1e-10, where composing them with the
+## seven-digit RGB_TO_XYZ_MATRIX puts white 3.4e-4 out and casts every grey.
 RGB_TO_LMS_MATRIX = (
     (0.4122214708, 0.5363325363, 0.0514459929),
     (0.2119034982, 0.6806995451, 0.1073969566),
     (0.0883024619, 0.2817188376, 0.6299787005),
 )
 
-## The first row sums to 0.9999999935, so white lands 6.5e-9 short of L = 1;
-## the other two rows put a and b of a neutral within FLOAT_ERROR of zero,
-## where _threshold takes them to exactly zero.
+## First row sums to 0.9999999935, so white lands 6.5e-9 short of L = 1. A
+## neutral's a and b land within FLOAT_ERROR, where _threshold zeroes them.
 LMS_TO_OKLAB_MATRIX = (
     (0.2104542553, 0.7936177850, -0.0040720468),
     (1.9779984951, -2.4285922050, 0.4505937099),
     (0.0259040371, 0.7827717662, -0.8086757660),
 )
 
-## Derived for the same reason as XYZ_TO_RGB_MATRIX: the published inverses are
-## rounded to ten digits and are not the exact inverses of the matrices they
-## undo. Composing each published pair leaves the identity out by 1.6e-10 and
-## 3.7e-8 respectively; inverting brings both to 5.6e-16. The derived values
-## agree with the published ones to eight decimal places.
+## Derived for the same reason as XYZ_TO_RGB_MATRIX: the published inverses
+## leave the identity out by 1.6e-10 and 3.7e-8, where these reach 5.6e-16.
 LMS_TO_RGB_MATRIX = _invert_3x3(RGB_TO_LMS_MATRIX)
 OKLAB_TO_LMS_MATRIX = _invert_3x3(LMS_TO_OKLAB_MATRIX)
 
@@ -421,7 +396,6 @@ RGB_TO_COLOR_NAMES: dict[RGB, list[str]] = {
     RGB(float(r), float(g), float(b)): names for (r, g, b), names in _NAMED_RGB.items()
 }
 
-## Building inverse relation
 COLOR_NAME_TO_RGB: dict[str, RGB] = {
     name.lower(): rgb for rgb, names in RGB_TO_COLOR_NAMES.items() for name in names
 }
@@ -430,7 +404,6 @@ COLOR_NAME_TO_RGB: dict[str, RGB] = {
 LONG_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 SHORT_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{3}$")
 
-## The same two forms with an alpha pair or digit on the end.
 LONG_HEX_ALPHA_COLOR = re.compile(r"^#[0-9a-fA-F]{8}$")
 SHORT_HEX_ALPHA_COLOR = re.compile(r"^#[0-9a-fA-F]{4}$")
 
@@ -463,25 +436,16 @@ def linspace(
     step = (stop - start) / (num - 1) if endpoint else (stop - start) / num
     result = [float(start + step * i) for i in range(num)]
     if endpoint:
-        ## `start + step * (num - 1)` is not reliably `stop`: it lands a unit in
-        ## the last place away for about one interval in six, so the final
-        ## sample is assigned rather than computed. The docstring promises
-        ## `stop` is included, and a caller interpolating an alpha needs that
-        ## literally -- `Color.alpha` rejects 1.0000000000000002 outright,
-        ## its range check having none of the float tolerance `is_hsl` has.
+        ## `start + step * (num - 1)` misses `stop` by a ulp about one interval
+        ## in six, and `Color.alpha` rejects 1.0000000000000002 outright.
         result[-1] = float(stop)
     return result
 
 
-## CSS's system colours, from CSS Color 4 section 6.2 and its Appendix A of
-## deprecated ones. They are real keywords, and this library deliberately
-## resolves none of them: every one is defined as whatever the user's platform,
-## browser and theme say it is, so any fixed value would be wrong for most
-## readers and right for nobody in particular. `Color("Canvas")` is white on
-## one machine and near-black on the next.
-##
-## Kept only so that asking for one gets that answer instead of "cannot
-## identify color", which reads as a typo.
+## Real CSS keywords that this library deliberately resolves to nothing: each
+## is whatever the reader's platform and theme say, so `Color("Canvas")` is
+## white on one machine and near-black on the next. Listed only so that asking
+## for one says that, rather than reading as a typo.
 SYSTEM_COLORS = frozenset(
     {
         ## Current, CSS Color 4 section 6.2.

@@ -163,8 +163,7 @@ def test_bad_hex2web():
 
 
 def test_bad_web2hex():
-    ## A malformed hex used to raise AttributeError here, which is neither
-    ## accurate nor catchable alongside every other bad-colour error.
+    ## Used to raise AttributeError, which no caller would think to catch.
     with pytest.raises(InvalidColorError):
         web2hex("#1234")
     with pytest.raises(InvalidColorError):
@@ -385,7 +384,7 @@ def test_hsla2hsl_returns_floats_for_integer_input():
 
 
 HSV_CASES = [
-    ## (rgb, hsv) -- reference values from the HSV definition
+    ## (rgb, hsv), from the HSV definition
     ((255, 0, 0), (0.0, 100.0, 100.0)),
     ((0, 255, 0), (120.0, 100.0, 100.0)),
     ((0, 0, 255), (240.0, 100.0, 100.0)),
@@ -460,8 +459,7 @@ def test_bad_input_to_hsv_producers():
         web2hsv("nope")
 
 
-## Reference values for sRGB primaries under D65, as published for CIE XYZ and
-## CIE L*a*b*.
+## sRGB primaries under D65, as published for CIE XYZ and CIE L*a*b*.
 SPACE_REFERENCES = [
     ((255, 255, 255), (95.047, 100.0, 108.883), (100.0, 0.0, 0.0)),
     ((0, 0, 0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
@@ -612,8 +610,7 @@ def test_greys_are_neutral_in_xyz():
         assert rgb2lab((level, level, level))[1:] == pytest.approx((0.0, 0.0))
 
 
-## Reference values published with Oklab (Ottosson, 2020) for the sRGB
-## primaries, rounded to five decimal places.
+## Published with Oklab (Ottosson, 2020), to five decimal places.
 OKLAB_REFERENCE = [
     ((255, 255, 255), (1.0, 0.0, 0.0)),
     ((0, 0, 0), (0.0, 0.0, 0.0)),
@@ -626,8 +623,7 @@ OKLAB_REFERENCE = [
 @pytest.mark.parametrize(("rgb", "oklab"), OKLAB_REFERENCE)
 def test_rgb2oklab_reference(rgb, oklab):
     assert rgb2oklab(rgb) == pytest.approx(oklab, abs=1e-5)
-    ## The five decimal places the reference is quoted to are worth about
-    ## 0.02 of a channel on the way back, so the return leg is looser.
+    ## Five decimals is 0.02 of a channel back, so the return leg is looser.
     assert oklab2rgb(oklab) == pytest.approx(rgb, abs=5e-2)
 
 
@@ -654,8 +650,7 @@ def test_greys_have_no_hue_in_oklch():
 
 
 def test_oklab2oklch_and_oklch2oklab():
-    ## Taken from the full-precision red rather than the rounded reference
-    ## above, whose fifth decimal place moves the hue by 1e-3.
+    ## Full-precision red: the rounded reference moves the hue by 1e-3.
     oklab = rgb2oklab((255, 0, 0))
     assert oklab2oklch(oklab) == pytest.approx((0.62796, 0.25768, 29.2339), abs=1e-4)
     assert oklch2oklab(oklab2oklch(oklab)) == pytest.approx(oklab, abs=1e-15)
@@ -736,8 +731,7 @@ def test_in_srgb_gamut_rejects_colours_srgb_cannot_show(space, value):
 @pytest.mark.parametrize(
     ("space", "inside", "outside"),
     [
-        ## The wide-gamut spaces CSS's color() names. Each has a redder red
-        ## than sRGB can show, which is what makes it wide.
+        ## Each has a redder red than sRGB can show, which makes it wide.
         ("display-p3", (0.4, 0.5, 0.6), (1.0, 0.0, 0.0)),
         ("a98-rgb", (0.4, 0.5, 0.6), (1.0, 0.0, 0.0)),
         ("rec2020", (0.4, 0.5, 0.6), (1.0, 0.0, 0.0)),
@@ -771,10 +765,9 @@ def test_in_srgb_gamut_agrees_with_what_the_conversion_does():
             for b in range(-128, 128, 16):
                 value = (lightness, a, b)
                 clipped = lab2rgb(value)
-                ## A clipped colour is one that hit a channel limit. Only to
-                ## within float error: `1.055 * 1.0 - 0.055` is
-                ## 0.9999999999999999, so a channel pinned to the top comes
-                ## back as 254.99999999999997 rather than 255.0.
+                ## Within float error: `1.055 * 1.0 - 0.055` is
+                ## 0.9999999999999999, so a pinned channel comes back as
+                ## 254.99999999999997.
                 pinned = any(c < 1e-9 or c > 255.0 - 1e-9 for c in clipped)
                 if not in_srgb_gamut(value, space="lab", tolerance=2.0):
                     assert pinned, value

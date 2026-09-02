@@ -42,8 +42,7 @@ from collections.abc import Callable, Sequence
 from .conversions import _cached, hsl2lab, hsl2oklab, rgb2hsl
 from .definitions import COLOR_NAME_TO_RGB
 
-## CIE94, graphic-arts weighting. The textile variant uses different constants
-## and is not offered, rather than offered from memory.
+## CIE94, graphic-arts weighting. The textile variant's constants differ.
 _CIE94_K1 = 0.045
 _CIE94_K2 = 0.015
 
@@ -131,8 +130,8 @@ def delta_e_cie94(lab1: Sequence[float], lab2: Sequence[float]) -> float:
     chroma1 = math.hypot(a1, b1)
     chroma2 = math.hypot(a2, b2)
     delta_chroma = chroma1 - chroma2
-    ## The hue term is what is left of the a/b distance once the chroma
-    ## difference is taken out. Float error can leave that a hair below zero.
+    ## The a/b distance less the chroma difference, which float error can push
+    ## below zero.
     delta_hue_squared = max(
         (a1 - a2) ** 2 + (b1 - b2) ** 2 - delta_chroma**2,
         0.0,
@@ -184,8 +183,7 @@ def delta_e_ciede2000(lab1: Sequence[float], lab2: Sequence[float]) -> float:
     lightness1, a1, b1 = lab1[:3]
     lightness2, a2, b2 = lab2[:3]
 
-    ## The a axis is stretched for low-chroma colours, which is what pulls the
-    ## near-neutral region into shape.
+    ## Stretching a for low-chroma colours shapes the near-neutral region.
     mean_chroma = (math.hypot(a1, b1) + math.hypot(a2, b2)) / 2.0
     seventh = mean_chroma**7
     stretch = 1.0 + 0.5 * (1.0 - math.sqrt(seventh / (seventh + 25.0**7)))
@@ -230,8 +228,7 @@ def delta_e_ciede2000(lab1: Sequence[float], lab2: Sequence[float]) -> float:
     )
     weight_hue = 1.0 + 0.015 * mean_chroma * hue_shape
 
-    ## The rotation term, which handles the blue region where chroma and hue
-    ## differences are not independent.
+    ## Rotation term: in the blue region chroma and hue are not independent.
     seventh = mean_chroma**7
     rotation = (
         -math.sin(math.radians(60.0 * math.exp(-(((mean_hue - 275.0) / 25.0) ** 2))))

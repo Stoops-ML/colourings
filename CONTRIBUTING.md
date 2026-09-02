@@ -154,8 +154,9 @@ mode this project takes most seriously, and it shapes two rules:
 ## Style
 
 - Ruff decides formatting and import order. Do not hand-format around it.
-- Comments explain *why*. The code says what it does; a comment restating that
-  is noise, and will be removed.
+- Comments explain *why*, and briefly. The code says what it does; a comment
+  restating that is noise and will be removed, and one that takes a paragraph
+  to say a sentence will be cut down. Prefer a name or a docstring to a comment.
 - Public API surface is deliberate. The top-level exports are pinned by a test,
   so widening them is a decision rather than a drift.
 

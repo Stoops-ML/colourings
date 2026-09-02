@@ -106,11 +106,9 @@ def test_out_of_range_is_refused_rather_than_clamped():
         Color("rgb(-1 0 0)")
 
 
-## CSS Color 4 gives each of these axes its own percentage reference, so a
-## percentage is only meaningful against the right one. Each pair is a
-## percentage and the number it stands for, and every value is inside the sRGB
-## gamut on purpose: out of gamut both sides clip, and a wrong reference would
-## be hidden by the two of them landing on the same gamut boundary.
+## Each axis has its own percentage reference in CSS Color 4. Every value is
+## inside the sRGB gamut on purpose: out of gamut both sides clip, and a wrong
+## reference would be hidden by the two landing on the same boundary.
 PERCENTAGE_EQUIVALENTS = [
     ("lab(50 20% 0)", "lab(50 25 0)"),  ## a: 100% = 125
     ("lab(50 -20% 0)", "lab(50 -25 0)"),  ## and -100% = -125
@@ -321,7 +319,7 @@ def test_the_display_p3_matrix_agrees_with_its_own_chromaticities():
     derived = _rgb_to_xyz_from_chromaticities(
         [(0.680, 0.320), (0.265, 0.690), (0.150, 0.060)], (0.3127, 0.3290)
     )
-    ## The specification's `lin_P3_to_XYZ`, as the exact rationals it gives.
+    ## The spec's `lin_P3_to_XYZ`, as exact rationals.
     published = [
         [608311 / 1250200, 189793 / 714400, 198249 / 1000160],
         [35783 / 156275, 247089 / 357200, 198249 / 2500400],

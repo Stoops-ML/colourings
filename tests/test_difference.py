@@ -17,10 +17,9 @@ from colourings.difference import (
     nearest_named_hsl,
 )
 
-## Pairs differing only in lightness, where CIEDE2000 reduces to dL / SL with
+## Lightness-only pairs, where CIEDE2000 reduces to dL / SL with
 ## SL = 1 + 0.015 * (Lbar - 50)^2 / sqrt(20 + (Lbar - 50)^2). Computed from
-## that expression rather than recorded from this implementation, so they test
-## the formula instead of restating it.
+## that expression, not recorded from this implementation.
 LIGHTNESS_ONLY = [(0.0, 100.0), (50.0, 51.0), (0.0, 1.0), (99.0, 100.0), (20.0, 80.0)]
 
 
@@ -40,21 +39,15 @@ def test_ciede2000_reduces_to_the_lightness_term_for_neutrals(first, second):
 ## accompanying "The CIEDE2000 Color-Difference Formula: Implementation Notes,
 ## Supplementary Test Data, and Mathematical Observations", G. Sharma, W. Wu and
 ## E. N. Dalal, Color Research and Application 30(1), 21-30, February 2005.
+## Committed verbatim: CI must not need the network.
 ##
-## Committed verbatim rather than fetched. CI must not need the network, and
-## published test data does not change.
+## Every other test of this function passes even when the formula is wrong,
+## because none puts two chromatic colours on opposite sides of a hue
+## boundary. These 34 pairs straddle 0/360 and cluster around the 275-degree
+## peak of the rotation term.
 ##
-## These 34 pairs are here because every other test of this function passes
-## even when the formula is wrong. Symmetry, zero-against-itself, exactly 100
-## for black against white and the neutral lightness reduction all hold with a
-## broken hue-rotation term or a mistyped weight, because none of them puts two
-## chromatic colours on opposite sides of a hue boundary. That is what these
-## pairs do: they straddle 0/360 degrees in hue, and they cluster around the
-## 275-degree peak of the rotation term.
-##
-## Tested through the function rather than through Color, deliberately: 14 of
-## these 68 Lab values are outside the sRGB gamut, so building a Color from
-## them would clip the input and measure a different pair.
+## Through the function rather than through Color: 14 of these 68 Lab values
+## are outside the sRGB gamut, so a Color would clip and measure another pair.
 SHARMA_WU_DALAL = [
     ((50, 2.6772, -79.7751), (50, 0, -82.7485), 2.0425),
     ((50, 3.1571, -77.2803), (50, 0, -82.7485), 2.8615),
@@ -92,12 +85,10 @@ SHARMA_WU_DALAL = [
     ((2.0776, 0.0795, -1.135), (0.9033, -0.0636, -0.5514), 0.9082),
 ]
 
-## Half of the last digit the table publishes, and it cannot be tighter.
-## The table gives four decimals; Sharma's own MATLAB reference computes pair
-## 23 as 1.000049498977, which the table prints as 1.0000. Checked against a
-## line-for-line port of that reference, this implementation agrees to 3e-14 --
-## so the residual against the published column is the table's rounding, not
-## this code's error.
+## Half of the table's last published digit, and it cannot be tighter: pair
+## 23 is 1.000049498977 in Sharma's MATLAB reference and 1.0000 in the table.
+## Against a line-for-line port of that reference this agrees to 3e-14, so the
+## residual is the table's rounding rather than this code's error.
 PUBLISHED_PRECISION = 5e-5
 
 

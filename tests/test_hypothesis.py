@@ -81,26 +81,18 @@ ROUND_TRIP_SPACES = [
 SYMMETRIC_METRICS = ["cie76", "ciede2000", "ok"]
 ALL_METRICS = [*SYMMETRIC_METRICS, "cie94"]
 
-## Round-trip tolerance, in rgb channel units. Most spaces come back within a
-## few parts in 1e12, so the bound is set where float noise is and not where
-## the eye is.
+## In rgb channel units, set where float noise is and not where the eye is.
 ROUND_TRIP_TOLERANCE = dict.fromkeys(ROUND_TRIP_SPACES, 1e-9)
-## Two are looser, for a reason rather than by measurement. Oklch's chroma and
-## YUV's U and V are passed through ``_threshold``, which clamps anything under
-## ``FLOAT_ERROR`` (5e-7) to zero so that float dust does not reach the output.
-## Near white and near black those components carry real signal as well as
-## dust, so the clamp costs some accuracy: the loss is at most FLOAT_ERROR,
-## times the gain of the inverse transform, times 255. For YUV that is
-## 5e-7 x 1.13983 x 255 = 1.5e-4, and the worst case found is 1.6e-4.
-##
-## 1e-3 leaves room above both and is still 500 times smaller than the half
-## channel step that would be needed to change a single digit of the hex.
+## Two are looser by derivation rather than by measurement. Oklch's chroma and
+## YUV's U and V pass through ``_threshold``, whose FLOAT_ERROR (5e-7) clamp
+## costs at most FLOAT_ERROR x the inverse transform's gain x 255 -- for YUV
+## 5e-7 x 1.13983 x 255 = 1.5e-4, against a worst case found of 1.6e-4. 1e-3
+## clears both and is still 500 times under a single hex digit.
 ROUND_TRIP_TOLERANCE["oklch"] = 1e-3
 ROUND_TRIP_TOLERANCE["yuv"] = 1e-3
 
-## Floats rather than the 8-bit integers the sweeps use: a Color holds HSL and
-## reports RGB, so nothing quantises a channel on the way through, and the
-## interesting failures are between the integers rather than on them.
+## Floats rather than the sweeps' 8-bit integers: nothing quantises a channel
+## on the way through, so the interesting failures are between them.
 channels = st.floats(min_value=0, max_value=255, allow_nan=False, allow_infinity=False)
 rgbs = st.tuples(channels, channels, channels)
 alphas = st.floats(min_value=0, max_value=1, allow_nan=False, allow_infinity=False)
@@ -207,11 +199,10 @@ def test_cie94_grows_as_its_reference_loses_chroma(first, second):
     )
 
 
-## Each form writes a fixed number of digits, and that sets exactly how far a
-## colour can move on the way out and back. ``hex`` and ``rgb`` are 8-bit, so
-## half a channel; ``hsl`` and ``oklch`` carry more precision than 8-bit RGB
-## does. The alpha bounds are the same arithmetic: 1/510 for an 8-bit alpha
-## byte, and 5e-5 for four decimal places.
+## Each form's digit count sets how far a colour can move out and back:
+## ``hex`` and ``rgb`` are 8-bit, so half a channel, where ``hsl`` and
+## ``oklch`` carry more. Alphas likewise: 1/510 for a byte, 5e-5 for four
+## decimal places.
 CSS_FORM_TOLERANCES = {
     "hex": (0.5 + 1e-9, 1 / 510 + 1e-9),
     "rgb": (0.5 + 1e-9, 5e-5 + 1e-9),

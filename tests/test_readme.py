@@ -42,14 +42,12 @@ import pytest
 
 README = pathlib.Path(__file__).resolve().parent.parent / "README.md"
 
-## A fence, with whatever prefix its surroundings give it: `> ` inside a
-## blockquote, spaces inside a list item, nothing at the top level. The closing
-## fence carries the same prefix, and every body line has it stripped, or the
-## body is not valid Python.
+## A fence with whatever prefix its surroundings give it: `> ` in a
+## blockquote, spaces in a list item, nothing at the top level. The prefix is
+## stripped from every body line, or the body is not valid Python.
 ##
-## Anchoring at the line start alone was not enough. An indented fence was
-## silently not collected, so a broken example inside a list item would have
-## passed -- found by adding one and watching this file stay green.
+## Anchoring at the line start alone silently skipped indented fences, so a
+## broken example inside a list item passed -- found by adding one.
 _FENCE = re.compile(
     r"^(?P<prefix>[ \t]*(?:> ?)?)```python\n(?P<body>.*?)^(?P=prefix)```",
     re.S | re.M,
@@ -90,15 +88,12 @@ def _decimals(text):
     return len(match.group(1)) if match else None
 
 
-## A trailing comment is read as an expected value when it begins like one --
-## a number, a quote, a bracket, `True`/`False`/`None`, or a call-style repr
-## such as `HSL(...)`. Anything else is a label on the *input*, of which the
-## README has a dozen: `Color("rgb(255, 0, 0)")  # legacy commas` says which
-## syntax is being shown, and the value is the same `<Color red>` every time.
-##
-## The cost of the convention is that a genuine expectation phrased as prose
-## ("# returns <Color red>") is skipped silently, which is what the count
-## guard below is for.
+## A trailing comment is an expected value when it begins like one: a number,
+## a quote, a bracket, `True`/`False`/`None`, or a repr like `HSL(...)`.
+## Anything else labels the *input*, of which the README has a dozen --
+## `Color("rgb(255, 0, 0)")  # legacy commas` names the syntax, and the value
+## is `<Color red>` either way. The cost is that an expectation phrased as
+## prose is skipped silently, which the count guard below covers.
 _VALUE_LIKE = re.compile(r"""[-+]?\d|['"<\[({]|(?:True|False|None)|\w+\(""")
 
 
@@ -110,7 +105,6 @@ def _claims_exactly(comment, actual):
     """Whether ``comment`` is ``actual``, allowing elision and rounding."""
     if comment == actual:
         return True
-    ## Digits elided with `...`, anywhere in the value.
     if _ELISION in comment:
         pattern = ".*?".join(re.escape(part) for part in comment.split(_ELISION))
         if re.fullmatch(pattern, actual):

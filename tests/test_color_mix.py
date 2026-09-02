@@ -44,9 +44,8 @@ def test_the_documented_lch_mix_matches_the_specification():
         ## The specification's own worked example.
         ("shorter", 30.0, 90.0, 60.0),
         ("longer", 30.0, 90.0, 240.0),
-        ## And each remaining branch, so that none is only ever skipped: the
-        ## shorter arc wrapping over 0 in both directions, the longer arc for
-        ## a falling hue, and a pair that needs no adjustment at all.
+        ## Then every remaining branch: the shorter arc wrapping over 0 both
+        ## ways, the longer arc falling, and a pair needing no adjustment.
         ("shorter", 350.0, 10.0, 0.0),
         ("shorter", 10.0, 350.0, 0.0),
         ("longer", 90.0, 30.0, 240.0),
@@ -224,8 +223,7 @@ def test_a_mix_that_cannot_be_read_says_why(text, message):
 
 def test_unbalanced_parentheses_are_reported_as_such():
     with pytest.raises(InvalidColorError, match="Unbalanced parentheses"):
-        ## The inner function is never closed, so the outer `)` closes it and
-        ## the arguments are left one level deep.
+        ## The outer `)` closes the inner call, leaving the arguments nested.
         color_mix2hsla("color-mix(in oklab, rgb(255 0 0, blue)")
 
 

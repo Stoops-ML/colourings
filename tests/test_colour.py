@@ -429,10 +429,8 @@ def test_identify_color_refuses_what_it_cannot_place(value):
         identify_color(value)
 
 
-## An unrecognised string gets a guess at what it was meant to be. The
-## suggestions come from difflib, which is in the standard library -- this
-## package has no runtime dependencies and this feature was not going to be
-## the first one.
+## Suggestions come from difflib: this package has no runtime dependencies,
+## and this feature was not going to be the first one.
 def test_a_misspelled_colour_name_suggests_the_name():
     """The case the whole feature exists for."""
     with pytest.raises(
@@ -549,9 +547,6 @@ def test_a_value_that_is_not_a_string_gets_the_plain_message(value):
     assert "Did you mean" not in str(raised.value)
 
 
-## CSS system colours are real keywords that this library resolves to nothing,
-## because each is defined as whatever the reader's platform and theme make it.
-## Reporting them as unidentifiable read as a typo, so they say what they are.
 @pytest.mark.parametrize("name", sorted(SYSTEM_COLORS))
 def test_a_system_colour_says_what_it_is_rather_than_reading_as_a_typo(name):
     with pytest.raises(UnknownColorError, match="is a CSS system color"):
@@ -792,8 +787,7 @@ def test_pick_for():
     """
     assert Color(pick_for=[1, 2]) == Color(pick_for=[1, 2])
     assert Color(pick_for=[1, 2]) != Color(pick_for=[3, 4])
-    ## pinned, so a regression in the picker cannot pass by being merely
-    ## self-consistent
+    ## Pinned, so a regression cannot pass by being merely self-consistent.
     assert Color(pick_for=[1, 2]).hex_l == "#5162f9"
     assert Color(pick_for=[3, 4]).hex_l == "#3594b1"
 
@@ -1541,7 +1535,6 @@ def test_color_scale_keeps_endpoints_in_every_space(space):
     assert len(scale) == 10
     assert scale[0] == stops[0]
     assert scale[-1] == stops[-1]
-    ## every control colour survives as one of the steps
     for stop in stops:
         assert stop in scale
 
@@ -1645,7 +1638,6 @@ def test_hsl_passes_through_hues_in_neither_endpoint():
     assert any(c.hex_l == "#ff007f" for c in scale)  # a pink, from nowhere
     oklab = color_scale((Color("blue"), Color("yellow")), 9, space="oklab")
     assert all(c.oklab.lightness > 0 for c in oklab)
-    ## Oklab stays between the endpoints on both chroma axes
     lo, hi = sorted((Color("blue").oklab.b, Color("yellow").oklab.b))
     assert all(lo - 1e-12 <= c.oklab.b <= hi + 1e-12 for c in oklab)
 
@@ -2094,10 +2086,8 @@ def test_overlay_is_hard_light_with_the_operands_swapped():
             assert a.blend(b, "overlay") == b.blend(a, "hard-light")
 
 
-## The three modes below come from https://www.w3.org/TR/compositing-1/. Each
-## test states a consequence of the published formula -- a closed form it
-## collapses to, an identity its prose asserts, or a branch its ordering
-## decides -- rather than recording what this implementation returns.
+## From https://www.w3.org/TR/compositing-1/. Each test states a consequence
+## of the published formula, not what this implementation returns.
 _DODGE = _BLEND_MODES["color-dodge"]
 _BURN = _BLEND_MODES["color-burn"]
 _SOFT = _BLEND_MODES["soft-light"]
@@ -2196,10 +2186,8 @@ def test_the_new_modes_have_their_identities_through_the_public_api():
             assert got == want
 
 
-## The four non-separable modes, from https://www.w3.org/TR/compositing-1/
-## section 10.2. They are defined through Lum, Sat, SetLum and SetSat, and the
-## tests below state consequences of those definitions rather than recording
-## what this implementation returns.
+## From https://www.w3.org/TR/compositing-1/ section 10.2, defined through
+## Lum, Sat, SetLum and SetSat. Consequences of those, not of this code.
 _HUE = _NONSEPARABLE_BLEND_MODES["hue"]
 _SATURATION = _NONSEPARABLE_BLEND_MODES["saturation"]
 _COLOR = _NONSEPARABLE_BLEND_MODES["color"]
@@ -2226,7 +2214,6 @@ def test_the_blend_luma_is_not_wcag_relative_luminance():
     assert _blend_luma((0.0, 0.0, 1.0)) == 0.11
     ## The weights summing to exactly 1.0 is what makes SetLum exact.
     assert _blend_luma((1.0, 1.0, 1.0)) == 1.0
-    ## And they really are a different answer from the WCAG pair.
     assert _blend_luma((0.0, 1.0, 0.0)) != rgb2relative_luminance((0.0, 255.0, 0.0))
 
 
@@ -2447,8 +2434,8 @@ def test_every_blend_stays_in_range_and_leaves_its_operands_alone(mode):
     assert result is not backdrop
 
 
-## `a` and `c` carry a strategy stricter than the hash, `b` a looser one, and
-## all three render the same hex. That is the arrangement in which `==` misbehaves.
+## `a` and `c` are stricter than the hash, `b` looser, and all three render
+## the same hex -- the arrangement in which `==` misbehaves.
 def _mixed_strategy_trio():
     return (
         Color(hsl=(0, 100, 50.0000001), equality=HSL_equivalence),
@@ -2528,8 +2515,7 @@ def test_a_strategy_looser_than_the_hash_does_break_the_contract():
 
 def _picked_in_a_fresh_process(expression):
     """Pick a colour in a separate interpreter, so hash salting is re-rolled."""
-    ## No shell, and the argv is built here out of sys.executable and
-    ## literals from the parametrize list.
+    ## No shell, and the argv is sys.executable plus literals from above.
     result = subprocess.run(  # noqa: S603
         [
             sys.executable,
@@ -2560,8 +2546,7 @@ def test_pick_for_is_stable_across_processes(expression):
     used to break this is only re-rolled by a new interpreter."""
     first = _picked_in_a_fresh_process(expression)
     assert first == _picked_in_a_fresh_process(expression)
-    ## The expression comes from the parametrize list a few lines up, and
-    ## calls into colourings, so literal_eval cannot evaluate it.
+    ## A literal from above that calls into colourings, so not literal_eval.
     assert first == str(eval(expression))  # noqa: S307
 
 

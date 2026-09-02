@@ -67,10 +67,8 @@ from .css import (
     read_mix_method,
 )
 
-## The colour tuple types keep the ``*Tuple`` names, uniformly, so that nothing
-## in this module is called ``HSL`` or ``RGB`` -- the names the accessors below
-## used to take, and which a caller reaching for the old spelling would
-## otherwise receive silently as a NamedTuple.
+## Aliased to ``*Tuple`` so that nothing here is called ``HSL`` or ``RGB``,
+## which the accessors took before 2.0 and a caller may still reach for.
 from .definitions import (
     CMYK as CMYKTuple,
     COLOR_NAME_TO_RGB,
@@ -224,11 +222,8 @@ NAMED_RGB = C_RGB()
 NAMED_HEX = C_HEX()
 
 
-## Interpolation spaces for ``color_scale``. The key is the ``Color`` property
-## that reads the space, and the value pairs the conversion that takes an
-## interpolated triple back to HSL with the index of the space's hue channel,
-## or ``None`` when the space is rectangular and has no hue to take an arc
-## around.
+## For ``color_scale``: the conversion back to HSL, and where the hue channel
+## sits, or ``None`` for a rectangular space with no arc to take.
 _SCALE_SPACES: dict[str, tuple[Callable[[Sequence[float]], HSLTuple], int | None]] = {
     "hsl": (lambda values: HSLTuple(*values), 0),
     "lab": (lab2hsl, None),
@@ -391,7 +386,6 @@ def color_scale(
     ValueError
         Raised when ``longer`` is requested in a space without a hue channel.
     """
-    # checks
     if len(colors) < 2:
         raise ValueError("At least two colours are required to make a scale.")
     if len(colors) > num_steps:
@@ -400,26 +394,22 @@ def color_scale(
         )
     to_hsl, hue_index = _scale_space(space, longer)
 
-    # linearly interpolate between colours
     num_sections = len(colors) - 1
     num_steps_per_iter = math.floor((num_steps - len(colors)) / num_sections)
     remainder = ((num_steps - len(colors)) / num_sections) % 1
     out = []
     added = 0
     for i in range(num_sections):
-        # colour definitions
         start = list(getattr(colors[i], space))
         end = list(getattr(colors[i + 1], space))
         if hue_index is not None:
             _unwrap_hue(start, end, hue_index, longer)
 
-        # number of colours
-        num_colors = num_steps_per_iter + 2  # add 2 for start and end colours
+        num_colors = num_steps_per_iter + 2  # start and end
         if round(remainder * (i + 1) - added, 7) >= 1:
             num_colors += 1
             added += 1
 
-        # interpolate
         channels = [linspace(a, b, num_colors) for a, b in zip(start, end, strict=True)]
         if hue_index is not None:
             channels[hue_index] = [(v * 360) % 360 for v in channels[hue_index]]
@@ -429,7 +419,6 @@ def color_scale(
             for *values, alpha in zip(*channels, alphas, strict=True)
         ]
 
-        # add to output
         if i == 0:
             out.extend(add)
         else:
@@ -557,8 +546,7 @@ def hash_or_str(obj: object) -> str | int:
     try:
         return hash((type(obj).__name__, obj))
     except TypeError:
-        ## Adds the type name to make sure two object of different type but
-        ## identical string representation get distinguished.
+        ## The type name distinguishes two objects that stringify alike.
         return f"{type(obj).__name__}{obj}"
 
 
@@ -580,29 +568,18 @@ def RGB_color_picker(obj: object) -> Color:
         Color generated from the SHA-384 digest of the object string.
     """
 
-    ## Turn the input into a by 3-dividable string. SHA-384 is good because it
-    ## divides into 3 components of the same size, which will be used to
-    ## represent the RGB values of the color.
+    ## SHA-384 divides into three components of equal size, one per channel.
     digest = hashlib.sha384(str(obj).encode("utf-8")).hexdigest()
 
-    ## Split the digest into 3 sub-strings of equivalent size.
     subsize = int(len(digest) / 3)
     splitted_digest = [digest[i * subsize : (i + 1) * subsize] for i in range(3)]
 
-    ## Convert those hexadecimal sub-strings into integer and scale them down
-    ## to the 0..1 range.
     max_value = float(int("f" * subsize, 16))
-    components = [
-        int(d, 16)  ## Make a number from a list with hex digits
-        / max_value  ## Scale it down to [0.0, 1.0]
-        for d in splitted_digest
-    ]
+    components = [int(d, 16) / max_value for d in splitted_digest]
 
-    ## Built from the normalised components directly. Handing them to rgb2hex
-    ## instead treated a [0, 1] value as a [0, 255] one, so every channel
-    ## rounded to 0 or 1 and the whole digest collapsed onto eight
-    ## near-black colours, which is not enough to tell two objects apart.
-    return Color(rgbf=components)  ## Profit!
+    ## Normalised, so `rgbf`. Handing these to rgb2hex read a [0, 1] value as a
+    ## [0, 255] one and collapsed every digest onto eight near-black colours.
+    return Color(rgbf=components)
 
 
 def RGB_equivalence(c1: Color, c2: Color) -> bool:
@@ -671,11 +648,10 @@ def _alpha_from(given: float | None, carried: float, format_name: str) -> float:
     return carried
 
 
-## The spaces `color-mix()` may interpolate in, mapped to the conversions that
-## reach them and come back, and where the hue channel sits. CSS also allows
-## `srgb`, `srgb-linear`, `hwb`, `xyz` and the predefined RGB spaces; those
-## raise rather than being silently substituted, which is the choice this
-## package makes everywhere a value cannot be produced exactly.
+## The spaces `color-mix()` may interpolate in: the conversions there and
+## back, and where the hue channel sits. CSS also allows `srgb`,
+## `srgb-linear`, `hwb`, `xyz` and the predefined RGB spaces, which raise
+## rather than being silently substituted.
 _MIX_SPACES: dict[
     str,
     tuple[
@@ -691,8 +667,7 @@ _MIX_SPACES: dict[
     "oklch": (hsl2oklch, oklch2hsl, 2),
 }
 
-## The two hue arcs this takes. `increasing` and `decreasing` are also in the
-## specification and are not implemented.
+## `increasing` and `decreasing` are also in the spec, and not implemented.
 _MIX_HUE_METHODS = ("shorter", "longer")
 
 
@@ -859,13 +834,11 @@ def color_mix2hsla(css: str) -> HSLATuple:
         colour = Color(text)
         colours.append(HSLATuple(*colour.hsl, colour.alpha * 100.0))
 
-    ## Fold from the front, each step weighted by what the pair carries between
-    ## them, so that the merged item keeps their combined share.
+    ## Folded from the front, so a merged item keeps the pair's whole share.
     result, carried = colours[0], weights[0]
     for colour_hsla, weight in zip(colours[1:], weights[1:], strict=True):
         combined = carried + weight
-        ## Both at 0% is the one case with no ratio to take; the specification
-        ## says to treat it as an even mix.
+        ## Both at 0% has no ratio; the spec says to treat it as even.
         progress = weight / combined if combined else 0.5
         result = _mix_pair(result, colour_hsla, progress, space, hue_method)
         carried = combined
@@ -908,11 +881,9 @@ _SEQUENCE_FORMATS: tuple[
 )
 
 
-## How close a name has to be before it is worth suggesting. This is also
-## difflib's own default, but it is written out because it is load-bearing
-## rather than incidental: at 0.7 every other typo below still matches, and
-## `rde` -> `red` does not. Three letters leave a transposition very little to
-## match on, and `rde` is the case suggestions exist for.
+## difflib's own default, but written out because it is load-bearing: at 0.7
+## every other typo still matches and `rde` -> `red` does not, three letters
+## leaving a transposition very little to match on.
 _SUGGESTION_CUTOFF = 0.6
 _SUGGESTIONS = 3
 
@@ -965,8 +936,7 @@ def _suggestion_for(text: str) -> str:
     str
         A sentence to append to a message, or ``""``.
     """
-    ## A function shape whose name is unknown. A *known* name with a malformed
-    ## body never reaches here: the parser raises about the body instead.
+    ## An unknown function name; a known one with a bad body raises earlier.
     function = CSS_FUNCTION.fullmatch(text)
     if function:
         name = function.group(1)
@@ -976,8 +946,7 @@ def _suggestion_for(text: str) -> str:
         )
     if text.startswith("#"):
         digits = text[1:]
-        ## Only about the count, and only when they really are hex digits:
-        ## `#zzzz` is the wrong characters rather than the wrong length.
+        ## Only when they are digits: `#zzzz` is wrong characters, not count.
         if digits and all(digit in string.hexdigits for digit in digits):
             return (
                 f" A hexadecimal color takes 3, 4, 6 or 8 digits, and this "
@@ -1096,8 +1065,7 @@ def _apply_property_keywords(color: Color, keywords: dict[str, Any]) -> None:
         Raised when a name is not a writable property.
     """
     for name, value in keywords.items():
-        ## Assigning a slot here would skip the property that validates it,
-        ## which is what `__slots__` is present to prevent.
+        ## Assigning the slot would skip the property that validates it.
         if name in Color.__slots__:
             raise ValueError(
                 f"{name!r} is stored state rather than a color property. "
@@ -1194,9 +1162,8 @@ def _soft_light(backdrop: float, source: float) -> float:
     return backdrop + (2.0 * source - 1.0) * (lightened - backdrop)
 
 
-## The separable blend modes CSS defines, each taking the backdrop channel and
-## the source channel. The non-separable ones -- hue, saturation, color,
-## luminosity -- work on all three channels at once and are not here.
+## The separable modes, taking a backdrop channel and a source channel. The
+## non-separable ones take all three at once and are below.
 _BLEND_MODES: dict[str, Callable[[float, float], float]] = {
     "normal": lambda _backdrop, source: source,
     "multiply": lambda backdrop, source: backdrop * source,
@@ -1213,13 +1180,11 @@ _BLEND_MODES: dict[str, Callable[[float, float], float]] = {
 }
 
 
-## The non-separable modes are built from four helpers the spec defines for
-## them. `Lum` is deliberately not `rgb2relative_luminance`: the coefficients
-## here are 0.3, 0.59 and 0.11 on the channels as they stand, where WCAG uses
-## 0.2126, 0.7152 and 0.0722 on linearised ones. Substituting one for the other
-## produces plausible output that is simply wrong, so they stay apart. The
-## three weights sum to exactly 1.0 in binary floating point, which is what
-## makes the identities below exact rather than approximate.
+## The spec's `Lum`, deliberately not `rgb2relative_luminance`: these weights
+## apply to the channels as they stand, where WCAG's 0.2126/0.7152/0.0722
+## apply to linearised ones, and swapping them gives plausible output that is
+## wrong. They sum to exactly 1.0 in binary float, which is what makes the
+## identities below exact.
 _BLEND_LUMA_WEIGHTS = (0.3, 0.59, 0.11)
 
 
@@ -1280,16 +1245,14 @@ def _set_blend_saturation(colour: Sequence[float], saturation: float) -> RGBfTup
     """
     lowest, highest = min(colour), max(colour)
     if highest <= lowest:
-        ## No spread to rescale. The spec sets all three channels to zero, and
-        ## the SetLum that follows lifts them back to the right lightness.
+        ## No spread to rescale; the SetLum that follows restores lightness.
         return RGBfTuple(0.0, 0.0, 0.0)
     scale = saturation / (highest - lowest)
     return RGBfTuple(*((channel - lowest) * scale for channel in colour))
 
 
-## The four non-separable modes, which take whole colours rather than single
-## channels: each reads two of hue, saturation and luma from one operand and
-## the rest from the other, which cannot be done a channel at a time.
+## Whole colours rather than single channels: each reads two of hue, saturation
+## and luma from one operand and the rest from the other.
 _NONSEPARABLE_BLEND_MODES: dict[
     str, Callable[[Sequence[float], Sequence[float]], RGBfTuple]
 ] = {
@@ -1310,9 +1273,8 @@ _NONSEPARABLE_BLEND_MODES: dict[
 _ALL_BLEND_MODES = frozenset(_BLEND_MODES) | frozenset(_NONSEPARABLE_BLEND_MODES)
 
 
-## The keyword colour inputs, each with the conversion that takes it to HSL.
-## `color` and `pick_for` are not here: one is identified rather than named,
-## and the other needs the picker arguments.
+## `color` and `pick_for` are absent: one is identified rather than named,
+## the other needs the picker arguments.
 _KEYWORD_INPUTS: dict[str, Callable[[Any], Any]] = {
     "web": lambda value: web2hsl(value.strip().lower()),
     "hsl": lambda value: value,
@@ -1335,7 +1297,6 @@ _KEYWORD_INPUTS: dict[str, Callable[[Any], Any]] = {
     "rgbaf": rgbaf2hsl,
 }
 
-## The scale the fourth component is on, for the inputs that carry an alpha.
 _KEYWORD_ALPHA_SCALES: dict[str, float] = {
     "hsla": 100.0,
     "rgba": 255.0,
@@ -1453,12 +1414,11 @@ class Color:
         subclass with a ``__dict__``, a name that can be attached.
     """
 
-    ## Only these three are stored; every colour format below is a property
-    ## computed from them. Declaring them as slots keeps a mistyped attribute an
-    ## AttributeError instead of silently becoming a new attribute.
+    ## Only these are stored; every colour format below is computed from
+    ## them. Slots keep a mistyped attribute an AttributeError.
     __slots__ = ("_alpha", "_hsl", "equality")
 
-    _hsl: HSLTuple  # internal representation
+    _hsl: HSLTuple
     _alpha: float
     equality: ColorEquality
 
@@ -1492,9 +1452,7 @@ class Color:
         equality: ColorEquality = RGB_equivalence,
         **kwargs: Any,
     ):
-        # checks
-        ## Typed as Any because the dispatch below is dynamic: the values are
-        ## the parameters, whose real types are on the signature.
+        ## Any because the dispatch is dynamic; real types are on the signature.
         inputs: dict[str, Any] = {
             "color": color,
             "web": web,
@@ -1527,16 +1485,14 @@ class Color:
         source = given[0]
         value = inputs[source]
 
-        # convert to hsl
         if source == "color":
             if isinstance(value, str):
                 value = value.strip().lower()
             func = identify_color(value)
             self.hsl = func(value)
             if isinstance(value, Color):
-                ## Copied rather than reconciled: a Color always carries an
-                ## alpha, so treating a disagreement as an error would reject
-                ## `Color(other, alpha=0.5)` for every opaque `other`.
+                ## Copied, not reconciled: a Color always carries an alpha,
+                ## so disagreeing would reject `Color(other, alpha=0.5)`.
                 if alpha is None:
                     alpha = value.alpha
             else:
@@ -1544,8 +1500,7 @@ class Color:
                 if carried is not None:
                     alpha = _alpha_from(alpha, carried[1], carried[0])
         elif source == "pick_for":
-            ## Taken as HSL rather than through `.web`, which quantised the
-            ## picked colour to 8 bits per channel by way of a string.
+            ## HSL rather than `.web`, which quantised to 8 bits per channel.
             self.hsl = picker(pick_key(value)).hsl
         else:
             self.hsl = _KEYWORD_INPUTS[source](value)
@@ -1553,7 +1508,6 @@ class Color:
             if scale is not None:
                 alpha = _alpha_from(alpha, value[3] / scale, source)
 
-        # set attributes
         self.equality = equality
         self.alpha = alpha if alpha is not None else 1.0
         _apply_property_keywords(self, kwargs)
@@ -1697,8 +1651,7 @@ class Color:
     def set_hsl(self, value: Sequence[float]) -> None:
         if not is_hsl(value):
             raise InvalidColorError("Value is not a valid HSL")
-        ## Stored as float so that every colour attribute reports floats,
-        ## whatever numeric type the caller supplied.
+        ## float, so every attribute reports floats whatever was passed in.
         self._hsl = HSLTuple(float(value[0]), float(value[1]), float(value[2]))
 
     def set_hsv(self, value: Sequence[float]) -> None:
@@ -1769,9 +1722,8 @@ class Color:
     def set_web(self, value: str) -> None:
         self.hex = web2hex(value)
 
-    ## The colour formats are properties over the accessors above, so they are
-    ## visible to type checkers, editors and dir(), and reading one is a plain
-    ## descriptor call. Those without a ``set_*`` accessor are read-only.
+    ## Properties over the accessors above, so they are visible to type
+    ## checkers, editors and dir(). Those without a ``set_*`` are read-only.
     hsl = property(get_hsl, set_hsl)
     hsv = property(get_hsv, set_hsv)
     xyz = property(get_xyz, set_xyz)
@@ -1921,8 +1873,7 @@ class Color:
         >>> Color("navy").best_text_color()
         <Color white>
         """
-        ## A str is a Sequence, so `candidates="white"` would otherwise be
-        ## read as five one-letter colours.
+        ## A str is a Sequence, so `"white"` would read as five colours.
         if isinstance(candidates, str):
             raise ValueError(
                 f"`candidates` must be a sequence of colors, not the single "
@@ -2282,8 +2233,7 @@ class Color:
         str
             A fragment of HTML.
         """
-        ## Nothing here is escaped because nothing here needs it: `web` is a
-        ## colour name or a hex string, and the rest is generated numbers.
+        ## Unescaped safely: `web` is a name or hex, the rest is numbers.
         label = self.web if self._alpha >= 1.0 else f"{self.web} / {self._alpha:g}"
         fill = self.to_css("rgb")
         if self._alpha >= 1.0:
@@ -2372,9 +2322,7 @@ class Color:
         source_alpha, backdrop_alpha = self._alpha, backdrop._alpha
         alpha = source_alpha + backdrop_alpha * (1.0 - source_alpha)
         if alpha == 0.0:
-            ## Nothing is visible, so no colour is more right than another.
-            ## The source's is kept so that the result still says where it
-            ## came from.
+            ## Nothing is visible, so keep the source's to say where it came from.
             return Color(hsl=self._hsl, alpha=0.0)
 
         encode = _linear_to_srgb if linear else lambda channel: channel
@@ -2382,9 +2330,6 @@ class Color:
         source_rgb = [decode(channel) for channel in self.rgbf]
         backdrop_rgb = [decode(channel) for channel in backdrop.rgbf]
 
-        ## The blend itself, which is where the two kinds part company: a
-        ## separable mode is applied to each channel independently, while a
-        ## non-separable one reads all three at once.
         if name in _NONSEPARABLE_BLEND_MODES:
             blended_rgb: Sequence[float] = _NONSEPARABLE_BLEND_MODES[name](
                 backdrop_rgb, source_rgb
@@ -2400,9 +2345,8 @@ class Color:
         for source, back, blended_channel in zip(
             source_rgb, backdrop_rgb, blended_rgb, strict=True
         ):
-            ## The backdrop shows through the blend in proportion to how
-            ## opaque it is: with nothing behind, there is nothing to blend
-            ## with and the source passes through unchanged.
+            ## The backdrop shows through in proportion to its opacity, so
+            ## with nothing behind the source passes through unchanged.
             blended = (1.0 - backdrop_alpha) * source + backdrop_alpha * blended_channel
             mixed = blended * source_alpha + back * backdrop_alpha * (
                 1.0 - source_alpha
@@ -2736,10 +2680,8 @@ def make_color_factory(**kwargs_defaults: Any) -> Callable[..., Color]:
     return ColorFactory
 
 
-## The accessors were called ``HSL``, ``RGB`` and ``HEX`` before 2.0. Reached
-## through the module ``__getattr__`` rather than left as globals, so that the
-## old spelling still works, says what to use instead, and -- crucially --
-## cannot be confused with the tuple types of the same name.
+## The accessors' names before 2.0. Reached through ``__getattr__`` rather
+## than left as globals, so they cannot be confused with the tuple types.
 _RENAMED_IN_2_0 = {
     "HSL": "NAMED_HSL",
     "RGB": "NAMED_RGB",

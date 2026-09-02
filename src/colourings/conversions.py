@@ -69,10 +69,8 @@ from .identify import (
 P = ParamSpec("P")
 R = TypeVar("R")
 
-## Conversions are pure functions of their arguments and return immutable
-## values, so results can be memoised and shared between callers. The cache is
-## bounded because hex and RGB inputs form a very large key space, while the
-## palette an application actually uses is typically tiny.
+## Conversions are pure, so results can be shared between callers. Bounded
+## because the key space is huge where a real palette is tiny.
 CACHE_SIZE = 1024
 
 _caches: list[Callable[[], None]] = []
@@ -129,12 +127,11 @@ def _cached(func: Callable[P, R]) -> Callable[P, R]:
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         if not kwargs:
             try:
-                ## Tuples and strings, which is what conversions are normally
-                ## given, key the cache directly and skip the work below.
+                ## Tuples and strings key the cache directly.
                 return cached(*args)
             except ColorError:
-                ## A rejected colour, not an unhashable argument. Re-raise it
-                ## rather than falling through and running the conversion twice.
+                ## A rejected colour, not an unhashable argument -- falling
+                ## through would run the conversion a second time.
                 raise
             except TypeError:
                 pass
@@ -142,9 +139,7 @@ def _cached(func: Callable[P, R]) -> Callable[P, R]:
             key_args = tuple(_hashable(a) for a in args)
             key_kwargs = {k: _hashable(v) for k, v in kwargs.items()}
         except TypeError:
-            ## An argument that cannot be a cache key at all is passed straight
-            ## through, so the conversion still raises its own error rather than
-            ## one from the cache.
+            ## Unkeyable, so the conversion raises its own error, not the cache's.
             return func(*args, **kwargs)
         return cached(*key_args, **key_kwargs)
 
@@ -543,11 +538,6 @@ def _rgbf2hsl(r: float, g: float, b: float) -> HSL:
     if diff < FLOAT_ERROR:  ## This is a gray, no chroma...
         return HSL(0.0, 0.0, _threshold(_l * 100.0))
 
-    ##
-    ## Chromatic data...
-    ##
-
-    ## Saturation
     s = diff / vsum if _l < 0.5 else diff / (2.0 - vsum)
 
     dr = (((vmax - r) / 6) + (diff / 2)) / diff
@@ -819,16 +809,15 @@ def hex2web(hex: str) -> str:
     ## Table keys are whole numbers, so truncate before looking the color up.
     dec_rgb = RGB(float(int(rgb[0])), float(int(rgb[1])), float(int(rgb[2])))
     if dec_rgb in RGB_TO_COLOR_NAMES:
-        ## take the first one
         color_name = RGB_TO_COLOR_NAMES[dec_rgb][0]
-        ## Enforce full lowercase for single worded color name.
+        ## Single-word names are lowercased; CamelCase ones keep their case.
         return (
             color_name
             if len(re.sub(r"[^A-Z]", "", color_name)) > 1
             else color_name.lower()
         )
 
-    # Hex format is verified by hex2rgb function. And should be 3 or 6 digit
+    ## hex2rgb above has verified the format, so this is the 6-digit form.
     if len(hex) == 7 and hex[1] == hex[2] and hex[3] == hex[4] and hex[5] == hex[6]:
         return "#" + hex[1] + hex[3] + hex[5]
     return hex
@@ -1594,19 +1583,14 @@ def rgb2oklab(rgb: Sequence[int | float]) -> OKLAB:
     if not is_rgb(rgb):
         raise InvalidColorError("Input is not an RGB type.")
     linear = [_srgb_to_linear(c) for c in rgb2rgbf(rgb)]
-    ## Every coefficient of the matrix is positive and every linear channel is
-    ## non-negative, so the cube roots below never see a negative base. They
-    ## are wrapped in ``float`` because ``**`` is typed as possibly returning
-    ## ``complex``.
+    ## The matrix is all-positive and the channels non-negative, so no cube
+    ## root sees a negative base. ``float`` because ``**`` may type as complex.
     roots = [float(c ** (1 / 3)) for c in _matrix_apply(RGB_TO_LMS_MATRIX, linear)]
     lightness, a, b = _matrix_apply(LMS_TO_OKLAB_MATRIX, roots)
-    ## a and b deliberately skip _threshold. Oklab's chroma axes are two orders
-    ## of magnitude shorter than L*a*b*'s, so FLOAT_ERROR sits above the
-    ## residual a grey leaves behind rather than below it, and clamping that to
-    ## zero costs 2.6e-5 of a channel on the way back -- eight orders of
-    ## magnitude more than the arithmetic itself loses. oklab2oklch zeroes the
-    ## hue of an achromatic colour instead, which is where a hue read off
-    ## floating-point noise would actually be visible.
+    ## a and b deliberately skip _threshold: Oklab's chroma axes are 100x
+    ## shorter than L*a*b*'s, so FLOAT_ERROR sits above a grey's residual and
+    ## clamping costs 2.6e-5 of a channel. oklab2oklch zeroes the hue of an
+    ## achromatic colour instead, where the noise would actually show.
     return OKLAB(_threshold(lightness), float(a), float(b))
 
 
@@ -1651,9 +1635,8 @@ def oklab2oklch(oklab: Sequence[int | float]) -> OKLCH:
         raise InvalidColorError("Input is not an OKLAB type.")
     chroma = math.hypot(oklab[1], oklab[2])
     if chroma < FLOAT_ERROR:
-        ## An achromatic colour has no hue, and below FLOAT_ERROR the angle is
-        ## just the direction of the noise left in a and b. Report zero rather
-        ## than an arbitrary hue that a caller might interpolate through.
+        ## Below FLOAT_ERROR the angle is just the direction of the noise, and
+        ## a caller might interpolate through whatever hue it reported.
         return OKLCH(_threshold(oklab[0]), 0.0, 0.0)
     hue = math.degrees(math.atan2(oklab[2], oklab[1])) % 360.0
     return OKLCH(_threshold(oklab[0]), _threshold(chroma), _threshold(hue))
@@ -2149,29 +2132,19 @@ def _unclamped_rgbf_from_yuv(yuv: Sequence[int | float]) -> tuple[float, ...]:
     return (r, g, b)
 
 
-## The wide-gamut RGB spaces CSS's `color()` can name, and CIE XYZ as CSS
-## scales it, with Y of 1 rather than this module's 100.
+## The wide-gamut spaces CSS's `color()` names, plus CIE XYZ as CSS scales it
+## (Y of 1, not this module's 100).
 ##
-## Every constant comes from the sample code in CSS Color 4 section 17, which
-## states them as exact rationals. The three matrices here are each the product
-## of that section's `lin_<space>_to_XYZ` and its `XYZ_to_lin_sRGB`, multiplied
-## out in exact arithmetic and rounded once at the end rather than twice.
+## Each is the product of CSS Color 4 section 17's `lin_<space>_to_XYZ` and its
+## `XYZ_to_lin_sRGB`, multiplied out in exact rationals and rounded once.
+## Checked twice over: white survives every matrix exactly, and each was
+## re-derived from the space's published chromaticities to machine precision.
 ##
-## Each was checked two ways. Every one of these spaces is D65, so white must
-## survive the matrix, and in rational arithmetic it does exactly. And each
-## `lin_<space>_to_XYZ` was re-derived from the space's published chromaticities
-## by the usual construction and agreed with the specification's rationals to
-## machine precision -- a second, independent route to the same nine numbers.
+## The a98 middle row really is (0, 1, 0) -- sRGB and Adobe RGB 1998 share
+## their red and blue primaries and differ only in green.
 ##
-## The a98 matrix looks wrong at a glance, its middle row being exactly
-## (0, 1, 0). It is not: sRGB and Adobe RGB 1998 share their red and blue
-## primaries and differ only in green, so most of the transform cancels. The
-## chromaticity derivation reproduces that row too.
-##
-## RGB_TO_XYZ_MATRIX above is deliberately not used for any of this. It is the
-## familiar seven-digit matrix and differs from the specification's exact values
-## in the fifth decimal, so routing `color()` through it would quietly mix two
-## definitions of XYZ.
+## RGB_TO_XYZ_MATRIX above is deliberately unused: it is the seven-digit one
+## and differs in the fifth decimal, so it would mix two definitions of XYZ.
 LINEAR_P3_TO_LINEAR_SRGB = (
     (1.2249401762805598, -0.22494017628055996, 0.0),
     (-0.042056954709688163, 1.0420569547096881, 0.0),
@@ -2232,8 +2205,6 @@ def _rec2020_to_linear(channel: float) -> float:
     return math.copysign(abs(channel) ** 2.4, channel)
 
 
-## Each wide-gamut space, as the transfer function that linearises it and the
-## matrix that takes it to linear sRGB.
 _WIDE_GAMUT_RGB: dict[
     str, tuple[Callable[[float], float], tuple[tuple[float, ...], ...]]
 ] = {
@@ -2308,8 +2279,7 @@ _UNCLAMPED_RGBF_FROM: dict[
     "oklab": _unclamped_rgbf_from_oklab,
     "oklch": lambda oklch: _unclamped_rgbf_from_oklab(oklch2oklab(oklch)),
     "yuv": _unclamped_rgbf_from_yuv,
-    ## CSS's `color()` spaces. srgb and srgb-linear are absent on purpose:
-    ## their own ranges bound them, so they cannot leave the gamut.
+    ## srgb and srgb-linear are absent because their ranges bound them.
     "display-p3": lambda values: _unclamped_rgbf_from_wide_gamut("display-p3", values),
     "a98-rgb": lambda values: _unclamped_rgbf_from_wide_gamut("a98-rgb", values),
     "rec2020": lambda values: _unclamped_rgbf_from_wide_gamut("rec2020", values),
