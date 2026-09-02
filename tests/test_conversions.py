@@ -733,6 +733,37 @@ def test_in_srgb_gamut_rejects_colours_srgb_cannot_show(space, value):
     assert not in_srgb_gamut(value, space)
 
 
+@pytest.mark.parametrize(
+    ("space", "inside", "outside"),
+    [
+        ## The wide-gamut spaces CSS's color() names. Each has a redder red
+        ## than sRGB can show, which is what makes it wide.
+        ("display-p3", (0.4, 0.5, 0.6), (1.0, 0.0, 0.0)),
+        ("a98-rgb", (0.4, 0.5, 0.6), (1.0, 0.0, 0.0)),
+        ("rec2020", (0.4, 0.5, 0.6), (1.0, 0.0, 0.0)),
+        ## CSS's XYZ, with Y of 1 for white where `xyz` here uses 100.
+        ("xyz-d65", (0.9504559270516716, 1.0, 1.0890577507598784), (0.0, 0.0, 1.1)),
+    ],
+)
+def test_in_srgb_gamut_answers_for_the_css_color_function_spaces(
+    space, inside, outside
+):
+    """The question `color()` makes a caller want to ask. A wide-gamut value
+    is converted and clipped, and nothing in the resulting `Color` records
+    that -- so it has to be asked before converting."""
+    assert in_srgb_gamut(inside, space)
+    assert not in_srgb_gamut(outside, space)
+
+
+@pytest.mark.parametrize("space", ["display-p3", "a98-rgb", "rec2020", "xyz-d65"])
+@pytest.mark.parametrize("value", [(0.5, 0.5), (0.5, 0.5, 0.5, 0.5), ()])
+def test_in_srgb_gamut_refuses_the_wrong_number_of_components(space, value):
+    """CSS allows components outside [0, 1] in these spaces, so the length is
+    the only thing left to check -- and it is still worth checking."""
+    with pytest.raises(InvalidColorError, match="Input is not"):
+        in_srgb_gamut(value, space)
+
+
 def test_in_srgb_gamut_agrees_with_what_the_conversion_does():
     """The predicate has to answer the question it is asked: was this clipped."""
     for lightness in range(0, 101, 10):

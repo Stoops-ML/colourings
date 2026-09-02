@@ -25,9 +25,15 @@ from collections.abc import Callable, Sequence
 
 ## `_cached` rather than lru_cache, so `clear_caches` reaches these too.
 from .conversions import (
+    LINEAR_A98_TO_LINEAR_SRGB,
+    LINEAR_P3_TO_LINEAR_SRGB,
+    LINEAR_REC2020_TO_LINEAR_SRGB,
+    XYZ_D65_TO_LINEAR_SRGB,
+    _a98_to_linear,
     _cached,
     _linear_to_srgb,
     _matrix_apply,
+    _rec2020_to_linear,
     _srgb_to_linear,
     hsl2oklch,
     hsl2rgb,
@@ -357,50 +363,30 @@ def normalize_mix_percentages(
     return filled, leftover
 
 
-## The predefined color spaces `color()` can name. Every constant below comes
-## from the sample code in CSS Color 4 section 17, which gives them as exact
-## rationals rather than as decimals; the display-p3 matrix is the product of
-## that section's `lin_P3_to_XYZ` and `XYZ_to_lin_sRGB`, multiplied out in
-## exact arithmetic and rounded once at the end.
-##
-## Both were checked by sending white through them. display-p3, sRGB and XYZ
-## here are all D65, so (1, 1, 1) and D65 white must come back as exactly
-## (1, 1, 1) -- in rational arithmetic, before any rounding -- and they do.
-##
-## The package's own RGB_TO_XYZ_MATRIX is deliberately not used for this: it is
-## the familiar seven-digit one and differs from the specification's exact
-## values in the fifth decimal, so routing `color()` through it would mix two
-## slightly different definitions of XYZ.
-LINEAR_P3_TO_LINEAR_SRGB = (
-    (1.2249401762805598, -0.22494017628055996, 0.0),
-    (-0.042056954709688163, 1.0420569547096881, 0.0),
-    (-0.019637554590334432, -0.078636045550631889, 1.0982736001409663),
-)
-XYZ_D65_TO_LINEAR_SRGB = (
-    (3.2409699419045213, -1.5373831775700935, -0.49861076029300327),
-    (-0.96924363628087984, 1.8759675015077206, 0.041555057407175612),
-    (0.055630079696993608, -0.20397695888897657, 1.0569715142428786),
-)
-
-## Each space says how to get from its components to *linear* sRGB; the tail of
-## the conversion is shared. display-p3 uses sRGB's own transfer function,
-## which the specification states rather than leaves to be inferred.
+## How each `color()` space reaches linear sRGB. The matrices and transfer
+## functions live with the other conversions; what is here is only which
+## keyword means which of them.
 _PREDEFINED_SPACES: dict[str, Callable[[Sequence[float]], Sequence[float]]] = {
     "srgb": lambda values: [_srgb_to_linear(value) for value in values],
     "srgb-linear": list,
     "display-p3": lambda values: _matrix_apply(
         LINEAR_P3_TO_LINEAR_SRGB, [_srgb_to_linear(value) for value in values]
     ),
+    "a98-rgb": lambda values: _matrix_apply(
+        LINEAR_A98_TO_LINEAR_SRGB, [_a98_to_linear(value) for value in values]
+    ),
+    "rec2020": lambda values: _matrix_apply(
+        LINEAR_REC2020_TO_LINEAR_SRGB, [_rec2020_to_linear(value) for value in values]
+    ),
     "xyz": lambda values: _matrix_apply(XYZ_D65_TO_LINEAR_SRGB, values),
     "xyz-d65": lambda values: _matrix_apply(XYZ_D65_TO_LINEAR_SRGB, values),
 }
 
-## The rest of the specification's list. `a98-rgb` and `rec2020` each need a
-## transfer function of their own; `prophoto-rgb` and `xyz-d50` are relative to
-## D50 and need a chromatic adaptation this package does not have. Named here
-## so that asking for one says what is missing rather than that the color
-## cannot be identified.
-_UNSUPPORTED_SPACES = ("a98-rgb", "prophoto-rgb", "rec2020", "xyz-d50")
+## What is left of the specification's list. Both are relative to D50, so
+## reading them needs a chromatic adaptation this package does not have --
+## new machinery rather than another constant. Named here so that asking for
+## one says what is missing rather than that the color cannot be identified.
+_UNSUPPORTED_SPACES = ("prophoto-rgb", "xyz-d50")
 
 ## Every function name this module reads. `color()` is not in `_CSS_FUNCTIONS`
 ## because it takes a space keyword where the others take a first component, so

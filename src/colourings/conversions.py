@@ -2149,6 +2149,156 @@ def _unclamped_rgbf_from_yuv(yuv: Sequence[int | float]) -> tuple[float, ...]:
     return (r, g, b)
 
 
+## The wide-gamut RGB spaces CSS's `color()` can name, and CIE XYZ as CSS
+## scales it, with Y of 1 rather than this module's 100.
+##
+## Every constant comes from the sample code in CSS Color 4 section 17, which
+## states them as exact rationals. The three matrices here are each the product
+## of that section's `lin_<space>_to_XYZ` and its `XYZ_to_lin_sRGB`, multiplied
+## out in exact arithmetic and rounded once at the end rather than twice.
+##
+## Each was checked two ways. Every one of these spaces is D65, so white must
+## survive the matrix, and in rational arithmetic it does exactly. And each
+## `lin_<space>_to_XYZ` was re-derived from the space's published chromaticities
+## by the usual construction and agreed with the specification's rationals to
+## machine precision -- a second, independent route to the same nine numbers.
+##
+## The a98 matrix looks wrong at a glance, its middle row being exactly
+## (0, 1, 0). It is not: sRGB and Adobe RGB 1998 share their red and blue
+## primaries and differ only in green, so most of the transform cancels. The
+## chromaticity derivation reproduces that row too.
+##
+## RGB_TO_XYZ_MATRIX above is deliberately not used for any of this. It is the
+## familiar seven-digit matrix and differs from the specification's exact values
+## in the fifth decimal, so routing `color()` through it would quietly mix two
+## definitions of XYZ.
+LINEAR_P3_TO_LINEAR_SRGB = (
+    (1.2249401762805598, -0.22494017628055996, 0.0),
+    (-0.042056954709688163, 1.0420569547096881, 0.0),
+    (-0.019637554590334432, -0.078636045550631889, 1.0982736001409663),
+)
+LINEAR_A98_TO_LINEAR_SRGB = (
+    (1.3983557439607783, -0.39835574396077827, 0.0),
+    (0.0, 1.0, 0.0),
+    (0.0, -0.042928989294473266, 1.0429289892944733),
+)
+LINEAR_REC2020_TO_LINEAR_SRGB = (
+    (1.6604910021084345, -0.58764113878854951, -0.072849863319884883),
+    (-0.12455047452159074, 1.1328998971259603, -0.0083494226043694768),
+    (-0.018150763354905303, -0.10057889800800739, 1.1187296613629127),
+)
+XYZ_D65_TO_LINEAR_SRGB = (
+    (3.2409699419045213, -1.5373831775700935, -0.49861076029300327),
+    (-0.96924363628087984, 1.8759675015077206, 0.041555057407175612),
+    (0.055630079696993608, -0.20397695888897657, 1.0569715142428786),
+)
+
+
+def _a98_to_linear(channel: float) -> float:
+    """a98-rgb's transfer function: a single power, with the sign kept.
+
+    Parameters
+    ----------
+    channel : float
+        A gamma-encoded a98-rgb channel. Values outside ``[0, 1]`` are allowed
+        by CSS and are handled, which is why the sign is carried separately.
+
+    Returns
+    -------
+    float
+        The channel in linear light.
+    """
+    return math.copysign(abs(channel) ** (563.0 / 256.0), channel)
+
+
+def _rec2020_to_linear(channel: float) -> float:
+    """Rec.2020's transfer function *as CSS defines it*.
+
+    A plain 2.4 power, which is BT.1886's electro-optical function with black
+    lift 0 and gain 1 -- and not Rec.2020's own piecewise camera curve with its
+    alpha and beta constants. The specification is explicit about which of the
+    two it means, and they are not the same function.
+
+    Parameters
+    ----------
+    channel : float
+        A gamma-encoded rec2020 channel.
+
+    Returns
+    -------
+    float
+        The channel in linear light.
+    """
+    return math.copysign(abs(channel) ** 2.4, channel)
+
+
+## Each wide-gamut space, as the transfer function that linearises it and the
+## matrix that takes it to linear sRGB.
+_WIDE_GAMUT_RGB: dict[
+    str, tuple[Callable[[float], float], tuple[tuple[float, ...], ...]]
+] = {
+    "display-p3": (_srgb_to_linear, LINEAR_P3_TO_LINEAR_SRGB),
+    "a98-rgb": (_a98_to_linear, LINEAR_A98_TO_LINEAR_SRGB),
+    "rec2020": (_rec2020_to_linear, LINEAR_REC2020_TO_LINEAR_SRGB),
+}
+
+
+def _unclamped_rgbf_from_wide_gamut(
+    space: str, values: Sequence[int | float]
+) -> tuple[float, ...]:
+    """Gamma-encoded sRGB channels for a wide-gamut RGB colour, clamping none.
+
+    Parameters
+    ----------
+    space : str
+        A key of :data:`_WIDE_GAMUT_RGB`.
+    values : Sequence[int | float]
+        The three channels, gamma-encoded in that space. CSS allows values
+        outside ``[0, 1]``, so none is rejected for being out of range.
+
+    Returns
+    -------
+    tuple[float, ...]
+        sRGB channels, which fall outside ``[0, 1]`` when the colour does not
+        fit the sRGB gamut.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when there are not three channels.
+    """
+    if len(values) != 3:
+        raise InvalidColorError(f"Input is not a {space} type.")
+    to_linear, matrix = _WIDE_GAMUT_RGB[space]
+    linear = _matrix_apply(matrix, [to_linear(float(value)) for value in values])
+    return tuple(_encode_unclamped(channel) for channel in linear)
+
+
+def _unclamped_rgbf_from_xyz_d65(xyz: Sequence[int | float]) -> tuple[float, ...]:
+    """Gamma-encoded sRGB channels for CSS-scaled XYZ, clamping nothing.
+
+    Parameters
+    ----------
+    xyz : Sequence[int | float]
+        X, Y and Z with Y of 1 for white, which is CSS's scaling rather than
+        this module's 100.
+
+    Returns
+    -------
+    tuple[float, ...]
+        sRGB channels, unclamped.
+
+    Raises
+    ------
+    InvalidColorError
+        Raised when there are not three components.
+    """
+    if len(xyz) != 3:
+        raise InvalidColorError("Input is not an XYZ type.")
+    linear = _matrix_apply(XYZ_D65_TO_LINEAR_SRGB, [float(value) for value in xyz])
+    return tuple(_encode_unclamped(channel) for channel in linear)
+
+
 _UNCLAMPED_RGBF_FROM: dict[
     str, Callable[[Sequence[int | float]], tuple[float, ...]]
 ] = {
@@ -2158,6 +2308,12 @@ _UNCLAMPED_RGBF_FROM: dict[
     "oklab": _unclamped_rgbf_from_oklab,
     "oklch": lambda oklch: _unclamped_rgbf_from_oklab(oklch2oklab(oklch)),
     "yuv": _unclamped_rgbf_from_yuv,
+    ## CSS's `color()` spaces. srgb and srgb-linear are absent on purpose:
+    ## their own ranges bound them, so they cannot leave the gamut.
+    "display-p3": lambda values: _unclamped_rgbf_from_wide_gamut("display-p3", values),
+    "a98-rgb": lambda values: _unclamped_rgbf_from_wide_gamut("a98-rgb", values),
+    "rec2020": lambda values: _unclamped_rgbf_from_wide_gamut("rec2020", values),
+    "xyz-d65": _unclamped_rgbf_from_xyz_d65,
 }
 
 
@@ -2167,7 +2323,10 @@ def in_srgb_gamut(
     """Check whether a color is one sRGB can show, and so survives conversion.
 
     ``lab``, ``lch``, ``oklab``, ``oklch``, ``xyz`` and ``yuv`` all address
-    colors outside sRGB. Such a value is accepted by ``Color`` and by the
+    colors outside sRGB, and so do the wide-gamut spaces CSS's ``color()``
+    names: ``display-p3``, ``a98-rgb``, ``rec2020`` and ``xyz-d65``. That last
+    is CIE XYZ with Y of 1 for white, as CSS scales it, where ``xyz`` here is
+    the same space with Y of 100. Such a value is accepted by ``Color`` and by the
     conversions, and then **clipped** -- the color that comes back is not the
     one that went in, and nothing says so. Ask this first to find out. The
     check has to happen here rather than on a finished ``Color``, which cannot
@@ -2186,7 +2345,8 @@ def in_srgb_gamut(
         Components of the color, in the space named by ``space``.
     space : str
         Space the components are in: ``"lab"``, ``"lch"``, ``"oklab"``,
-        ``"oklch"``, ``"xyz"`` or ``"yuv"``.
+        ``"oklch"``, ``"xyz"``, ``"yuv"``, ``"display-p3"``, ``"a98-rgb"``,
+        ``"rec2020"`` or ``"xyz-d65"``.
     tolerance : float, default=0.5
         How far outside the representable range a channel may fall, in 8-bit
         levels. Pass ``0`` to test the gamut exactly.
@@ -2200,7 +2360,7 @@ def in_srgb_gamut(
     Raises
     ------
     ValueError
-        Raised when ``space`` is not one of the six that can leave the gamut.
+        Raised when ``space`` is not one that can leave the gamut.
     InvalidColorError
         Raised when ``color`` is not a valid value in ``space``.
 
@@ -2209,6 +2369,10 @@ def in_srgb_gamut(
     >>> in_srgb_gamut((53.2408, 80.0925, 67.2032), "lab")
     True
     >>> in_srgb_gamut((100, 120, -120), "lab")
+    False
+    >>> in_srgb_gamut((0.4, 0.5, 0.6), "display-p3")
+    True
+    >>> in_srgb_gamut((0.2, 0.5, 0.7), "display-p3")
     False
     """
     if space not in _UNCLAMPED_RGBF_FROM:

@@ -110,6 +110,8 @@ places really does fall outside and is reported as such.
 Every other format — `rgb`, `hsl`, `hsv`, `cmyk`, `hex`, `web` and their
 variants — is bounded by its own ranges, so it is representable by construction
 and converts exactly. `in_srgb_gamut` raises `ValueError` if asked about one.
+It also answers for the wide-gamut spaces `color()` reads — `display-p3`,
+`a98-rgb`, `rec2020` and `xyz-d65`.
 
 ## Constructing Colors
 
@@ -499,31 +501,33 @@ them against D50, which is the difference the conversions already carry.
 
 ```python
 Color("color(srgb 0.2 0.5 0.7)")  # <Color #337fb2>
-Color("color(display-p3 0.2 0.5 0.7)")  # <Color #0082b7>, converted
+Color("color(display-p3 0.4 0.5 0.6)")  # <Color #5f809c>
+Color("color(rec2020 0.3 0.5 0.6)")  # <Color #007d97>
 Color("color(xyz 0.9504559270516716 1 1.0890577507598784)")  # <Color white>
 Color("color(srgb 1 0 0 / 50%)").alpha  # 0.5
 ```
 
-Read: `srgb`, `srgb-linear`, `display-p3`, `xyz` and `xyz-d65`. Components may
-be numbers or percentages, with `100%` meaning 1 in all of them.
+Read: `srgb`, `srgb-linear`, `display-p3`, `a98-rgb`, `rec2020`, `xyz` and
+`xyz-d65`. Components may be numbers or percentages, with `100%` meaning 1 in
+all of them, and values outside `[0, 1]` are allowed as CSS allows them.
 
-**A wide-gamut color is converted, and clipped if it does not fit.**
-`display-p3` covers more than sRGB, and a `Color` holds sRGB, so a P3 value
-inside sRGB converts exactly while one outside it lands on the edge:
+**A wide-gamut color is converted, and clipped if it does not fit.** These
+spaces reach colors sRGB cannot show, and a `Color` holds sRGB, so a value
+that fits converts exactly and one that does not lands on the edge — the same
+rule as every other out-of-gamut input here. **Ask before trusting one:**
 
 ```python
-Color("color(display-p3 1 0 0)") == Color("red")  # True — clipped
+in_srgb_gamut((0.4, 0.5, 0.6), "display-p3")  # True, converts exactly
+in_srgb_gamut((0.2, 0.5, 0.7), "display-p3")  # False, its red is -0.083
+in_srgb_gamut((1, 0, 0), "rec2020")  # False, far outside
 ```
 
-That is the same rule as every other out-of-gamut input here, and the reason
-`in_srgb_gamut` exists. It is worth knowing before treating a `color()` value
-as faithful, because clipping is the one case where this library returns a
-different color rather than raising — it is what CSS itself specifies for
-display.
+The second is worth a look: it seems a modest color and is outside sRGB. A
+finished `Color` cannot answer this, because by then the clipping has already
+happened — which is why the question is asked of the components.
 
-`a98-rgb`, `prophoto-rgb`, `rec2020` and `xyz-d50` raise, naming themselves.
-The first two need a transfer function each; the last two are relative to D50
-and need a chromatic adaptation this library does not have.
+`prophoto-rgb` and `xyz-d50` raise, naming themselves. Both are relative to
+D50, and reading them needs a chromatic adaptation this library does not have.
 
 ## Adjusting a Color
 

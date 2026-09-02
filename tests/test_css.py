@@ -2,7 +2,7 @@
 
 import pytest
 
-from colourings import Color
+from colourings import Color, in_srgb_gamut
 from colourings.conversions import hex2rgba, rgba2hex
 from colourings.css import (
     CSS_FUNCTION_NAMES,
@@ -385,13 +385,71 @@ def test_white_is_white_in_every_space_that_is_read(text):
 
 
 def test_a_display_p3_colour_inside_srgb_is_converted_rather_than_clipped():
-    """P3 covers sRGB, so a modest P3 value has an exact sRGB answer. If the
-    matrix were wrong this would still produce *a* colour, which is why the
-    matrix is checked separately above."""
-    inside = Color("color(display-p3 0.2 0.5 0.7)")
-    assert inside.hex_l == "#0082b7"
-    ## And it is genuinely a conversion: the same numbers read as sRGB differ.
-    assert inside != Color("color(srgb 0.2 0.5 0.7)")
+    """P3 covers sRGB, so a P3 value that fits has an exact sRGB answer -- and
+    a converted one, not the same numbers read differently.
+
+    The value matters. `display-p3 0.2 0.5 0.7` looks modest and is *outside*
+    sRGB: its red comes out at -0.083 and is clipped to zero. That was written
+    into an earlier version of this test as an example of conversion, and
+    `in_srgb_gamut` is what caught it.
+    """
+    inside = (0.4, 0.5, 0.6)
+    assert in_srgb_gamut(inside, "display-p3")
+    written = " ".join(str(value) for value in inside)
+    converted = Color(f"color(display-p3 {written})")
+    assert converted != Color(f"color(srgb {written})")
+    ## Nothing was clipped, so every channel is strictly inside the range.
+    assert all(0.0 < channel < 1.0 for channel in converted.rgbf)
+
+
+@pytest.mark.parametrize("level", [0.0, 0.25, 0.5, 0.75, 1.0])
+@pytest.mark.parametrize("space", ["display-p3", "a98-rgb", "rec2020"])
+def test_a_grey_stays_a_grey_in_every_one_of_these_spaces(space, level):
+    """All of these share sRGB's white point, so a neutral must stay neutral.
+    It is the sharpest check available on a matrix: a grey exercises all nine
+    coefficients and any imbalance between the rows shows up as a colour cast
+    on something that should have none."""
+    grey = f"{level} {level} {level}"
+    channels = Color(f"color({space} {grey})").rgbf
+    assert channels[0] == pytest.approx(channels[1], abs=1e-9)
+    assert channels[1] == pytest.approx(channels[2], abs=1e-9)
+
+
+@pytest.mark.parametrize("level", [0.0, 0.25, 0.5, 0.75, 1.0])
+def test_a_display_p3_grey_keeps_its_value_where_the_others_do_not(level):
+    """display-p3 is the one of the three that shares sRGB's transfer
+    function, which the specification states rather than leaves to be
+    inferred, so its greys come through unchanged.
+
+    a98-rgb and rec2020 use a 563/256 and a 2.4 power instead, so their greys
+    stay neutral -- checked above -- but land on a different value. Asserting
+    they *differ* is what pins the transfer functions apart; using sRGB's for
+    all three would pass the neutrality test and fail this one.
+    """
+    grey = f"{level} {level} {level}"
+    for got, want in zip(
+        Color(f"color(display-p3 {grey})").rgbf, (level,) * 3, strict=True
+    ):
+        assert got == pytest.approx(want, abs=1e-9)
+    if 0.0 < level < 1.0:
+        assert Color(f"color(rec2020 {grey})") != Color(f"color(display-p3 {grey})")
+
+
+@pytest.mark.parametrize(
+    ("space", "value"),
+    [
+        ("display-p3", (1.0, 0.0, 0.0)),
+        ("a98-rgb", (1.0, 0.0, 0.0)),
+        ("rec2020", (1.0, 0.0, 0.0)),
+    ],
+)
+def test_a_wide_gamut_primary_is_reported_outside_srgb(space, value):
+    """Each of these spaces has a redder red than sRGB can show, which is what
+    makes them wide -- so `in_srgb_gamut` has to say so, and the colour that
+    comes back is the clipped one."""
+    assert not in_srgb_gamut(value, space)
+    written = " ".join(str(component) for component in value)
+    assert Color(f"color({space} {written})") == Color("red")
 
 
 def test_a_display_p3_colour_outside_srgb_is_clipped_and_says_nothing():
@@ -408,9 +466,7 @@ def test_color_carries_an_alpha():
 @pytest.mark.parametrize(
     ("text", "message"),
     [
-        ("color(rec2020 1 0 0)", "cannot read 'rec2020' yet"),
         ("color(prophoto-rgb 1 0 0)", "cannot read 'prophoto-rgb' yet"),
-        ("color(a98-rgb 1 0 0)", "cannot read 'a98-rgb' yet"),
         ("color(xyz-d50 1 1 1)", "cannot read 'xyz-d50' yet"),
         ("color(nonsense 1 0 0)", "is not a predefined color space"),
         ("color(srgb 1 0)", "takes 3 components"),
