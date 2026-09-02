@@ -1,4 +1,5 @@
 import copy
+import difflib
 import inspect
 import math
 import subprocess
@@ -14,6 +15,7 @@ from colourings.colour import (
     _KEYWORD_ALPHA_SCALES,
     _KEYWORD_INPUTS,
     _NONSEPARABLE_BLEND_MODES,
+    _SUGGESTION_CUTOFF,
     NAMED_HEX,
     NAMED_HSL,
     NAMED_RGB,
@@ -425,6 +427,126 @@ def test_bad_identify_color():
 def test_identify_color_refuses_what_it_cannot_place(value):
     with pytest.raises(UnknownColorError, match="Cannot identify color"):
         identify_color(value)
+
+
+## An unrecognised string gets a guess at what it was meant to be. The
+## suggestions come from difflib, which is in the standard library -- this
+## package has no runtime dependencies and this feature was not going to be
+## the first one.
+def test_a_misspelled_colour_name_suggests_the_name():
+    """The case the whole feature exists for."""
+    with pytest.raises(
+        UnknownColorError, match=r"Cannot identify color 'rde'\. Did you mean 'red'\?"
+    ):
+        Color("rde")
+
+
+@pytest.mark.parametrize(
+    ("typo", "expected"),
+    [
+        ("gren", "green"),
+        ("chartruese", "chartreuse"),
+        ("rebeccapurpel", "rebeccapurple"),
+        ("blakc", "black"),
+        ("yelow", "yellow"),
+        ("wihte", "white"),
+    ],
+)
+def test_a_typo_suggests_the_colour_it_is_nearly(typo, expected):
+    with pytest.raises(UnknownColorError, match=f"Did you mean.*{expected}"):
+        Color(typo)
+
+
+@pytest.mark.parametrize("name", sorted(COLOR_NAME_TO_RGB))
+def test_every_name_survives_a_dropped_character_or_a_transposition(name):
+    """Stronger than a table of typos, and it is the table's justification:
+    for every one of the 152 names, deleting any single character or swapping
+    any adjacent pair suggests the name back. Around 3000 typos in total.
+
+    Skips a typo that is itself a name -- `grey` is a character from `grexy`
+    but `gray` is a colour, and a valid name never reaches the error at all.
+    """
+    variants = {name[:i] + name[i + 1 :] for i in range(len(name))}
+    variants |= {
+        name[:i] + name[i + 1] + name[i] + name[i + 2 :] for i in range(len(name) - 1)
+    }
+    for typo in variants - set(COLOR_NAME_TO_RGB) - {name, ""}:
+        with pytest.raises(UnknownColorError, match="Cannot identify color") as raised:
+            Color(typo)
+        assert repr(name) in str(raised.value), f"{typo!r} did not suggest {name!r}"
+
+
+def test_the_cutoff_is_the_loose_one_for_a_reason():
+    """0.6 rather than 0.7, and the difference is the motivating case itself.
+    Written as a test so that raising it fails here, with the reason, instead
+    of quietly dropping the shortest names.
+    """
+    names = sorted(COLOR_NAME_TO_RGB)
+    assert difflib.get_close_matches("rde", names, cutoff=_SUGGESTION_CUTOFF) == ["red"]
+    assert difflib.get_close_matches("rde", names, cutoff=0.7) == []
+
+
+@pytest.mark.parametrize(
+    "nonsense", ["xyzzy", "definitely-not-a-colour", "nope", "z", "----"]
+)
+def test_something_unlike_any_colour_is_offered_nothing(nonsense):
+    """A suggestion for everything would be worse than none: the message has
+    to stay trustworthy when it does make one."""
+    with pytest.raises(UnknownColorError, match="Cannot identify color") as raised:
+        Color(nonsense)
+    assert "Did you mean" not in str(raised.value)
+
+
+def test_at_most_three_suggestions_are_offered():
+    """`gren` is near a dozen names. A list of them all would be noise."""
+    with pytest.raises(UnknownColorError) as raised:
+        Color("gren")
+    assert str(raised.value).count("'") <= 2 + 2 * 3  # the input, plus three names
+
+
+@pytest.mark.parametrize(
+    ("typed", "expected"),
+    [("rbg(1 2 3)", "rgb"), ("hsi(0 1% 2%)", "hsl"), ("okclh(0.5 0.1 200)", "oklch")],
+)
+def test_an_unknown_colour_function_suggests_the_function(typed, expected):
+    """A near miss on the function name, which is a different table from the
+    colour names and reads differently in the message."""
+    with pytest.raises(UnknownColorError, match="no color function called") as raised:
+        Color(typed)
+    assert repr(expected) in str(raised.value)
+
+
+def test_an_unknown_function_with_no_near_name_says_only_that():
+    with pytest.raises(UnknownColorError, match="no color function called") as raised:
+        Color("nonsense(1 2 3)")
+    assert "Did you mean" not in str(raised.value)
+
+
+@pytest.mark.parametrize(("typed", "digits"), [("#ff000", 5), ("#ff00000", 7)])
+def test_a_hex_colour_of_the_wrong_length_says_which_lengths_work(typed, digits):
+    """3, 4, 6 and 8 all parse, so 5 and 7 are the only lengths that reach
+    here -- and the count is the useful thing to say."""
+    with pytest.raises(UnknownColorError, match="3, 4, 6 or 8 digits") as raised:
+        Color(typed)
+    assert f"has {digits}" in str(raised.value)
+
+
+def test_a_hash_string_that_is_not_hex_at_all_is_not_told_about_lengths():
+    """`#zzzz` is the wrong characters, not the wrong count, and saying
+    "this has 4" would be actively misleading -- 4 is a valid length."""
+    with pytest.raises(UnknownColorError, match="Cannot identify color") as raised:
+        Color("#zzzz")
+    assert "digits" not in str(raised.value)
+
+
+@pytest.mark.parametrize("value", [[1, 2], (1, 2, 3, 4, 5)])
+def test_a_value_that_is_not_a_string_gets_the_plain_message(value):
+    """Suggestions are a string affair; there is nothing to compare a sequence
+    of the wrong length against. A sequence rather than an arbitrary object,
+    so the call still matches the signature."""
+    with pytest.raises(UnknownColorError, match="Cannot identify color") as raised:
+        identify_color(value)
+    assert "Did you mean" not in str(raised.value)
 
 
 ## CSS system colours are real keywords that this library resolves to nothing,

@@ -920,8 +920,22 @@ try:
     Color(user_input)
 except ColorError as e:
     print(f"not a color: {e}")
-# not a color: Cannot identify color.
+# not a color: Cannot identify color 'chartruese'. Did you mean 'chartreuse'?
 ```
+
+That suggestion is not only for names. A string that is nearly a color gets
+told what it is nearly:
+
+| typed | said |
+| --- | --- |
+| `rde` | `Did you mean 'red'?` |
+| `gren` | `Did you mean 'green', 'grey' or 'seagreen'?` |
+| `rbg(1 2 3)` | `There is no color function called 'rbg'. Did you mean 'rgb'?` |
+| `#ff000` | `A hexadecimal color takes 3, 4, 6 or 8 digits, and this has 5.` |
+| `xyzzy` | nothing beyond `Cannot identify color 'xyzzy'.` |
+
+Nothing is offered unless it is close, since a suggestion for everything would
+make the ones worth reading harder to trust. At most three are given.
 
 The subclasses say what went wrong:
 

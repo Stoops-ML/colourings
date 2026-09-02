@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import difflib
 import hashlib
 import math
+import string
 import warnings
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Iterable, Sequence
 from typing import Any, Protocol
 
 from .conversions import (
@@ -50,7 +52,7 @@ from .conversions import (
     xyz2hsl,
     yuv2hsl,
 )
-from .css import css2hsl, css2hsla, hsla2css, is_css
+from .css import _CSS_FUNCTIONS, CSS_FUNCTION, css2hsl, css2hsla, hsla2css, is_css
 
 ## The colour tuple types keep the ``*Tuple`` names, uniformly, so that nothing
 ## in this module is called ``HSL`` or ``RGB`` -- the names the accessors below
@@ -675,6 +677,85 @@ _SEQUENCE_FORMATS: tuple[
 )
 
 
+## How close a name has to be before it is worth suggesting. This is also
+## difflib's own default, but it is written out because it is load-bearing
+## rather than incidental: at 0.7 every other typo below still matches, and
+## `rde` -> `red` does not. Three letters leave a transposition very little to
+## match on, and `rde` is the case suggestions exist for.
+_SUGGESTION_CUTOFF = 0.6
+_SUGGESTIONS = 3
+
+
+def _did_you_mean(word: str, candidates: Iterable[str]) -> str:
+    """Phrase the nearest candidates as a question, or say nothing.
+
+    Parameters
+    ----------
+    word : str
+        What was typed.
+    candidates : Iterable[str]
+        The names it might have been meant to be.
+
+    Returns
+    -------
+    str
+        A sentence to append to a message, beginning with a space, or ``""``
+        when nothing is near enough to be worth offering.
+    """
+    matches = [
+        repr(match)
+        for match in difflib.get_close_matches(
+            word, sorted(candidates), n=_SUGGESTIONS, cutoff=_SUGGESTION_CUTOFF
+        )
+    ]
+    if not matches:
+        return ""
+    listed = (
+        matches[0]
+        if len(matches) == 1
+        else f"{', '.join(matches[:-1])} or {matches[-1]}"
+    )
+    return f" Did you mean {listed}?"
+
+
+def _suggestion_for(text: str) -> str:
+    """Guess what a string that named no color was meant to be.
+
+    Three shapes are worth guessing at, and anything else gets nothing rather
+    than a suggestion drawn from the wrong table.
+
+    Parameters
+    ----------
+    text : str
+        The value, stripped and lower-cased.
+
+    Returns
+    -------
+    str
+        A sentence to append to a message, or ``""``.
+    """
+    ## A function shape whose name is unknown. A *known* name with a malformed
+    ## body never reaches here: the parser raises about the body instead.
+    function = CSS_FUNCTION.fullmatch(text)
+    if function:
+        name = function.group(1)
+        return (
+            f" There is no color function called {name!r}."
+            f"{_did_you_mean(name, _CSS_FUNCTIONS)}"
+        )
+    if text.startswith("#"):
+        digits = text[1:]
+        ## Only about the count, and only when they really are hex digits:
+        ## `#zzzz` is the wrong characters rather than the wrong length.
+        if digits and all(digit in string.hexdigits for digit in digits):
+            return (
+                f" A hexadecimal color takes 3, 4, 6 or 8 digits, and this "
+                f"has {len(digits)}."
+            )
+        return ""
+    return _did_you_mean(text, COLOR_NAME_TO_RGB)
+
+
 def _why_it_is_not_a_colour(color: object) -> str:
     """Say why a value could not be read as a color.
 
@@ -683,6 +764,11 @@ def _why_it_is_not_a_colour(color: object) -> str:
     stating -- see :data:`~colourings.definitions.SYSTEM_COLORS`. The name is
     quoted as the specification spells it, in lower case, since that is the
     form that reaches here.
+
+    Anything else that is a string gets a guess at what it was meant to be,
+    from :func:`_suggestion_for`. System colours are not among the candidates:
+    being told to try ``Canvas`` and then told that ``Canvas`` has no value
+    would be two steps to nowhere.
 
     Parameters
     ----------
@@ -694,13 +780,16 @@ def _why_it_is_not_a_colour(color: object) -> str:
     str
         The message to raise.
     """
-    if isinstance(color, str) and color.strip().lower() in SYSTEM_COLORS:
+    if not isinstance(color, str):
+        return "Cannot identify color."
+    text = color.strip().lower()
+    if text in SYSTEM_COLORS:
         return (
-            f"{color.strip().lower()!r} is a CSS system color, whose value is "
+            f"{text!r} is a CSS system color, whose value is "
             "whatever the reader's platform and theme make it, so there is no "
             "fixed color to return. Name the color you mean instead."
         )
-    return "Cannot identify color."
+    return f"Cannot identify color {text!r}.{_suggestion_for(text)}"
 
 
 def identify_color(
