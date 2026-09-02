@@ -14,16 +14,26 @@ tooling, declared in `[dependency-groups] dev` in `pyproject.toml`.
 ```sh
 git clone https://github.com/Stoops-ML/colourings
 cd colourings
-python -m pip install -e . --group dev
+uv sync --locked
 ```
 
-`uv sync` works too, and is what the lock file is for. CI installs with pip,
-so the command above is the one guaranteed to match it.
+`uv.lock` is committed and CI installs from it with `uv sync --locked`, so that
+command gives you the same versions every job runs. `--locked` fails rather
+than resolving if the lock and `pyproject.toml` have drifted, which is what
+you want to hear about.
+
+Changing a dependency means `uv lock` in the same commit; the `uv sync` you run
+next will tell you if you forgot. `pip install -e . --group dev` still works
+and reads the same `[dependency-groups]`, but it ignores the lock, so the
+versions are whatever resolves today.
 
 ## Running what CI runs
 
 Every check below is a CI job. Running them locally is the whole story — there
 is nothing CI does that you cannot reproduce.
+
+Prefix any of these with `uv run` to be certain they run against the locked
+environment rather than whatever is on your path.
 
 ```sh
 python -m pytest                       # tests, including doctests
