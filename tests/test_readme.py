@@ -42,10 +42,17 @@ import pytest
 
 README = pathlib.Path(__file__).resolve().parent.parent / "README.md"
 
-## A fence, optionally inside a blockquote. The `> ` prefixes have to come off
-## before the body is valid Python.
+## A fence, with whatever prefix its surroundings give it: `> ` inside a
+## blockquote, spaces inside a list item, nothing at the top level. The closing
+## fence carries the same prefix, and every body line has it stripped, or the
+## body is not valid Python.
+##
+## Anchoring at the line start alone was not enough. An indented fence was
+## silently not collected, so a broken example inside a list item would have
+## passed -- found by adding one and watching this file stay green.
 _FENCE = re.compile(
-    r"^(?P<quote>> ?)?```python\n(?P<body>.*?)^(?P=quote)?```", re.S | re.M
+    r"^(?P<prefix>[ \t]*(?:> ?)?)```python\n(?P<body>.*?)^(?P=prefix)```",
+    re.S | re.M,
 )
 _ELISION = "..."
 ## What separates a value from a remark about it.
@@ -55,10 +62,11 @@ _REMARK = re.compile(r", | -- ")
 def _blocks(text):
     """Every python block, as ``(first line number, source)``."""
     for match in _FENCE.finditer(text):
-        body = match.group("body")
-        if match.group("quote"):
+        prefix, body = match.group("prefix"), match.group("body")
+        if prefix:
             body = "".join(
-                re.sub(r"^> ?", "", line) for line in body.splitlines(keepends=True)
+                line[len(prefix) :] if line.startswith(prefix) else line.lstrip()
+                for line in body.splitlines(keepends=True)
             )
         yield text.count("\n", 0, match.start()) + 1, body
 
@@ -227,6 +235,22 @@ def test_enough_of_the_readme_is_actually_checked(readme):
     quietly stops recognising anything. This pins the count."""
     _, _, checked = readme
     assert checked >= 60
+
+
+@pytest.mark.parametrize(
+    ("prefix", "label"),
+    [("", "top level"), ("> ", "blockquote"), ("  ", "list item")],
+)
+def test_a_fenced_block_is_found_whatever_prefixes_it(prefix, label):
+    """Checked directly rather than through the README, which need not always
+    contain one of each -- and did not, which is how an indented fence went
+    uncollected in the first place."""
+    source = 'Color("red")  # <Color red>\n'
+    fence = "```python"
+    document = f"text\n\n{prefix}{fence}\n{prefix}{source}{prefix}```\n"
+    found = list(_blocks(document))
+    assert len(found) == 1, label
+    assert found[0][1] == source, label
 
 
 def test_the_readme_has_the_blocks_this_expects():
