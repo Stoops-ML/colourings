@@ -17,19 +17,19 @@ This project is a modernized fork of [vaab/colour](https://github.com/vaab/colou
 pip install colourings
 ```
 
-## A taste
+## Minimal example
 
 ```python
 from colourings import Color
 
-c = Color("#3d7ab8")
+c = Color("red")
 
-c.hsl  # HSL(hue=210.24..., saturation=50.20..., lightness=48.03...)
-c.oklch  # OKLCH(lightness=0.5677..., chroma=0.1153..., hue=250.8861...)
-c.mix("white", 0.3).hex_l  # '#78a2cf'
-c.contrast_ratio("white")  # 4.4925...
+c.hsl  # HSL(hue=0.0, saturation=100.0, lightness=50.0)
+c.oklch  # OKLCH(lightness=0.6279..., chroma=0.2576..., hue=29.2338...)
+c.mix("white", 0.3).hex_l  # '#ff7765'
+c.contrast_ratio("white")  # 3.9984...
 c.best_text_color()  # <Color black>
-c.nearest_name()  # 'steelblue'
+c.darken(0.2).nearest_name()  # 'firebrick'
 ```
 
 ## What it does
@@ -45,19 +45,6 @@ c.nearest_name()  # 'steelblue'
 | **Compositing** | `over` and `blend` through all sixteen CSS blend modes, encoded or linear | [Compositing](https://colourings.readthedocs.io/en/latest/compositing.html) |
 | **Gamut checking** | `in_srgb_gamut`, to ask before a value gets clipped | [Ranges and gamut](https://colourings.readthedocs.io/en/latest/ranges.html) |
 | **Stable picking** | `pick_for`, mapping any object to the same colour in every process | [Equality and picking](https://colourings.readthedocs.io/en/latest/equality.html) |
-
-## The one thing worth knowing up front
-
-A `Color` holds sRGB. `lab`, `lch`, `oklab`, `oklch`, `xyz` and `yuv` can each name a colour that sRGB cannot show, and such a value is **clipped** on the way in — quietly, and often. Afterwards it is indistinguishable from a colour that always fitted, so ask first:
-
-```python
-from colourings import in_srgb_gamut
-
-in_srgb_gamut((53.2408, 80.0925, 67.2032), "lab")  # True, this is red
-in_srgb_gamut((100, 120, -120), "lab")  # False, would be clipped
-```
-
-[Ranges and the sRGB gamut](https://colourings.readthedocs.io/en/latest/ranges.html) covers this properly, and it is the page to read before choosing a space to work in.
 
 ## Correctness
 
