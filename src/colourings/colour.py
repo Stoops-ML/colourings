@@ -1035,7 +1035,8 @@ def identify_color(
         for matches, convert in _STRING_FORMATS:
             if matches(color):
                 return convert
-    elif isinstance(color, Sequence):
+    else:
+        ## The sequence matchers take `object` and reject anything else.
         for matches, convert in _SEQUENCE_FORMATS:
             if matches(color):
                 return convert
