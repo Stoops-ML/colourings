@@ -1,6 +1,4 @@
-## v2.0.0rc0 (2026-09-02)
-
-## v2.0.0rc0 (2026-09-02)
+## v2.0.0 (2026-09-24)
 
 ### BREAKING CHANGE
 
@@ -35,6 +33,7 @@ NAMED_HEX. The old accessor names still work and warn. Version 2.0.0.
 
 ### Fix
 
+- **colour**: drop redundant Sequence check in identify_color
 - stop the tests asserting the interpreter, and repin two actions
 - pick the same colour for the same value in every process
 - say what the trailing keywords do, and stop them writing the slots
