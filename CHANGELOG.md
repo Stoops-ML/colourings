@@ -1,3 +1,9 @@
+## v2.0.0 (2026-09-24)
+
+### Fix
+
+- **colour**: drop redundant Sequence check in identify_color
+
 ## v2.0.0rc0 (2026-09-02)
 
 ## v2.0.0rc0 (2026-09-02)
