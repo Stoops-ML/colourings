@@ -34,9 +34,15 @@ Writing
    Color("red").to_css("oklch")           # 'oklch(0.62796 0.25768 29.23389)'
 
 Output uses the space-separated syntax a browser itself serialises to, and
-includes the alpha only when the colour is not opaque. Every form round-trips
-exactly: reading back what ``to_css`` wrote gives the same 8-bit colour, alpha
-included.
+includes the alpha only when the colour is not opaque.
+
+``hex`` and ``rgb`` round-trip exactly: reading back what they wrote gives the
+same 8-bit colour, alpha included. So do ``hsl`` and ``oklch`` for a colour
+built from 8-bit values -- a name, a hex string or ``rgb``. A colour between
+8-bit steps, such as one from a gradient or from ``lab``, can come back one
+step away in a channel from those two, since their decimals can land on either
+side of a rounding boundary: about 2% of such colours in ``hsl``, and 0.4% in
+``oklch``. Write ``hex`` or ``rgb`` where the exact 8-bit colour matters.
 
 The same forms work as format specs, so a colour can go straight into an
 f-string:
