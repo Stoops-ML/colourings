@@ -111,6 +111,22 @@ Measure it
 WCAG contrast is in :doc:`contrast`; perceptual distance and the four delta-E
 metrics are in :doc:`difference`.
 
+Compare it
+----------
+
+``==`` compares two colours, and a string is not a colour, so it never equals
+one. ``equals`` reads its argument as any input ``Color`` takes:
+
+.. code-block:: python
+
+   from colourings import Color
+
+   Color("red") == Color("#f00")  # True
+   Color("red") == "red"          # False
+   Color("red").equals("#f00")    # True
+
+See :doc:`equality`.
+
 Read and write CSS
 ------------------
 

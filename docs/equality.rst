@@ -24,6 +24,14 @@ error, and colours are hashable, so they work in sets and as dict keys:
    assert len({Color("red"), Color("#f00"), Color("blue")}) == 2
    assert {Color("red"): "warm"}[Color("#f00")] == "warm"
 
+To compare against a string, use ``equals``, which reads its
+argument as any input ``Color`` takes:
+
+.. code-block:: python
+
+   assert Color("red").equals("red")
+   assert Color("red").equals("#ff0000")
+
 .. warning::
 
    ``Color`` is mutable, so do not mutate one while it is held in a set or
