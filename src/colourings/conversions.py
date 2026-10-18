@@ -642,6 +642,15 @@ def _hue2rgb(v1: float, v2: float, vH: float) -> float:
     return v1
 
 
+def _byte(channel: float) -> int:
+    """Round a ``[0, 255]`` channel to the 8-bit value every output shares.
+
+    Ties go down, and so does anything within ``FLOAT_ERROR`` above one, so
+    that noise from the HSL round trip cannot tip a channel up a step.
+    """
+    return int(channel + 0.5 - FLOAT_ERROR)
+
+
 @_cached
 def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
     """Convert RGB components to a hexadecimal color string.
@@ -661,7 +670,7 @@ def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
     if not is_rgb(rgb):
         raise InvalidColorError(f"Input is not of RGB type.{why_invalid('rgb', rgb)}")
 
-    hx = "".join([f"{int(c + 0.5 - FLOAT_ERROR):02x}" for c in rgb])
+    hx = "".join(f"{_byte(c):02x}" for c in rgb)
 
     if not force_long and hx[0::2] == hx[1::2]:
         hx = "".join(hx[0::2])
@@ -795,7 +804,7 @@ def rgba2hex(rgba: Sequence[int | float], force_long: bool = False) -> str:
         raise InvalidColorError(
             f"Input is not of RGBA type.{why_invalid('rgba', rgba)}"
         )
-    hx = "".join(f"{int(c + 0.5 - FLOAT_ERROR):02x}" for c in rgba)
+    hx = "".join(f"{_byte(c):02x}" for c in rgba)
     if not force_long and hx[0::2] == hx[1::2]:
         hx = "".join(hx[0::2])
     return f"#{hx}"

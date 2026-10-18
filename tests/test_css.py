@@ -248,6 +248,13 @@ def test_every_form_round_trips_exactly():
                         assert back.alpha == pytest.approx(alpha, abs=0.002)
 
 
+@pytest.mark.parametrize("tie", [126.5, 127.5, 0.5, 254.5])
+def test_rgb_form_rounds_a_tie_as_hex_does(tie):
+    color = Color(rgb=(tie, 0, 0))
+    assert Color(color.to_css("rgb")).hex_l == color.hex_l
+    assert color.to_css("rgb") == f"rgb({color.rgb_int.red} 0 0)"
+
+
 def test_a_whole_channel_is_not_trimmed_away():
     """`250` must not be written as `25`. Stripping trailing zeros from the
     integer part turns a rounding into a different colour."""

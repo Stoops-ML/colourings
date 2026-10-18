@@ -2730,7 +2730,7 @@ class Color:
         --------
         >>> red = Color("red")
         >>> red.replace(alpha=0.5, lightness=25).to_css("rgb")
-        'rgb(128 0 0 / 0.5)'
+        'rgb(127 0 0 / 0.5)'
         >>> red
         <Color red>
         """

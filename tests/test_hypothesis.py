@@ -228,6 +228,15 @@ def test_anything_written_as_css_reads_back_as_the_same_colour(rgb, alpha):
         assert abs(back.alpha - color.alpha) <= alpha_tolerance, f"{css!r} alpha"
 
 
+@given(rgbs)
+def test_the_8_bit_forms_agree_on_every_channel(rgb):
+    """``hex`` and ``rgb`` both write whole channels, so they must round the
+    same way; they once split on every tie, ``127.5`` included."""
+    color = Color(rgb=rgb)
+    assert Color(color.to_css("rgb")).hex_l == color.hex_l
+    assert Color(color.to_css("hex")).hex_l == color.hex_l
+
+
 @given(rgbs, rgbs, steps, spaces)
 def test_a_scale_has_the_length_and_the_ends_it_was_asked_for(
     first, second, count, space
