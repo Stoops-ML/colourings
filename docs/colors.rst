@@ -216,3 +216,13 @@ canonical spelling:
    from colourings.colour import NAMED_HEX
 
    NAMED_HEX.rebeccapurple == NAMED_HEX.RebeccaPurple  # True
+
+``color_names()`` lists every name, sorted, for a picker or a validation
+list, and the accessors list them in ``dir()`` so an editor can complete them:
+
+.. code-block:: python
+
+   from colourings import color_names
+
+   len(color_names())  # 152
+   color_names()[:3]   # ('aliceblue', 'antiquewhite', 'aqua')

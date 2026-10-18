@@ -137,7 +137,14 @@ def _no_such_colour(container: object, name: str) -> AttributeError:
     )
 
 
-class C_HSL:
+class _NamedColors:
+    """Lists the color names in ``dir()``, so editors can complete them."""
+
+    def __dir__(self) -> list[str]:
+        return [*super().__dir__(), *COLOR_NAME_TO_RGB]
+
+
+class C_HSL(_NamedColors):
     """Container exposing named colors as HSL tuples."""
 
     def __getattr__(self, value: str) -> HSLTuple:
@@ -167,7 +174,7 @@ class C_HSL:
 NAMED_HSL = C_HSL()
 
 
-class C_RGB:
+class C_RGB(_NamedColors):
     """Container exposing named colors as RGB tuples."""
 
     def __getattr__(self, value: str) -> RGBTuple:
@@ -194,7 +201,7 @@ class C_RGB:
             raise _no_such_colour(self, value) from None
 
 
-class C_HEX:
+class C_HEX(_NamedColors):
     """Container exposing named colors as hexadecimal strings."""
 
     def __getattr__(self, value: str) -> str:
@@ -223,6 +230,34 @@ class C_HEX:
 
 NAMED_RGB = C_RGB()
 NAMED_HEX = C_HEX()
+
+
+def color_names() -> tuple[str, ...]:
+    """List every color name :class:`Color` reads, in alphabetical order.
+
+    These are the CSS named colors, with both spellings of each ``gray`` and
+    ``grey``, and a few X11 names CSS dropped, such as ``navyblue``.
+    ``transparent`` is read too, as CSS, but has no RGB of its own and so is
+    not listed.
+
+    Returns
+    -------
+    tuple[str, ...]
+        The names, in lower case.
+
+    Examples
+    --------
+    >>> names = color_names()
+    >>> names[:3]
+    ('aliceblue', 'antiquewhite', 'aqua')
+    >>> "rebeccapurple" in names
+    True
+    """
+    return _COLOR_NAMES
+
+
+_COLOR_NAMES = tuple(sorted(COLOR_NAME_TO_RGB))
+colour_names = color_names
 
 
 ## For ``color_scale``: the conversion back to HSL, and where the hue channel

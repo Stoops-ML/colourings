@@ -27,7 +27,9 @@ from colourings.colour import (
     _blend_luma,
     _blend_saturation,
     _set_blend_saturation,
+    color_names,
     color_scale,
+    colour_names,
     colour_scale,
     hash_or_str,
     identify_color,
@@ -2784,3 +2786,20 @@ def test_replace_refuses_stored_state():
 def test_replace_refuses_an_unknown_name():
     with pytest.raises(AttributeError, match="lightnes"):
         Color("red").replace(lightnes=50)
+
+
+def test_color_names_are_every_name_sorted():
+    names = color_names()
+    assert names == tuple(sorted(COLOR_NAME_TO_RGB))
+    assert all(Color(name).web for name in names)
+
+
+def test_colour_names_is_color_names():
+    assert colour_names is color_names
+
+
+@pytest.mark.parametrize("accessor", [NAMED_HSL, NAMED_RGB, NAMED_HEX])
+def test_accessors_list_the_names_in_dir(accessor):
+    listed = dir(accessor)
+    assert set(COLOR_NAME_TO_RGB) <= set(listed)
+    assert "__class__" in listed
