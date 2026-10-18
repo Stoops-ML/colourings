@@ -2648,7 +2648,9 @@ class Color:
         return self.to_css(format_spec)
 
     def __repr__(self) -> str:
-        return f"<Color {self.web}>"
+        if self._alpha == 1:
+            return f"<Color {self.web}>"
+        return f"<Color {self.web} alpha={self._alpha:g}>"
 
     def replace(self, **properties: Any) -> Color:
         """Return a copy with some properties changed, leaving this one alone.

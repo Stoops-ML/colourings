@@ -877,6 +877,18 @@ def test_color_str():
     assert repr(c) == "<Color red>"
 
 
+@pytest.mark.parametrize(
+    ("color", "expected"),
+    [
+        (Color("red", alpha=0.5), "<Color red alpha=0.5>"),
+        (Color("red", alpha=0), "<Color red alpha=0>"),
+        (Color("#ff000080"), "<Color red alpha=0.501961>"),
+    ],
+)
+def test_repr_shows_alpha_when_not_opaque(color, expected):
+    assert repr(color) == expected
+
+
 def test_purple_inputs():
     assert (
         Color("purple")

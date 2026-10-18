@@ -178,7 +178,7 @@ channels would drag towards it:
 
    from colourings import Color
 
-   Color("color-mix(in oklab, red, transparent)")        # <Color red>
+   Color("color-mix(in oklab, red, transparent)")        # <Color red alpha=0.5>
    Color("color-mix(in oklab, red, transparent)").alpha  # 0.5
 
 Mixing works ``in hsl``, ``lab``, ``lch``, ``oklab`` and ``oklch``, with
