@@ -774,6 +774,31 @@ def test_only_one_input():
         Color(color="red", pick_for="foo")
 
 
+def test_two_inputs_are_named():
+    with pytest.raises(ValueError, match="Got 'color', 'pick_for' together"):
+        Color(color="red", pick_for="foo")
+
+
+def test_no_input_is_reported_as_such():
+    with pytest.raises(ValueError, match=r"No color was given\. Only one of"):
+        Color()
+
+
+def test_property_keyword_alone_is_not_called_unknown():
+    with pytest.raises(ValueError, match=r"No color was given\. Only one of"):
+        Color(lightness=50)
+
+
+def test_misspelled_input_is_suggested():
+    with pytest.raises(ValueError, match="Did you mean 'rgb'"):
+        Color(rbg=(1, 2, 3))
+
+
+def test_unrecognisable_keyword_gets_no_suggestion():
+    with pytest.raises(ValueError, match=r"'qqq' is not an input\. Only one of"):
+        Color(qqq=1)
+
+
 def test_pick_for():
     """Equal keys give one colour, different keys give different ones.
 

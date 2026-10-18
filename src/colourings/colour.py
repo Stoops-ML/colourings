@@ -1043,6 +1043,44 @@ def identify_color(
     raise UnknownColorError(_why_it_is_not_a_colour(color))
 
 
+def _input_count_message(
+    inputs: list[str], given: list[str], keywords: dict[str, Any]
+) -> str:
+    """Say why the constructor did not get exactly one color input.
+
+    Parameters
+    ----------
+    inputs : list[str]
+        Every color input the constructor accepts.
+    given : list[str]
+        The ones that were passed.
+    keywords : dict[str, Any]
+        The trailing keywords, which may hold a misspelled input.
+
+    Returns
+    -------
+    str
+        The message to raise.
+    """
+    names = [f"{name!r}" for name in inputs]
+    rule = f"Only one of {', '.join(names[:-1])} or {names[-1]} may be entered."
+    if given:
+        listed = ", ".join(repr(name) for name in given)
+        return f"Got {listed} together. {rule}"
+    properties = {
+        name
+        for name, member in vars(Color).items()
+        if isinstance(member, property) and member.fset is not None
+    }
+    for keyword in keywords:
+        if keyword not in properties:
+            suggestion = _did_you_mean(keyword, {*inputs, *properties})
+            return (
+                f"No color was given; {keyword!r} is not an input.{suggestion} {rule}"
+            )
+    return f"No color was given. {rule}"
+
+
 def _apply_property_keywords(color: Color, keywords: dict[str, Any]) -> None:
     """Set writable colour properties named as trailing keyword arguments.
 
@@ -1484,10 +1522,7 @@ class Color:
         }
         given = [name for name, value in inputs.items() if value is not None]
         if len(given) != 1:
-            names = [f"{name!r}" for name in inputs]
-            raise ValueError(
-                f"Only one of {', '.join(names[:-1])} or {names[-1]} may be entered."
-            )
+            raise ValueError(_input_count_message(list(inputs), given, kwargs))
         source = given[0]
         value = inputs[source]
 
