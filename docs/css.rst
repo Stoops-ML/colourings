@@ -38,6 +38,15 @@ includes the alpha only when the colour is not opaque. Every form round-trips
 exactly: reading back what ``to_css`` wrote gives the same 8-bit colour, alpha
 included.
 
+The same forms work as format specs, so a colour can go straight into an
+f-string:
+
+.. code-block:: python
+
+   red = Color("red")
+   f"color: {red:rgb};"  # 'color: rgb(255 0 0);'
+   f"{red}"              # 'red'
+
 Out of range is an error, not a clamp
 -------------------------------------
 

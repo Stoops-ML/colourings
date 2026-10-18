@@ -494,3 +494,19 @@ def test_a_misspelled_color_function_suggests_it():
     with pytest.raises(UnknownColorError, match="Did you mean") as raised:
         Color("colr(srgb 1 0 0)")
     assert "'color'" in str(raised.value)
+
+
+@pytest.mark.parametrize("form", ["hex", "rgb", "hsl", "oklch"])
+def test_format_spec_is_to_css(form):
+    color = Color("teal", alpha=0.25)
+    assert format(color, form) == color.to_css(form)
+
+
+def test_empty_format_spec_is_str():
+    color = Color("teal")
+    assert f"{color}" == str(color) == "teal"
+
+
+def test_unknown_format_spec_is_refused():
+    with pytest.raises(ValueError, match="Unknown CSS form 'lab'"):
+        format(Color("red"), "lab")

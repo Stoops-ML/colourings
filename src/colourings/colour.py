@@ -2618,6 +2618,34 @@ class Color:
     def __str__(self) -> str:
         return f"{self.web}"
 
+    def __format__(self, format_spec: str) -> str:
+        """Format as ``str`` does, or as CSS when a form is named.
+
+        Parameters
+        ----------
+        format_spec : str
+            Empty, or one of the forms :meth:`to_css` takes.
+
+        Returns
+        -------
+        str
+            The color's web name for an empty spec, else its CSS.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``format_spec`` is not a form ``to_css`` knows.
+
+        Examples
+        --------
+        >>> red = Color("red")
+        >>> f"{red} is {red:hex}, or {red:rgb}"
+        'red is #f00, or rgb(255 0 0)'
+        """
+        if not format_spec:
+            return str(self)
+        return self.to_css(format_spec)
+
     def __repr__(self) -> str:
         return f"<Color {self.web}>"
 
