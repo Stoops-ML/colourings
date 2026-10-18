@@ -1021,14 +1021,20 @@ def identify_color(
         and is_rgb(color)
         and is_hsl(color)
     ):
-        raise AmbiguousColorError("Cannot determine whether color is RGB or HSL.")
+        raise AmbiguousColorError(
+            "Cannot determine whether color is RGB or HSL. "
+            "Pass it as rgb=... or hsl=... to say which."
+        )
     if (
         isinstance(color, Sequence)
         and len(color) == 4
         and is_rgba(color)
         and is_hsla(color)
     ):
-        raise AmbiguousColorError("Cannot determine whether color is RGBA or HSLA.")
+        raise AmbiguousColorError(
+            "Cannot determine whether color is RGBA or HSLA. "
+            "Pass it as rgba=... or hsla=... to say which."
+        )
 
     if isinstance(color, Color):
         return lambda existing: HSLTuple(*existing.hsl)

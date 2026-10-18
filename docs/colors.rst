@@ -75,7 +75,7 @@ format to settle it:
        Color((0, 0, 0))
    except AmbiguousColorError as e:
        print(e)
-   # Cannot determine whether color is RGB or HSL.
+   # Cannot determine whether color is RGB or HSL. Pass it as rgb=... or hsl=... to say which.
 
 Setting properties as you build
 -------------------------------

@@ -413,6 +413,18 @@ def test_bad_identify_color():
 
 
 @pytest.mark.parametrize(
+    ("value", "hint"),
+    [
+        ((0, 0, 0), "Pass it as rgb=... or hsl=..."),
+        ((0, 0, 0, 0), "Pass it as rgba=... or hsla=..."),
+    ],
+)
+def test_ambiguous_error_names_the_keywords_that_settle_it(value, hint):
+    with pytest.raises(AmbiguousColorError, match=hint):
+        Color(value)
+
+
+@pytest.mark.parametrize(
     "value",
     [
         123,  # neither a string nor a sequence
