@@ -3,6 +3,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import math
+import reprlib
 import string
 import warnings
 from collections.abc import Callable, Generator, Iterable, Sequence
@@ -924,7 +925,7 @@ def _did_you_mean(word: str, candidates: Iterable[str]) -> str:
 def _suggestion_for(text: str) -> str:
     """Guess what a string that named no color was meant to be.
 
-    Three shapes are worth guessing at, and anything else gets nothing rather
+    Four shapes are worth guessing at, and anything else gets nothing rather
     than a suggestion drawn from the wrong table.
 
     Parameters
@@ -954,6 +955,8 @@ def _suggestion_for(text: str) -> str:
                 f"has {len(digits)}."
             )
         return ""
+    if len(text) in (3, 4, 6, 8) and all(digit in string.hexdigits for digit in text):
+        return f" Did you mean {'#' + text!r}?"
     return _did_you_mean(text, COLOR_NAME_TO_RGB)
 
 
@@ -971,6 +974,9 @@ def _why_it_is_not_a_colour(color: object) -> str:
     being told to try ``Canvas`` and then told that ``Canvas`` has no value
     would be two steps to nowhere.
 
+    An integer that fits in 24 bits is offered as the hex string it spells,
+    and any other non-string is shown abbreviated by :mod:`reprlib`.
+
     Parameters
     ----------
     color : object
@@ -981,8 +987,14 @@ def _why_it_is_not_a_colour(color: object) -> str:
     str
         The message to raise.
     """
+    if (
+        isinstance(color, int)
+        and not isinstance(color, bool)
+        and 0 <= color <= 0xFFFFFF
+    ):
+        return f"Cannot identify color {color!r}. Did you mean '#{color:06x}'?"
     if not isinstance(color, str):
-        return "Cannot identify color."
+        return f"Cannot identify color {reprlib.repr(color)}."
     text = color.strip().lower()
     if text in SYSTEM_COLORS:
         return (

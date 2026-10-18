@@ -413,6 +413,33 @@ def test_bad_identify_color():
 
 
 @pytest.mark.parametrize(
+    ("value", "suggestion"),
+    [
+        ("ff0000", "'#ff0000'"),
+        ("ABC", "'#abc'"),
+        ("ff000080", "'#ff000080'"),
+        (0xFF0000, "'#ff0000'"),
+        (0, "'#000000'"),
+    ],
+)
+def test_bare_hex_and_integers_suggest_the_hash_form(value, suggestion):
+    with pytest.raises(UnknownColorError, match=f"Did you mean {suggestion}"):
+        Color(value)
+
+
+@pytest.mark.parametrize("value", [0x1000000, -1, True, 1.5])
+def test_other_non_strings_are_shown_without_a_suggestion(value):
+    with pytest.raises(UnknownColorError) as raised:
+        Color(value)
+    assert str(raised.value) == f"Cannot identify color {value!r}."
+
+
+def test_a_long_unidentifiable_value_is_abbreviated():
+    with pytest.raises(UnknownColorError, match=r"\.\.\.\]\.$"):
+        Color(list(range(50)))
+
+
+@pytest.mark.parametrize(
     ("value", "hint"),
     [
         ((0, 0, 0), "Pass it as rgb=... or hsl=..."),

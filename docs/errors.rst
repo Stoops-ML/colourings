@@ -55,7 +55,7 @@ Errors about how a helper was *called* -- more than one colour argument to
 "Did you mean"
 --------------
 
-A string that is nearly a colour gets told what it is nearly:
+A value that is nearly a colour gets told what it is nearly:
 
 .. list-table::
    :header-rows: 1
@@ -71,6 +71,10 @@ A string that is nearly a colour gets told what it is nearly:
      - ``There is no color function called 'rbg'. Did you mean 'rgb'?``
    * - ``#ff000``
      - ``A hexadecimal color takes 3, 4, 6 or 8 digits, and this has 5.``
+   * - ``ff0000``
+     - ``Did you mean '#ff0000'?``
+   * - ``0xff0000``
+     - ``Did you mean '#ff0000'?``
    * - ``xyzzy``
      - nothing beyond ``Cannot identify color 'xyzzy'.``
 
@@ -78,7 +82,7 @@ A string that is nearly a colour gets told what it is nearly:
 
    from colourings import Color, UnknownColorError
 
-   for typed in ("rde", "gren", "rbg(1 2 3)", "#ff000", "xyzzy"):
+   for typed in ("rde", "gren", "rbg(1 2 3)", "#ff000", "ff0000", 0xFF0000, "xyzzy"):
        try:
            Color(typed)
        except UnknownColorError as e:
@@ -87,6 +91,8 @@ A string that is nearly a colour gets told what it is nearly:
    # Cannot identify color 'gren'. Did you mean 'green', 'grey' or 'seagreen'?
    # Cannot identify color 'rbg(1 2 3)'. There is no color function called 'rbg'. Did you mean 'rgb'?
    # Cannot identify color '#ff000'. A hexadecimal color takes 3, 4, 6 or 8 digits, and this has 5.
+   # Cannot identify color 'ff0000'. Did you mean '#ff0000'?
+   # Cannot identify color 16711680. Did you mean '#ff0000'?
    # Cannot identify color 'xyzzy'.
 
 Nothing is offered unless it is close, since a suggestion for everything would
