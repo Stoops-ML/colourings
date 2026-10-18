@@ -107,6 +107,7 @@ from .identify import (
     is_rgba,
     is_short_hex,
     is_web,
+    why_invalid,
 )
 
 
@@ -1691,7 +1692,9 @@ class Color:
 
     def set_hsl(self, value: Sequence[float]) -> None:
         if not is_hsl(value):
-            raise InvalidColorError("Value is not a valid HSL")
+            raise InvalidColorError(
+                f"Value is not a valid HSL.{why_invalid('hsl', value)}"
+            )
         ## float, so every attribute reports floats whatever was passed in.
         self._hsl = HSLTuple(float(value[0]), float(value[1]), float(value[2]))
 

@@ -46,7 +46,7 @@ The subclasses
        Color(rgb=(300, 0, 0))
    except InvalidColorError as e:
        print(e)
-   # Input is not an RGB type.
+   # Input is not an RGB type. red=300 is outside [0, 255].
 
 Errors about how a helper was *called* -- more than one colour argument to
 ``Color``, a scale with fewer than two colours -- stay plain ``ValueError`` or

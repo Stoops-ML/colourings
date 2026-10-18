@@ -51,7 +51,7 @@ A browser reads ``rgb(300 0 0)`` as red. Here it raises:
        Color("rgb(300 0 0)")
    except InvalidColorError as e:
        print(e)
-   # Input is not an RGB type.
+   # Input is not an RGB type. red=300 is outside [0, 255].
 
 Quietly turning one colour into another is what this library avoids
 everywhere, and reading a stylesheet is not a reason to start. This is the one
