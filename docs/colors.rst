@@ -139,6 +139,17 @@ into the stored HSL:
 Note that ``alpha`` is always in ``[0, 1]`` while ``hsla``'s fourth component
 is on the ``[0, 100]`` scale that format uses. :doc:`ranges` lists every scale.
 
+Assignment changes the colour in place. To leave it alone and get a changed
+copy instead, as the adjustment methods do, use ``replace``:
+
+.. code-block:: python
+
+   red = Color("red")
+   pink = red.replace(lightness=75, alpha=0.5)
+
+   pink.hsla  # HSLA(hue=0.0, saturation=100.0, lightness=75.0, alpha=50.0)
+   red.hsla   # HSLA(hue=0.0, saturation=100.0, lightness=50.0, alpha=100.0)
+
 Named components
 ----------------
 

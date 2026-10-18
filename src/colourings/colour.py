@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import difflib
 import hashlib
 import math
@@ -2648,6 +2649,43 @@ class Color:
 
     def __repr__(self) -> str:
         return f"<Color {self.web}>"
+
+    def replace(self, **properties: Any) -> Color:
+        """Return a copy with some properties changed, leaving this one alone.
+
+        Assigning a property changes the color in place, which is easy to get
+        wrong when the color is shared; this changes a copy instead, as the
+        adjustment methods do. The copy keeps the ``equality`` strategy.
+
+        Parameters
+        ----------
+        **properties : Any
+            Writable properties to set on the copy, in the order given. Each
+            goes through its own setter and is validated as an assignment is.
+
+        Returns
+        -------
+        Color
+            The changed copy.
+
+        Raises
+        ------
+        ValueError
+            Raised when a name is one of the stored attributes.
+        AttributeError
+            Raised when a name is not a writable property.
+
+        Examples
+        --------
+        >>> red = Color("red")
+        >>> red.replace(alpha=0.5, lightness=25).to_css("rgb")
+        'rgb(128 0 0 / 0.5)'
+        >>> red
+        <Color red>
+        """
+        changed = copy.copy(self)
+        _apply_property_keywords(changed, properties)
+        return changed
 
     def equals(
         self,

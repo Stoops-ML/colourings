@@ -2732,3 +2732,43 @@ def test_each_accessor_names_itself_in_its_error(accessor, expected):
 def test_the_accessors_are_case_insensitive(accessor):
     assert getattr(accessor, "BLUE") == getattr(accessor, "blue")  # noqa: B009
     assert getattr(accessor, "RebeccaPurple") == getattr(accessor, "rebeccapurple")  # noqa: B009
+
+
+def test_replace_changes_a_copy_and_not_the_original():
+    red = Color("red")
+    pink = red.replace(lightness=75, alpha=0.5)
+    assert pink.hsl == (0.0, 100.0, 75.0)
+    assert pink.alpha == 0.5
+    assert red.hsl == (0.0, 100.0, 50.0)
+    assert red.alpha == 1.0
+
+
+def test_replace_applies_properties_in_order():
+    assert Color("red").replace(rgb=(0, 0, 255), hue=120).hex_l == "#00ff00"
+
+
+def test_replace_keeps_the_equality_strategy():
+    color = Color("red", equality=HSL_equivalence)
+    assert color.replace(alpha=0.5).equality is HSL_equivalence
+
+
+def test_replace_keeps_the_subclass():
+    class Swatch(Color):
+        __slots__ = ()
+
+    assert type(Swatch("red").replace(lightness=10)) is Swatch
+
+
+def test_replace_validates_like_assignment():
+    with pytest.raises(InvalidColorError, match="lightness=200 is outside"):
+        Color("red").replace(lightness=200)
+
+
+def test_replace_refuses_stored_state():
+    with pytest.raises(ValueError, match="is stored state"):
+        Color("red").replace(_hsl=(0, 0, 0))
+
+
+def test_replace_refuses_an_unknown_name():
+    with pytest.raises(AttributeError, match="lightnes"):
+        Color("red").replace(lightnes=50)
