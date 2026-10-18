@@ -1,6 +1,29 @@
 ## v2.1.0 (2026-10-18)
 
+### Feat
+
+- **colour**: add rgb_int for 8-bit integer channels
+- add color_names and list names in the accessors' dir()
+- **colour**: show alpha in repr when the colour is not opaque
+- **colour**: add Color.replace for a changed copy
+- **colour**: accept to_css forms as format specs
+- **colour**: suggest the hex form for bare digits and integers
+- **colour**: say how to settle an ambiguous tuple
+- name the component that failed validation
+- **colour**: say why the constructor did not get one input
+
+### Fix
+
+- **css**: round rgb() channels the way hex does
+
 ## v2.0.0 (2026-09-24)
+
+### Fix
+
+- CHANGELOG removes v2.0.0rc0
+- **colour**: drop redundant Sequence check in identify_color
+
+## v2.0.0rc0 (2026-09-02)
 
 ### BREAKING CHANGE
 
@@ -35,7 +58,6 @@ NAMED_HEX. The old accessor names still work and warn. Version 2.0.0.
 
 ### Fix
 
-- **colour**: drop redundant Sequence check in identify_color
 - stop the tests asserting the interpreter, and repin two actions
 - pick the same colour for the same value in every process
 - say what the trailing keywords do, and stop them writing the slots
