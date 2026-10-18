@@ -35,6 +35,20 @@ Only one colour input source is allowed per call. Passing two raises
 ``ValueError``, since it is a mistake about the call rather than about a
 colour.
 
+.. warning::
+
+   Each format's alpha is on that format's own scale: ``[0, 255]`` for
+   ``rgba``, ``[0, 100]`` for ``hsla``, and ``[0, 1]`` only for ``rgbaf``,
+   ``hslaf`` and the ``alpha`` keyword. CSS writes ``rgba(255, 0, 0, 0.5)``,
+   but ``Color(rgba=(255, 0, 0, 0.5))`` is accepted and is very nearly
+   transparent:
+
+   .. code-block:: python
+
+      Color(rgba=(255, 0, 0, 0.5)).alpha     # 0.00196
+      Color(rgb=(255, 0, 0), alpha=0.5).alpha  # 0.5
+      Color("rgba(255, 0, 0, 0.5)").alpha     # 0.5
+
 Alpha when copying
 ------------------
 

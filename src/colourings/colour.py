@@ -1435,7 +1435,8 @@ class Color:
     hsl : Sequence[int | float] | None, optional
         HSL components as ``(h, s, l)``.
     hsla : Sequence[int | float] | None, optional
-        HSLA components as ``(h, s, l, a)`` with alpha in percent.
+        HSLA components as ``(h, s, l, a)`` with alpha in percent, not the
+        ``[0, 1]`` fraction ``alpha`` takes.
     hslf : Sequence[int | float] | None, optional
         Normalized HSL components in ``[0, 1]``.
     hslaf : Sequence[int | float] | None, optional
@@ -1466,7 +1467,9 @@ class Color:
     rgb : Sequence[int | float] | None, optional
         RGB components in ``[0, 255]``.
     rgba : Sequence[int | float] | None, optional
-        RGBA components with alpha in ``[0, 255]``.
+        RGBA components with alpha in ``[0, 255]``, not the ``[0, 1]`` CSS
+        uses: ``(255, 0, 0, 0.5)`` is almost transparent. Pass ``alpha=``
+        or ``rgbaf`` for a fraction.
     rgbf : Sequence[int | float] | None, optional
         Normalized RGB components in ``[0, 1]``.
     rgbaf : Sequence[int | float] | None, optional
