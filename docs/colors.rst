@@ -139,6 +139,17 @@ into the stored HSL:
 Note that ``alpha`` is always in ``[0, 1]`` while ``hsla``'s fourth component
 is on the ``[0, 100]`` scale that format uses. :doc:`ranges` lists every scale.
 
+``rgb`` holds floats, since the colour is stored as HSL and converting back
+rarely lands on a whole number. ``rgb_int`` gives the 8-bit integers that
+``hex_l`` spells:
+
+.. code-block:: python
+
+   c = Color(hex="#123456")
+
+   c.rgb      # RGB(red=17.999999999999993, green=51.99999999999997, blue=86.0)
+   c.rgb_int  # RGB(red=18, green=52, blue=86)
+
 Assignment changes the colour in place. To leave it alone and get a changed
 copy instead, as the adjustment methods do, use ``replace``:
 

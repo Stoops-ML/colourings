@@ -2803,3 +2803,16 @@ def test_accessors_list_the_names_in_dir(accessor):
     listed = dir(accessor)
     assert set(COLOR_NAME_TO_RGB) <= set(listed)
     assert "__class__" in listed
+
+
+@pytest.mark.parametrize("name", sorted(COLOR_NAME_TO_RGB))
+def test_rgb_int_is_what_hex_l_spells(name):
+    color = Color(name).replace(lightness=Color(name).lightness * 0.37)
+    rgb = color.rgb_int
+    assert all(type(channel) is int for channel in rgb)
+    assert "#{:02x}{:02x}{:02x}".format(*rgb) == color.hex_l
+
+
+def test_rgb_int_is_read_only():
+    with pytest.raises(AttributeError, match="rgb_int"):
+        Color("red").rgb_int = (0, 0, 0)  # type: ignore

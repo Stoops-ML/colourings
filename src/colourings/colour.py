@@ -1647,6 +1647,16 @@ class Color:
     def get_rgb(self) -> RGBTuple:
         return hsl2rgb(self.hsl)
 
+    def get_rgb_int(self) -> RGBTuple:
+        """RGB rounded to whole numbers, exactly as :attr:`hex_l` spells them.
+
+        Examples
+        --------
+        >>> Color(hex="#123456").rgb_int
+        RGB(red=18, green=52, blue=86)
+        """
+        return RGBTuple(*(int(channel) for channel in hex2rgb(self.hex_l)))
+
     def get_rgbf(self) -> RGBfTuple:
         return hsl2rgbf(self.hsl)
 
@@ -1847,6 +1857,7 @@ class Color:
     alpha = property(get_alpha, set_alpha)
 
     hslf = property(get_hslf)
+    rgb_int = property(get_rgb_int)
     hsla = property(get_hsla)
     hslaf = property(get_hslaf)
     luminance = property(get_luminance)

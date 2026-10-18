@@ -15,6 +15,8 @@ The library uses explicit numeric ranges per format, rather than mixing
      - range
    * - ``rgb``, ``rgba``
      - channels in ``[0, 255]``, alpha included
+   * - ``rgb_int``
+     - read-only, whole numbers in ``[0, 255]``
    * - ``rgbf``, ``rgbaf``
      - channels in ``[0, 1]``
    * - ``hsl``
