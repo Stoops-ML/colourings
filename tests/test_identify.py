@@ -1,6 +1,6 @@
 import pytest
 
-from colourings import Color
+from colourings import Color, InvalidColorError
 from colourings.definitions import COLOR_NAME_TO_RGB, FLOAT_ERROR
 from colourings.identify import (
     is_cmyk,
@@ -19,6 +19,7 @@ from colourings.identify import (
     is_rgbf,
     is_xyz,
     is_yuv,
+    why_invalid,
 )
 
 
@@ -232,3 +233,34 @@ def test_is_yuv():
     assert not is_yuv((0, 0.5, 0))
     assert not is_yuv((0, 0, 0.7))
     assert not is_yuv((0, 0))
+
+
+@pytest.mark.parametrize(
+    ("form", "value", "reason"),
+    [
+        ("rgb", (300, 0, 0), " red=300 is outside [0, 255]."),
+        ("hsl", (0, 150, 50), " saturation=150 is outside [0, 100]."),
+        ("oklch", (0.5, 0.6000000000000001, 0), " chroma=0.6 is outside [0, 0.4]."),
+        (
+            "cmyk",
+            (0, 0, 0),
+            " cmyk takes 4 components (cyan, magenta, yellow, key), not 3.",
+        ),
+        ("lab", (50, "a", 0), " a='a' is not a number."),
+        ("rgb", "red", " rgb takes a sequence of 3 numbers, not str."),
+        ("rgb", (255, 0, 0), ""),
+    ],
+)
+def test_why_invalid_names_the_rejected_component(form, value, reason):
+    assert why_invalid(form, value) == reason
+
+
+def test_constructor_error_says_which_component_is_out_of_range():
+    with pytest.raises(InvalidColorError, match=r"red=300 is outside \[0, 255\]"):
+        Color(rgb=(300, 0, 0))
+
+
+def test_setter_error_says_which_component_is_out_of_range():
+    color = Color("red")
+    with pytest.raises(InvalidColorError, match="lightness=101 is outside"):
+        color.lightness = 101

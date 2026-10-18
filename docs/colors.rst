@@ -35,6 +35,20 @@ Only one colour input source is allowed per call. Passing two raises
 ``ValueError``, since it is a mistake about the call rather than about a
 colour.
 
+.. warning::
+
+   Each format's alpha is on that format's own scale: ``[0, 255]`` for
+   ``rgba``, ``[0, 100]`` for ``hsla``, and ``[0, 1]`` only for ``rgbaf``,
+   ``hslaf`` and the ``alpha`` keyword. CSS writes ``rgba(255, 0, 0, 0.5)``,
+   but ``Color(rgba=(255, 0, 0, 0.5))`` is accepted and is very nearly
+   transparent:
+
+   .. code-block:: python
+
+      Color(rgba=(255, 0, 0, 0.5)).alpha     # 0.00196
+      Color(rgb=(255, 0, 0), alpha=0.5).alpha  # 0.5
+      Color("rgba(255, 0, 0, 0.5)").alpha     # 0.5
+
 Alpha when copying
 ------------------
 
@@ -75,7 +89,7 @@ format to settle it:
        Color((0, 0, 0))
    except AmbiguousColorError as e:
        print(e)
-   # Cannot determine whether color is RGB or HSL.
+   # Cannot determine whether color is RGB or HSL. Pass it as rgb=... or hsl=... to say which.
 
 Setting properties as you build
 -------------------------------
@@ -138,6 +152,28 @@ into the stored HSL:
 
 Note that ``alpha`` is always in ``[0, 1]`` while ``hsla``'s fourth component
 is on the ``[0, 100]`` scale that format uses. :doc:`ranges` lists every scale.
+
+``rgb`` holds floats, since the colour is stored as HSL and converting back
+rarely lands on a whole number. ``rgb_int`` gives the 8-bit integers that
+``hex_l`` spells:
+
+.. code-block:: python
+
+   c = Color(hex="#123456")
+
+   c.rgb      # RGB(red=17.999999999999993, green=51.99999999999997, blue=86.0)
+   c.rgb_int  # RGB(red=18, green=52, blue=86)
+
+Assignment changes the colour in place. To leave it alone and get a changed
+copy instead, as the adjustment methods do, use ``replace``:
+
+.. code-block:: python
+
+   red = Color("red")
+   pink = red.replace(lightness=75, alpha=0.5)
+
+   pink.hsla  # HSLA(hue=0.0, saturation=100.0, lightness=75.0, alpha=50.0)
+   red.hsla   # HSLA(hue=0.0, saturation=100.0, lightness=50.0, alpha=100.0)
 
 Named components
 ----------------
@@ -205,3 +241,13 @@ canonical spelling:
    from colourings.colour import NAMED_HEX
 
    NAMED_HEX.rebeccapurple == NAMED_HEX.RebeccaPurple  # True
+
+``color_names()`` lists every name, sorted, for a picker or a validation
+list, and the accessors list them in ``dir()`` so an editor can complete them:
+
+.. code-block:: python
+
+   from colourings import color_names
+
+   len(color_names())  # 152
+   color_names()[:3]   # ('aliceblue', 'antiquewhite', 'aqua')

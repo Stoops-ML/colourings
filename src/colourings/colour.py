@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import copy
 import difflib
 import hashlib
 import math
+import reprlib
 import string
 import warnings
 from collections.abc import Callable, Generator, Iterable, Sequence
@@ -107,6 +109,7 @@ from .identify import (
     is_rgba,
     is_short_hex,
     is_web,
+    why_invalid,
 )
 
 
@@ -134,7 +137,14 @@ def _no_such_colour(container: object, name: str) -> AttributeError:
     )
 
 
-class C_HSL:
+class _NamedColors:
+    """Lists the color names in ``dir()``, so editors can complete them."""
+
+    def __dir__(self) -> list[str]:
+        return [*super().__dir__(), *COLOR_NAME_TO_RGB]
+
+
+class C_HSL(_NamedColors):
     """Container exposing named colors as HSL tuples."""
 
     def __getattr__(self, value: str) -> HSLTuple:
@@ -164,7 +174,7 @@ class C_HSL:
 NAMED_HSL = C_HSL()
 
 
-class C_RGB:
+class C_RGB(_NamedColors):
     """Container exposing named colors as RGB tuples."""
 
     def __getattr__(self, value: str) -> RGBTuple:
@@ -191,7 +201,7 @@ class C_RGB:
             raise _no_such_colour(self, value) from None
 
 
-class C_HEX:
+class C_HEX(_NamedColors):
     """Container exposing named colors as hexadecimal strings."""
 
     def __getattr__(self, value: str) -> str:
@@ -220,6 +230,34 @@ class C_HEX:
 
 NAMED_RGB = C_RGB()
 NAMED_HEX = C_HEX()
+
+
+def color_names() -> tuple[str, ...]:
+    """List every color name :class:`Color` reads, in alphabetical order.
+
+    These are the CSS named colors, with both spellings of each ``gray`` and
+    ``grey``, and a few X11 names CSS dropped, such as ``navyblue``.
+    ``transparent`` is read too, as CSS, but has no RGB of its own and so is
+    not listed.
+
+    Returns
+    -------
+    tuple[str, ...]
+        The names, in lower case.
+
+    Examples
+    --------
+    >>> names = color_names()
+    >>> names[:3]
+    ('aliceblue', 'antiquewhite', 'aqua')
+    >>> "rebeccapurple" in names
+    True
+    """
+    return _COLOR_NAMES
+
+
+_COLOR_NAMES = tuple(sorted(COLOR_NAME_TO_RGB))
+colour_names = color_names
 
 
 ## For ``color_scale``: the conversion back to HSL, and where the hue channel
@@ -923,7 +961,7 @@ def _did_you_mean(word: str, candidates: Iterable[str]) -> str:
 def _suggestion_for(text: str) -> str:
     """Guess what a string that named no color was meant to be.
 
-    Three shapes are worth guessing at, and anything else gets nothing rather
+    Four shapes are worth guessing at, and anything else gets nothing rather
     than a suggestion drawn from the wrong table.
 
     Parameters
@@ -953,6 +991,8 @@ def _suggestion_for(text: str) -> str:
                 f"has {len(digits)}."
             )
         return ""
+    if len(text) in (3, 4, 6, 8) and all(digit in string.hexdigits for digit in text):
+        return f" Did you mean {'#' + text!r}?"
     return _did_you_mean(text, COLOR_NAME_TO_RGB)
 
 
@@ -970,6 +1010,9 @@ def _why_it_is_not_a_colour(color: object) -> str:
     being told to try ``Canvas`` and then told that ``Canvas`` has no value
     would be two steps to nowhere.
 
+    An integer that fits in 24 bits is offered as the hex string it spells,
+    and any other non-string is shown abbreviated by :mod:`reprlib`.
+
     Parameters
     ----------
     color : object
@@ -980,8 +1023,14 @@ def _why_it_is_not_a_colour(color: object) -> str:
     str
         The message to raise.
     """
+    if (
+        isinstance(color, int)
+        and not isinstance(color, bool)
+        and 0 <= color <= 0xFFFFFF
+    ):
+        return f"Cannot identify color {color!r}. Did you mean '#{color:06x}'?"
     if not isinstance(color, str):
-        return "Cannot identify color."
+        return f"Cannot identify color {reprlib.repr(color)}."
     text = color.strip().lower()
     if text in SYSTEM_COLORS:
         return (
@@ -1020,14 +1069,20 @@ def identify_color(
         and is_rgb(color)
         and is_hsl(color)
     ):
-        raise AmbiguousColorError("Cannot determine whether color is RGB or HSL.")
+        raise AmbiguousColorError(
+            "Cannot determine whether color is RGB or HSL. "
+            "Pass it as rgb=... or hsl=... to say which."
+        )
     if (
         isinstance(color, Sequence)
         and len(color) == 4
         and is_rgba(color)
         and is_hsla(color)
     ):
-        raise AmbiguousColorError("Cannot determine whether color is RGBA or HSLA.")
+        raise AmbiguousColorError(
+            "Cannot determine whether color is RGBA or HSLA. "
+            "Pass it as rgba=... or hsla=... to say which."
+        )
 
     if isinstance(color, Color):
         return lambda existing: HSLTuple(*existing.hsl)
@@ -1041,6 +1096,44 @@ def identify_color(
             if matches(color):
                 return convert
     raise UnknownColorError(_why_it_is_not_a_colour(color))
+
+
+def _input_count_message(
+    inputs: list[str], given: list[str], keywords: dict[str, Any]
+) -> str:
+    """Say why the constructor did not get exactly one color input.
+
+    Parameters
+    ----------
+    inputs : list[str]
+        Every color input the constructor accepts.
+    given : list[str]
+        The ones that were passed.
+    keywords : dict[str, Any]
+        The trailing keywords, which may hold a misspelled input.
+
+    Returns
+    -------
+    str
+        The message to raise.
+    """
+    names = [f"{name!r}" for name in inputs]
+    rule = f"Only one of {', '.join(names[:-1])} or {names[-1]} may be entered."
+    if given:
+        listed = ", ".join(repr(name) for name in given)
+        return f"Got {listed} together. {rule}"
+    properties = {
+        name
+        for name, member in vars(Color).items()
+        if isinstance(member, property) and member.fset is not None
+    }
+    for keyword in keywords:
+        if keyword not in properties:
+            suggestion = _did_you_mean(keyword, {*inputs, *properties})
+            return (
+                f"No color was given; {keyword!r} is not an input.{suggestion} {rule}"
+            )
+    return f"No color was given. {rule}"
 
 
 def _apply_property_keywords(color: Color, keywords: dict[str, Any]) -> None:
@@ -1342,7 +1435,8 @@ class Color:
     hsl : Sequence[int | float] | None, optional
         HSL components as ``(h, s, l)``.
     hsla : Sequence[int | float] | None, optional
-        HSLA components as ``(h, s, l, a)`` with alpha in percent.
+        HSLA components as ``(h, s, l, a)`` with alpha in percent, not the
+        ``[0, 1]`` fraction ``alpha`` takes.
     hslf : Sequence[int | float] | None, optional
         Normalized HSL components in ``[0, 1]``.
     hslaf : Sequence[int | float] | None, optional
@@ -1373,7 +1467,9 @@ class Color:
     rgb : Sequence[int | float] | None, optional
         RGB components in ``[0, 255]``.
     rgba : Sequence[int | float] | None, optional
-        RGBA components with alpha in ``[0, 255]``.
+        RGBA components with alpha in ``[0, 255]``, not the ``[0, 1]`` CSS
+        uses: ``(255, 0, 0, 0.5)`` is almost transparent. Pass ``alpha=``
+        or ``rgbaf`` for a fraction.
     rgbf : Sequence[int | float] | None, optional
         Normalized RGB components in ``[0, 1]``.
     rgbaf : Sequence[int | float] | None, optional
@@ -1484,10 +1580,7 @@ class Color:
         }
         given = [name for name, value in inputs.items() if value is not None]
         if len(given) != 1:
-            names = [f"{name!r}" for name in inputs]
-            raise ValueError(
-                f"Only one of {', '.join(names[:-1])} or {names[-1]} may be entered."
-            )
+            raise ValueError(_input_count_message(list(inputs), given, kwargs))
         source = given[0]
         value = inputs[source]
 
@@ -1556,6 +1649,16 @@ class Color:
 
     def get_rgb(self) -> RGBTuple:
         return hsl2rgb(self.hsl)
+
+    def get_rgb_int(self) -> RGBTuple:
+        """RGB rounded to whole numbers, exactly as :attr:`hex_l` spells them.
+
+        Examples
+        --------
+        >>> Color(hex="#123456").rgb_int
+        RGB(red=18, green=52, blue=86)
+        """
+        return RGBTuple(*(int(channel) for channel in hex2rgb(self.hex_l)))
 
     def get_rgbf(self) -> RGBfTuple:
         return hsl2rgbf(self.hsl)
@@ -1656,7 +1759,9 @@ class Color:
 
     def set_hsl(self, value: Sequence[float]) -> None:
         if not is_hsl(value):
-            raise InvalidColorError("Value is not a valid HSL")
+            raise InvalidColorError(
+                f"Value is not a valid HSL.{why_invalid('hsl', value)}"
+            )
         ## float, so every attribute reports floats whatever was passed in.
         self._hsl = HSLTuple(float(value[0]), float(value[1]), float(value[2]))
 
@@ -1755,6 +1860,7 @@ class Color:
     alpha = property(get_alpha, set_alpha)
 
     hslf = property(get_hslf)
+    rgb_int = property(get_rgb_int)
     hsla = property(get_hsla)
     hslaf = property(get_hslaf)
     luminance = property(get_luminance)
@@ -2562,8 +2668,75 @@ class Color:
     def __str__(self) -> str:
         return f"{self.web}"
 
+    def __format__(self, format_spec: str) -> str:
+        """Format as ``str`` does, or as CSS when a form is named.
+
+        Parameters
+        ----------
+        format_spec : str
+            Empty, or one of the forms :meth:`to_css` takes.
+
+        Returns
+        -------
+        str
+            The color's web name for an empty spec, else its CSS.
+
+        Raises
+        ------
+        ValueError
+            Raised when ``format_spec`` is not a form ``to_css`` knows.
+
+        Examples
+        --------
+        >>> red = Color("red")
+        >>> f"{red} is {red:hex}, or {red:rgb}"
+        'red is #f00, or rgb(255 0 0)'
+        """
+        if not format_spec:
+            return str(self)
+        return self.to_css(format_spec)
+
     def __repr__(self) -> str:
-        return f"<Color {self.web}>"
+        if self._alpha == 1:
+            return f"<Color {self.web}>"
+        return f"<Color {self.web} alpha={self._alpha:g}>"
+
+    def replace(self, **properties: Any) -> Color:
+        """Return a copy with some properties changed, leaving this one alone.
+
+        Assigning a property changes the color in place, which is easy to get
+        wrong when the color is shared; this changes a copy instead, as the
+        adjustment methods do. The copy keeps the ``equality`` strategy.
+
+        Parameters
+        ----------
+        **properties : Any
+            Writable properties to set on the copy, in the order given. Each
+            goes through its own setter and is validated as an assignment is.
+
+        Returns
+        -------
+        Color
+            The changed copy.
+
+        Raises
+        ------
+        ValueError
+            Raised when a name is one of the stored attributes.
+        AttributeError
+            Raised when a name is not a writable property.
+
+        Examples
+        --------
+        >>> red = Color("red")
+        >>> red.replace(alpha=0.5, lightness=25).to_css("rgb")
+        'rgb(127 0 0 / 0.5)'
+        >>> red
+        <Color red>
+        """
+        changed = copy.copy(self)
+        _apply_property_keywords(changed, properties)
+        return changed
 
     def equals(
         self,

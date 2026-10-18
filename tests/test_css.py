@@ -248,6 +248,13 @@ def test_every_form_round_trips_exactly():
                         assert back.alpha == pytest.approx(alpha, abs=0.002)
 
 
+@pytest.mark.parametrize("tie", [126.5, 127.5, 0.5, 254.5])
+def test_rgb_form_rounds_a_tie_as_hex_does(tie):
+    color = Color(rgb=(tie, 0, 0))
+    assert Color(color.to_css("rgb")).hex_l == color.hex_l
+    assert color.to_css("rgb") == f"rgb({color.rgb_int.red} 0 0)"
+
+
 def test_a_whole_channel_is_not_trimmed_away():
     """`250` must not be written as `25`. Stripping trailing zeros from the
     integer part turns a rounding into a different colour."""
@@ -494,3 +501,19 @@ def test_a_misspelled_color_function_suggests_it():
     with pytest.raises(UnknownColorError, match="Did you mean") as raised:
         Color("colr(srgb 1 0 0)")
     assert "'color'" in str(raised.value)
+
+
+@pytest.mark.parametrize("form", ["hex", "rgb", "hsl", "oklch"])
+def test_format_spec_is_to_css(form):
+    color = Color("teal", alpha=0.25)
+    assert format(color, form) == color.to_css(form)
+
+
+def test_empty_format_spec_is_str():
+    color = Color("teal")
+    assert f"{color}" == str(color) == "teal"
+
+
+def test_unknown_format_spec_is_refused():
+    with pytest.raises(ValueError, match="Unknown CSS form 'lab'"):
+        format(Color("red"), "lab")

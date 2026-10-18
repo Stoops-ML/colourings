@@ -64,6 +64,7 @@ from .identify import (
     is_web,
     is_xyz,
     is_yuv,
+    why_invalid,
 )
 
 P = ParamSpec("P")
@@ -286,7 +287,7 @@ def hsl2hsla(hsl: Sequence[int | float], alpha: int | float) -> HSLA:
         HSLA tuple with alpha scaled to ``[0, 100]``.
     """
     if not is_hsl(hsl):
-        raise InvalidColorError("Input is not an HSL type.")
+        raise InvalidColorError(f"Input is not an HSL type.{why_invalid('hsl', hsl)}")
     return HSLA(
         _threshold(hsl[0]),
         _threshold(hsl[1]),
@@ -312,7 +313,7 @@ def hsl2hslaf(hsl: Sequence[int | float], alpha: int | float) -> HSLAf:
         HSLAf tuple where hue is scaled to ``[0, 1]`` and saturation/lightness to ``[0, 1]``.
     """
     if not is_hsl(hsl):
-        raise InvalidColorError("Input is not an HSL type.")
+        raise InvalidColorError(f"Input is not an HSL type.{why_invalid('hsl', hsl)}")
     return HSLAf(
         _threshold(hsl[0] / 360.0),
         _threshold(hsl[1] / 100.0),
@@ -336,7 +337,9 @@ def hslf2hsl(hslf: Sequence[int | float]) -> HSL:
         HSL tuple with hue in ``[0, 360]`` and saturation/lightness in ``[0, 100]``.
     """
     if not is_hslf(hslf):
-        raise InvalidColorError("Input is not an HSLf type.")
+        raise InvalidColorError(
+            f"Input is not an HSLf type.{why_invalid('hslf', hslf)}"
+        )
     return HSL(
         _threshold(hslf[0] * 360.0),
         _threshold(hslf[1] * 100.0),
@@ -359,7 +362,7 @@ def hsl2hslf(hsl: Sequence[int | float]) -> HSLf:
         HSLf tuple normalized to ``[0, 1]``.
     """
     if not is_hsl(hsl):
-        raise InvalidColorError("Input is not an HSLf type.")
+        raise InvalidColorError(f"Input is not an HSLf type.{why_invalid('hsl', hsl)}")
     return HSLf(
         _threshold(hsl[0] / 360.0),
         _threshold(hsl[1] / 100.0),
@@ -382,7 +385,7 @@ def hsl2rgb(hsl: Sequence[int | float]) -> RGB:
         RGB tuple in the ``[0, 255]`` range.
     """
     if not is_hsl(hsl):
-        raise InvalidColorError("Input is not an HSL type.")
+        raise InvalidColorError(f"Input is not an HSL type.{why_invalid('hsl', hsl)}")
     r, g, b = _hsl2rgbf(hsl)
     return RGB(
         _threshold(r * 255.0),
@@ -406,7 +409,7 @@ def hsl2rgbf(hsl: Sequence[int | float]) -> RGBf:
         RGBf tuple in the ``[0, 1]`` range.
     """
     if not is_hsl(hsl):
-        raise InvalidColorError("Input is not an HSL type.")
+        raise InvalidColorError(f"Input is not an HSL type.{why_invalid('hsl', hsl)}")
     r, g, b = _hsl2rgbf(hsl)
     return RGBf(_threshold(r), _threshold(g), _threshold(b))
 
@@ -426,7 +429,9 @@ def rgba2hsl(rgba: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     if not is_rgba(rgba):
-        raise InvalidColorError("Input is not an RGBA type.")
+        raise InvalidColorError(
+            f"Input is not an RGBA type.{why_invalid('rgba', rgba)}"
+        )
     return rgb2hsl(rgba[:3])
 
 
@@ -445,7 +450,9 @@ def rgbaf2hsl(rgbaf: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     if not is_rgbaf(rgbaf):
-        raise InvalidColorError("Input is not an RGBAf type.")
+        raise InvalidColorError(
+            f"Input is not an RGBAf type.{why_invalid('rgbaf', rgbaf)}"
+        )
     return _rgbf2hsl(_threshold(rgbaf[0]), _threshold(rgbaf[1]), _threshold(rgbaf[2]))
 
 
@@ -464,7 +471,9 @@ def hsla2hsl(hsla: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     if not is_hsla(hsla):
-        raise InvalidColorError("Input is not an HSLA type.")
+        raise InvalidColorError(
+            f"Input is not an HSLA type.{why_invalid('hsla', hsla)}"
+        )
     return HSL(_threshold(hsla[0]), _threshold(hsla[1]), _threshold(hsla[2]))
 
 
@@ -483,7 +492,9 @@ def rgbf2hsl(rgbf: Sequence[int | float]) -> HSL:
         HSL tuple.
     """
     if not is_rgbf(rgbf):
-        raise InvalidColorError("Input is not an RGBf type.")
+        raise InvalidColorError(
+            f"Input is not an RGBf type.{why_invalid('rgbf', rgbf)}"
+        )
     return _rgbf2hsl(_threshold(rgbf[0]), _threshold(rgbf[1]), _threshold(rgbf[2]))
 
 
@@ -502,7 +513,7 @@ def rgb2hsl(rgb: Sequence[int | float]) -> HSL:
         HSL tuple where hue is in ``[0, 360]`` and saturation/lightness are in ``[0, 100]``.
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not an RGB type.")
+        raise InvalidColorError(f"Input is not an RGB type.{why_invalid('rgb', rgb)}")
     return _rgbf2hsl(*rgb2rgbf(rgb))
 
 
@@ -631,6 +642,15 @@ def _hue2rgb(v1: float, v2: float, vH: float) -> float:
     return v1
 
 
+def _byte(channel: float) -> int:
+    """Round a ``[0, 255]`` channel to the 8-bit value every output shares.
+
+    Ties go down, and so does anything within ``FLOAT_ERROR`` above one, so
+    that noise from the HSL round trip cannot tip a channel up a step.
+    """
+    return int(channel + 0.5 - FLOAT_ERROR)
+
+
 @_cached
 def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
     """Convert RGB components to a hexadecimal color string.
@@ -648,9 +668,9 @@ def rgb2hex(rgb: Sequence[int | float], force_long: bool = False) -> str:
         Hex color string prefixed with ``#``.
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not of RGB type.")
+        raise InvalidColorError(f"Input is not of RGB type.{why_invalid('rgb', rgb)}")
 
-    hx = "".join([f"{int(c + 0.5 - FLOAT_ERROR):02x}" for c in rgb])
+    hx = "".join(f"{_byte(c):02x}" for c in rgb)
 
     if not force_long and hx[0::2] == hx[1::2]:
         hx = "".join(hx[0::2])
@@ -781,8 +801,10 @@ def rgba2hex(rgba: Sequence[int | float], force_long: bool = False) -> str:
     '#ff000080'
     """
     if not is_rgba(rgba):
-        raise InvalidColorError("Input is not of RGBA type.")
-    hx = "".join(f"{int(c + 0.5 - FLOAT_ERROR):02x}" for c in rgba)
+        raise InvalidColorError(
+            f"Input is not of RGBA type.{why_invalid('rgba', rgba)}"
+        )
+    hx = "".join(f"{_byte(c):02x}" for c in rgba)
     if not force_long and hx[0::2] == hx[1::2]:
         hx = "".join(hx[0::2])
     return f"#{hx}"
@@ -867,7 +889,7 @@ def hsl2hex(hsl: Sequence[int | float]) -> str:
         Hex color string.
     """
     if not is_hsl(hsl):
-        raise InvalidColorError("Input is not of hsl type.")
+        raise InvalidColorError(f"Input is not of hsl type.{why_invalid('hsl', hsl)}")
     return rgb2hex(hsl2rgb(hsl))
 
 
@@ -905,7 +927,7 @@ def rgb2web(rgb: Sequence[int | float]) -> str:
         Named CSS color when available, otherwise hex.
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not an RGB type.")
+        raise InvalidColorError(f"Input is not an RGB type.{why_invalid('rgb', rgb)}")
     return hex2web(rgb2hex(rgb))
 
 
@@ -962,7 +984,7 @@ def hsl2web(hsl: Sequence[int | float]) -> str:
         Named CSS color when available, otherwise hex.
     """
     if not is_hsl(hsl):
-        raise InvalidColorError("Input is not an HSL type.")
+        raise InvalidColorError(f"Input is not an HSL type.{why_invalid('hsl', hsl)}")
     return rgb2web(hsl2rgb(hsl))
 
 
@@ -986,7 +1008,7 @@ def hsl2hsv(hsl: Sequence[int | float]) -> HSV:
         ``[0, 100]``.
     """
     if not is_hsl(hsl):
-        raise InvalidColorError("Input is not an HSL type.")
+        raise InvalidColorError(f"Input is not an HSL type.{why_invalid('hsl', hsl)}")
     _h, _s, _l = (float(v) for v in hsl)
     _s /= 100.0
     _l /= 100.0
@@ -1018,7 +1040,7 @@ def hsv2hsl(hsv: Sequence[int | float]) -> HSL:
         ``[0, 100]``.
     """
     if not is_hsv(hsv):
-        raise InvalidColorError("Input is not an HSV type.")
+        raise InvalidColorError(f"Input is not an HSV type.{why_invalid('hsv', hsv)}")
     _h, _s, _v = (float(v) for v in hsv)
     _s /= 100.0
     _v /= 100.0
@@ -1049,7 +1071,7 @@ def rgb2hsv(rgb: Sequence[int | float]) -> HSV:
         HSV tuple.
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not an RGB type.")
+        raise InvalidColorError(f"Input is not an RGB type.{why_invalid('rgb', rgb)}")
     return hsl2hsv(rgb2hsl(rgb))
 
 
@@ -1068,7 +1090,7 @@ def hsv2rgb(hsv: Sequence[int | float]) -> RGB:
         RGB tuple in the ``[0, 255]`` range.
     """
     if not is_hsv(hsv):
-        raise InvalidColorError("Input is not an HSV type.")
+        raise InvalidColorError(f"Input is not an HSV type.{why_invalid('hsv', hsv)}")
     return hsl2rgb(hsv2hsl(hsv))
 
 
@@ -1087,7 +1109,7 @@ def hsv2hex(hsv: Sequence[int | float]) -> str:
         Hex color string.
     """
     if not is_hsv(hsv):
-        raise InvalidColorError("Input is not an HSV type.")
+        raise InvalidColorError(f"Input is not an HSV type.{why_invalid('hsv', hsv)}")
     return rgb2hex(hsv2rgb(hsv))
 
 
@@ -1125,7 +1147,7 @@ def hsv2web(hsv: Sequence[int | float]) -> str:
         Named CSS color when available, otherwise hex.
     """
     if not is_hsv(hsv):
-        raise InvalidColorError("Input is not an HSV type.")
+        raise InvalidColorError(f"Input is not an HSV type.{why_invalid('hsv', hsv)}")
     return rgb2web(hsv2rgb(hsv))
 
 
@@ -1255,7 +1277,7 @@ def rgb2relative_luminance(rgb: Sequence[int | float]) -> float:
     0.2126
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not an RGB type.")
+        raise InvalidColorError(f"Input is not an RGB type.{why_invalid('rgb', rgb)}")
     red, green, blue = (_srgb_to_linear(c) for c in rgb2rgbf(rgb))
     kr, kg, kb = WCAG_LUMINANCE_COEFFICIENTS
     return kr * red + kg * green + kb * blue
@@ -1350,7 +1372,7 @@ def rgb2xyz(rgb: Sequence[int | float]) -> XYZ:
         XYZ tuple scaled so that the reference white has ``y`` of 100.
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not an RGB type.")
+        raise InvalidColorError(f"Input is not an RGB type.{why_invalid('rgb', rgb)}")
     linear = [_srgb_to_linear(c) for c in rgb2rgbf(rgb)]
     x, y, z = _matrix_apply(RGB_TO_XYZ_MATRIX, linear)
     return XYZ(_threshold(x * 100.0), _threshold(y * 100.0), _threshold(z * 100.0))
@@ -1373,7 +1395,7 @@ def xyz2rgb(xyz: Sequence[int | float]) -> RGB:
         RGB tuple in the ``[0, 255]`` range.
     """
     if not is_xyz(xyz):
-        raise InvalidColorError("Input is not an XYZ type.")
+        raise InvalidColorError(f"Input is not an XYZ type.{why_invalid('xyz', xyz)}")
     linear = _matrix_apply(XYZ_TO_RGB_MATRIX, [c / 100.0 for c in xyz])
     return RGB(*(_threshold(_linear_to_srgb(c) * 255.0) for c in linear))
 
@@ -1393,7 +1415,7 @@ def xyz2lab(xyz: Sequence[int | float]) -> LAB:
         L*a*b* tuple with lightness in ``[0, 100]``.
     """
     if not is_xyz(xyz):
-        raise InvalidColorError("Input is not an XYZ type.")
+        raise InvalidColorError(f"Input is not an XYZ type.{why_invalid('xyz', xyz)}")
 
     def f(t: float) -> float:
         if t > LAB_DELTA**3:
@@ -1423,7 +1445,7 @@ def lab2xyz(lab: Sequence[int | float]) -> XYZ:
         XYZ tuple under D65.
     """
     if not is_lab(lab):
-        raise InvalidColorError("Input is not a LAB type.")
+        raise InvalidColorError(f"Input is not a LAB type.{why_invalid('lab', lab)}")
 
     def f_inv(t: float) -> float:
         if t > LAB_DELTA:
@@ -1456,7 +1478,7 @@ def lab2lch(lab: Sequence[int | float]) -> LCH:
         LCh tuple with hue in ``[0, 360]``.
     """
     if not is_lab(lab):
-        raise InvalidColorError("Input is not a LAB type.")
+        raise InvalidColorError(f"Input is not a LAB type.{why_invalid('lab', lab)}")
     chroma = math.hypot(lab[1], lab[2])
     hue = math.degrees(math.atan2(lab[2], lab[1])) % 360.0
     return LCH(_threshold(lab[0]), _threshold(chroma), _threshold(hue))
@@ -1477,7 +1499,7 @@ def lch2lab(lch: Sequence[int | float]) -> LAB:
         L*a*b* tuple.
     """
     if not is_lch(lch):
-        raise InvalidColorError("Input is not an LCH type.")
+        raise InvalidColorError(f"Input is not an LCH type.{why_invalid('lch', lch)}")
     radians = math.radians(lch[2])
     return LAB(
         _threshold(lch[0]),
@@ -1581,7 +1603,7 @@ def rgb2oklab(rgb: Sequence[int | float]) -> OKLAB:
         Oklab tuple with lightness in ``[0, 1]``.
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not an RGB type.")
+        raise InvalidColorError(f"Input is not an RGB type.{why_invalid('rgb', rgb)}")
     linear = [_srgb_to_linear(c) for c in rgb2rgbf(rgb)]
     ## The matrix is all-positive and the channels non-negative, so no cube
     ## root sees a negative base. ``float`` because ``**`` may type as complex.
@@ -1611,7 +1633,9 @@ def oklab2rgb(oklab: Sequence[int | float]) -> RGB:
         RGB tuple in the ``[0, 255]`` range.
     """
     if not is_oklab(oklab):
-        raise InvalidColorError("Input is not an OKLAB type.")
+        raise InvalidColorError(
+            f"Input is not an OKLAB type.{why_invalid('oklab', oklab)}"
+        )
     roots = _matrix_apply(OKLAB_TO_LMS_MATRIX, oklab)
     linear = _matrix_apply(LMS_TO_RGB_MATRIX, [c**3 for c in roots])
     return RGB(*(_threshold(_linear_to_srgb(c) * 255.0) for c in linear))
@@ -1632,7 +1656,9 @@ def oklab2oklch(oklab: Sequence[int | float]) -> OKLCH:
         Oklch tuple with hue in ``[0, 360]``.
     """
     if not is_oklab(oklab):
-        raise InvalidColorError("Input is not an OKLAB type.")
+        raise InvalidColorError(
+            f"Input is not an OKLAB type.{why_invalid('oklab', oklab)}"
+        )
     chroma = math.hypot(oklab[1], oklab[2])
     if chroma < FLOAT_ERROR:
         ## Below FLOAT_ERROR the angle is just the direction of the noise, and
@@ -1657,7 +1683,9 @@ def oklch2oklab(oklch: Sequence[int | float]) -> OKLAB:
         Oklab tuple.
     """
     if not is_oklch(oklch):
-        raise InvalidColorError("Input is not an OKLCH type.")
+        raise InvalidColorError(
+            f"Input is not an OKLCH type.{why_invalid('oklch', oklch)}"
+        )
     radians = math.radians(oklch[2])
     ## a and b skip _threshold for the reason given in rgb2oklab.
     return OKLAB(
@@ -1720,7 +1748,7 @@ def rgb2cmyk(rgb: Sequence[int | float]) -> CMYK:
         CMYK tuple with each component in the ``[0, 100]`` range.
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not an RGB type.")
+        raise InvalidColorError(f"Input is not an RGB type.{why_invalid('rgb', rgb)}")
     r, g, b = rgb2rgbf(rgb)
     key = 1.0 - max(r, g, b)
     if key >= 1.0:  ## black has no chromatic component to record
@@ -1749,7 +1777,7 @@ def cmyk2rgb(cmyk: Sequence[int | float]) -> RGB:
         RGB tuple in the ``[0, 255]`` range.
     """
     if not is_cmyk(cmyk):
-        raise InvalidColorError("Input is not a CMYK type.")
+        raise InvalidColorError(f"Input is not a CMYK type.{why_invalid('cmyk', cmyk)}")
     c, m, y, k = (component / 100.0 for component in cmyk)
     return RGB(
         _threshold((1.0 - c) * (1.0 - k) * 255.0),
@@ -1773,7 +1801,7 @@ def rgb2yuv(rgb: Sequence[int | float]) -> YUV:
         YUV tuple with luma in ``[0, 1]``.
     """
     if not is_rgb(rgb):
-        raise InvalidColorError("Input is not an RGB type.")
+        raise InvalidColorError(f"Input is not an RGB type.{why_invalid('rgb', rgb)}")
     r, g, b = rgb2rgbf(rgb)
     kr, kg, kb = YUV_LUMA_COEFFICIENTS
     luma = kr * r + kg * g + kb * b
@@ -1803,7 +1831,7 @@ def yuv2rgb(yuv: Sequence[int | float]) -> RGB:
         RGB tuple in the ``[0, 255]`` range.
     """
     if not is_yuv(yuv):
-        raise InvalidColorError("Input is not a YUV type.")
+        raise InvalidColorError(f"Input is not a YUV type.{why_invalid('yuv', yuv)}")
     luma, u, v = (float(c) for c in yuv)
     kr, kg, kb = YUV_LUMA_COEFFICIENTS
     r = luma + v / YUV_V_SCALE
@@ -2102,7 +2130,7 @@ def _encode_unclamped(channel: float) -> float:
 def _unclamped_rgbf_from_xyz(xyz: Sequence[int | float]) -> tuple[float, ...]:
     """Gamma-encoded sRGB channels for an XYZ colour, clamping nothing."""
     if not is_xyz(xyz):
-        raise InvalidColorError("Input is not an XYZ type.")
+        raise InvalidColorError(f"Input is not an XYZ type.{why_invalid('xyz', xyz)}")
     linear = _matrix_apply(XYZ_TO_RGB_MATRIX, [c / 100.0 for c in xyz])
     return tuple(_encode_unclamped(c) for c in linear)
 
@@ -2110,7 +2138,9 @@ def _unclamped_rgbf_from_xyz(xyz: Sequence[int | float]) -> tuple[float, ...]:
 def _unclamped_rgbf_from_oklab(oklab: Sequence[int | float]) -> tuple[float, ...]:
     """Gamma-encoded sRGB channels for an Oklab colour, clamping nothing."""
     if not is_oklab(oklab):
-        raise InvalidColorError("Input is not an OKLAB type.")
+        raise InvalidColorError(
+            f"Input is not an OKLAB type.{why_invalid('oklab', oklab)}"
+        )
     roots = _matrix_apply(OKLAB_TO_LMS_MATRIX, oklab)
     linear = _matrix_apply(LMS_TO_RGB_MATRIX, [c**3 for c in roots])
     return tuple(_encode_unclamped(c) for c in linear)
@@ -2123,7 +2153,7 @@ def _unclamped_rgbf_from_yuv(yuv: Sequence[int | float]) -> tuple[float, ...]:
     is no transfer function to undo here.
     """
     if not is_yuv(yuv):
-        raise InvalidColorError("Input is not a YUV type.")
+        raise InvalidColorError(f"Input is not a YUV type.{why_invalid('yuv', yuv)}")
     luma, u, v = (float(c) for c in yuv)
     kr, kg, kb = YUV_LUMA_COEFFICIENTS
     r = luma + v / YUV_V_SCALE

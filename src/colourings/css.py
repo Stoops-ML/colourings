@@ -30,6 +30,7 @@ from .conversions import (
     LINEAR_REC2020_TO_LINEAR_SRGB,
     XYZ_D65_TO_LINEAR_SRGB,
     _a98_to_linear,
+    _byte,
     _cached,
     _linear_to_srgb,
     _matrix_apply,
@@ -584,12 +585,10 @@ def css2hsl(css: str) -> HSL:
 def _trim(value: float, places: int) -> str:
     """Write a number without trailing zeros, and without a negative zero.
 
-    Only the fractional part is stripped. Stripping unconditionally turns the
-    channel value 250 into "25", which is a colour rather than a rounding.
+    ``places`` must be at least 1, so there is a point to stop at: stripping
+    ``f"{250:.0f}"`` would turn the channel 250 into "25".
     """
-    text = f"{value:.{places}f}"
-    if "." in text:
-        text = text.rstrip("0").rstrip(".")
+    text = f"{value:.{places}f}".rstrip("0").rstrip(".")
     return "0" if text in ("", "-0", "-") else text
 
 
@@ -642,7 +641,7 @@ def hsla2css(
         return rgba2hex((red, green, blue, alpha * 255.0))
 
     if form == "rgb":
-        body = " ".join(_trim(channel, 0) for channel in hsl2rgb(hsl))
+        body = " ".join(str(_byte(channel)) for channel in hsl2rgb(hsl))
     elif form == "hsl":
         hue, saturation, lightness = hsl
         body = f"{_trim(hue, 2)} {_trim(saturation, 2)}% {_trim(lightness, 2)}%"

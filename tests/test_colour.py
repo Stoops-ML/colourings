@@ -27,7 +27,9 @@ from colourings.colour import (
     _blend_luma,
     _blend_saturation,
     _set_blend_saturation,
+    color_names,
     color_scale,
+    colour_names,
     colour_scale,
     hash_or_str,
     identify_color,
@@ -413,6 +415,45 @@ def test_bad_identify_color():
 
 
 @pytest.mark.parametrize(
+    ("value", "suggestion"),
+    [
+        ("ff0000", "'#ff0000'"),
+        ("ABC", "'#abc'"),
+        ("ff000080", "'#ff000080'"),
+        (0xFF0000, "'#ff0000'"),
+        (0, "'#000000'"),
+    ],
+)
+def test_bare_hex_and_integers_suggest_the_hash_form(value, suggestion):
+    with pytest.raises(UnknownColorError, match=f"Did you mean {suggestion}"):
+        Color(value)
+
+
+@pytest.mark.parametrize("value", [0x1000000, -1, True, 1.5])
+def test_other_non_strings_are_shown_without_a_suggestion(value):
+    with pytest.raises(UnknownColorError) as raised:
+        Color(value)
+    assert str(raised.value) == f"Cannot identify color {value!r}."
+
+
+def test_a_long_unidentifiable_value_is_abbreviated():
+    with pytest.raises(UnknownColorError, match=r"\.\.\.\]\.$"):
+        Color(list(range(50)))
+
+
+@pytest.mark.parametrize(
+    ("value", "hint"),
+    [
+        ((0, 0, 0), "Pass it as rgb=... or hsl=..."),
+        ((0, 0, 0, 0), "Pass it as rgba=... or hsla=..."),
+    ],
+)
+def test_ambiguous_error_names_the_keywords_that_settle_it(value, hint):
+    with pytest.raises(AmbiguousColorError, match=hint):
+        Color(value)
+
+
+@pytest.mark.parametrize(
     "value",
     [
         123,  # neither a string nor a sequence
@@ -774,6 +815,31 @@ def test_only_one_input():
         Color(color="red", pick_for="foo")
 
 
+def test_two_inputs_are_named():
+    with pytest.raises(ValueError, match="Got 'color', 'pick_for' together"):
+        Color(color="red", pick_for="foo")
+
+
+def test_no_input_is_reported_as_such():
+    with pytest.raises(ValueError, match=r"No color was given\. Only one of"):
+        Color()
+
+
+def test_property_keyword_alone_is_not_called_unknown():
+    with pytest.raises(ValueError, match=r"No color was given\. Only one of"):
+        Color(lightness=50)
+
+
+def test_misspelled_input_is_suggested():
+    with pytest.raises(ValueError, match="Did you mean 'rgb'"):
+        Color(rbg=(1, 2, 3))
+
+
+def test_unrecognisable_keyword_gets_no_suggestion():
+    with pytest.raises(ValueError, match=r"'qqq' is not an input\. Only one of"):
+        Color(qqq=1)
+
+
 def test_pick_for():
     """Equal keys give one colour, different keys give different ones.
 
@@ -811,6 +877,18 @@ def test_color_str():
     c = Color("red")
     assert str(c) == "red"
     assert repr(c) == "<Color red>"
+
+
+@pytest.mark.parametrize(
+    ("color", "expected"),
+    [
+        (Color("red", alpha=0.5), "<Color red alpha=0.5>"),
+        (Color("red", alpha=0), "<Color red alpha=0>"),
+        (Color("#ff000080"), "<Color red alpha=0.501961>"),
+    ],
+)
+def test_repr_shows_alpha_when_not_opaque(color, expected):
+    assert repr(color) == expected
 
 
 def test_purple_inputs():
@@ -2668,3 +2746,73 @@ def test_each_accessor_names_itself_in_its_error(accessor, expected):
 def test_the_accessors_are_case_insensitive(accessor):
     assert getattr(accessor, "BLUE") == getattr(accessor, "blue")  # noqa: B009
     assert getattr(accessor, "RebeccaPurple") == getattr(accessor, "rebeccapurple")  # noqa: B009
+
+
+def test_replace_changes_a_copy_and_not_the_original():
+    red = Color("red")
+    pink = red.replace(lightness=75, alpha=0.5)
+    assert pink.hsl == (0.0, 100.0, 75.0)
+    assert pink.alpha == 0.5
+    assert red.hsl == (0.0, 100.0, 50.0)
+    assert red.alpha == 1.0
+
+
+def test_replace_applies_properties_in_order():
+    assert Color("red").replace(rgb=(0, 0, 255), hue=120).hex_l == "#00ff00"
+
+
+def test_replace_keeps_the_equality_strategy():
+    color = Color("red", equality=HSL_equivalence)
+    assert color.replace(alpha=0.5).equality is HSL_equivalence
+
+
+def test_replace_keeps_the_subclass():
+    class Swatch(Color):
+        __slots__ = ()
+
+    assert type(Swatch("red").replace(lightness=10)) is Swatch
+
+
+def test_replace_validates_like_assignment():
+    with pytest.raises(InvalidColorError, match="lightness=200 is outside"):
+        Color("red").replace(lightness=200)
+
+
+def test_replace_refuses_stored_state():
+    with pytest.raises(ValueError, match="is stored state"):
+        Color("red").replace(_hsl=(0, 0, 0))
+
+
+def test_replace_refuses_an_unknown_name():
+    with pytest.raises(AttributeError, match="lightnes"):
+        Color("red").replace(lightnes=50)
+
+
+def test_color_names_are_every_name_sorted():
+    names = color_names()
+    assert names == tuple(sorted(COLOR_NAME_TO_RGB))
+    assert all(Color(name).web for name in names)
+
+
+def test_colour_names_is_color_names():
+    assert colour_names is color_names
+
+
+@pytest.mark.parametrize("accessor", [NAMED_HSL, NAMED_RGB, NAMED_HEX])
+def test_accessors_list_the_names_in_dir(accessor):
+    listed = dir(accessor)
+    assert set(COLOR_NAME_TO_RGB) <= set(listed)
+    assert "__class__" in listed
+
+
+@pytest.mark.parametrize("name", sorted(COLOR_NAME_TO_RGB))
+def test_rgb_int_is_what_hex_l_spells(name):
+    color = Color(name).replace(lightness=Color(name).lightness * 0.37)
+    rgb = color.rgb_int
+    assert all(type(channel) is int for channel in rgb)
+    assert "#{:02x}{:02x}{:02x}".format(*rgb) == color.hex_l
+
+
+def test_rgb_int_is_read_only():
+    with pytest.raises(AttributeError, match="rgb_int"):
+        Color("red").rgb_int = (0, 0, 0)  # type: ignore
